@@ -1,0 +1,75 @@
+.game-over {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 3vmin 2vmin;
+  gap: 3vmin;
+  overflow-y: auto;
+}
+
+/* Headline — PRD-003 §2.2 */
+.game-over__headline {
+  font-size: clamp(48px, 8.3vmin, 120px);
+  font-weight: 900;
+  text-align: center;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  animation: reveal-flicker 1.2s cubic-bezier(0.5, 1, 0.89, 1) forwards;
+  line-height: 1.1;
+}
+
+.game-over__headline--village { color: var(--village-primary); }
+.game-over__headline--wolf    { color: var(--wolf-primary); }
+
+/* Player reveal grid */
+.game-over__players {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2vmin;
+}
+
+.game-over__player {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.8vmin;
+}
+
+.game-over__name {
+  font-size: clamp(12px, 1.7vmin, 22px);
+  color: rgba(255,255,255,0.8);
+}
+
+/* Role badge overlay — PRD-003 §2.2 */
+.game-over__role-badge {
+  font-size: clamp(12px, 1.7vmin, 22px);
+  padding: 0.2em 0.6em;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.9);
+  text-transform: capitalize;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+/* Elimination timeline */
+.game-over__timeline {
+  width: 100%;
+  max-width: 60vmin;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2vmin;
+  border-top: 1px solid rgba(255,255,255,0.15);
+  padding-top: 2vmin;
+}
+
+/* Timeline entries with staggered reveal-flicker (PRD-002 §2.6) */
+.game-over__timeline-entry {
+  font-size: clamp(16px, 2.4vmin, 32px);
+  color: rgba(255,255,255,0.75);
+  opacity: 0;
+  animation: reveal-flicker 1.2s cubic-bezier(0.5, 1, 0.89, 1) forwards;
+}

@@ -84,7 +84,7 @@ A 3–4 second dramatic beat between Night and Day phases.
 - Vote tally badge `clamp(12px, 1.9vmin, 24px)` on each avatar.
 
 **Behavior:**
-- SVG vote-web updates on every `state_update` broadcast (live, as players submit votes).
+- SVG vote-web is revealed **all at once** when voting closes (server transitions `phase` from `day_vote` to resolution). Lines are not drawn live as individual votes arrive — the full vote picture is revealed simultaneously for dramatic effect.
 - Eliminated player animation: when a day vote resolves, the eliminated player's avatar plays `filter: grayscale(1)` + tombstone drop over 500ms.
 
 ### §2.6 Game Over Screen
@@ -133,7 +133,7 @@ See **PRD-003 §7** for the full list. Critical prohibitions for Display:
 **Layout:**
 - Single-column form, vertically centered:
   1. Name input field (max 16 chars, auto-focused on load).
-  2. Avatar selector: horizontal scroll of 12 preset illustrated avatars + optional camera selfie button.
+  2. Avatar upload: a tap target that opens the device image picker (`<input type="file" accept="image/*">`). Selected image is cropped to a square and uploaded to the server as the player's avatar. No preset illustrated set; no live camera.
   3. `"Join Game"` CTA button (disabled until name entered).
 - After joining: lobby waiting screen showing all joined players as a scrollable list with their avatars. Live-updates on `state_update`.
 - Host device: additional `"Start Game"` button appears when ≥5 players have joined.
@@ -190,12 +190,22 @@ See **PRD-003 §7** for the full list. Critical prohibitions for Display:
 - After submit: `"Protection active"` idle state.
 - Haptic: 300ms pattern on confirm.
 
-**Villager — Decoy Task:**
-- Header (small, dim): `"Count the sheep while the village sleeps"`
-- Center: a sheep counter — stylized sheep icon with a `+1` tap target.
-- Counter increments on each tap (no functional effect — pure decoy).
-- Screen appearance from 2 feet: same dark background, same interaction pattern (tapping) as active roles.
-- After a random delay (15–30s, server-seeded to prevent timing analysis): `"Rest..."` replaces counter. Haptic: single 100ms pulse.
+**Villager / Mayor / Jester — Archive Puzzle:**
+
+This is the Archives puzzle system (`roles.json` `archivePuzzleSystem`). The server sends a `puzzle_state` object at night-phase start; the player solves it and submits a `submit_puzzle_answer` intent; a correct solve triggers a `HintPayload` unicast.
+
+- Header (small, dim): `"The Archives await. Solve the puzzle to earn a clue."`
+- Center: puzzle content area — same glass-panel rectangle dimensions as wolf-vote list (anti-cheat constraint). Puzzle type rotates per round (server-selected from `archivePuzzleSystem.puzzleTypes`):
+  - **Logic / Trivia** (`puzzle_type: "logic"`) — question drawn from `puzzles.md` static bank (400 questions across 8 categories). Displayed as short question text + 2 answer buttons. Time limit: 20s.
+  - **Math** (`puzzle_type: "math"`) — arithmetic expression + 3 answer buttons. Time limit: 15s.
+  - **Memory Sequence** (`puzzle_type: "sequence"`) — 4 colored tiles flash in order; player replays the sequence. Time limit: 30s.
+- Timer bar: thin progress strip below the content panel, depletes over `time_limit_seconds`. Color: amber when ≤8s remain.
+- On correct answer: brief `"✓ Clue incoming..."` flash (1s), then hint text rendered in dim amber italic: `"There are 3 Wolves total in this game."`
+- On wrong answer or timeout: `"No clue this round."` in muted text. No haptic.
+- After puzzle resolves (correct or not): idle state — `"Rest..."` in dim text. Haptic: single 100ms pulse on solve (correct only).
+- Screen appearance from 2 feet: dark background, centered panel with tap targets — visually indistinguishable from wolf-vote or seer-peek screens (`archivePuzzleSystem.antiCheatConstraint`).
+
+> **Logic puzzle bank:** `puzzles.md` (project root) — 400 trivia questions across categories: Classic Riddles, Geography & Nature, Science & Technology, History & Pop Culture, Food & Drink, Travel & Geography, History & Art, Pop Culture / Movies / Music, Animals & Nature. Server selects and rotates via game seed to prevent question repetition across rounds. Questions are presented as-is; distractors generated server-side.
 
 ### §3.5 Day Phase
 
@@ -281,11 +291,11 @@ See **PRD-003 §7** for the full list. Critical prohibitions for Display:
 
 ## §6. Open Questions
 
-| # | Question | Owner | Priority |
-|---|----------|-------|----------|
-| 1 | Does the Display TV reveal which player is the Doctor when a protection blocks a kill? (Standard: no — the save is silent) | Game Design | P0 |
-| 2 | Avatar approach: preset illustrated set vs. device camera selfie? Camera selfies add visual personalization but require camera permissions and moderation risk | UX / Product | P1 |
-| 3 | Night audio autoplay: browser autoplay policy blocks audio without prior user gesture — host must click something before the first night phase. Where is this gesture hidden? | Engineering | P1 |
-| 4 | Should the Seer's peek history on mobile persist across a page refresh (stored in `sessionStorage`)? | Engineering | P1 |
-| 5 | Vote-web SVG lines: animate incrementally on each vote (live update) or reveal all at once when voting closes? Live is more dramatic but may telegraph early winners | UX | P2 |
-| 6 | Day phase private notepad — should `Sus`/`Safe` tags be stored in `localStorage` so they survive accidental tab closes? | Engineering | P2 |
+| # | Question | Owner | Priority | Resolution |
+|---|----------|-------|----------|------------|
+| 1 | Does the Display TV reveal which player is the Doctor when a protection blocks a kill? | Game Design | P0 | **Resolved:** Silent. No reveal of Doctor identity when a save occurs. |
+| 2 | Avatar approach: preset illustrated set vs. device camera selfie? | UX / Product | P1 | **Resolved:** Image upload — player provides their own photo via device image picker. See §3.2. |
+| 3 | Night audio autoplay: browser autoplay policy blocks audio without prior user gesture — where is this gesture? | Engineering | P1 | **Resolved:** Display TV shows a "Click to begin" fullscreen overlay on page load. The first click dismisses the overlay, unlocks the AudioContext, and enters fullscreen. All subsequent phase-driven audio plays without friction. See ADR-003 §3. |
+| 4 | Should the Seer's peek history on mobile persist across a page refresh? | Engineering | P1 | **Resolved:** Yes — stored in `sessionStorage` keyed by `room_code + player_id`. Clears on tab close (intentional: history is per-session, not cross-game). |
+| 5 | Vote-web SVG lines: animate incrementally on each vote (live) or reveal all at once when voting closes? | UX | P2 | **Resolved:** Reveal all at once when voting closes. Prevents telegraphing early winners. See §2.5. |
+| 6 | Day phase private notepad — should `Sus`/`Safe` tags survive accidental tab closes? | Engineering | P2 | **Resolved:** Yes — stored in `localStorage` scoped by `room_code`. See ADR-003 §7. |

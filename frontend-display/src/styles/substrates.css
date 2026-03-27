@@ -1,0 +1,61 @@
+/* PRD-003 §4 — Layer Architecture / Substrate Specifications
+   Phase substrates are CSS class swaps on <html>; never controlled by React component state.
+   The grain overlay is a pseudo-element so it never reads game state. */
+
+/* ── Night substrate ───────────────────────────────────────────────────────── */
+html.phase-night {
+  background: radial-gradient(ellipse at 50% 20%, #141b2e 0%, #0a0e1a 60%, #060810 100%);
+}
+
+html.phase-night::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  /* SVG feTurbulence grain — same technique as BB boardRenderer.ts */
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  opacity: 0.03;
+  mix-blend-mode: screen;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Night Resolution substrate ────────────────────────────────────────────── */
+html.phase-night-resolution {
+  background-image: linear-gradient(to right, #434343 0%, black 100%);
+}
+
+/* ── Day substrate ─────────────────────────────────────────────────────────── */
+html.phase-day {
+  background-image: linear-gradient(to top, #dad4ec 0%, #dad4ec 1%, #f3e7e9 100%);
+}
+
+html.phase-day::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  opacity: 0.015;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Lobby substrate ───────────────────────────────────────────────────────── */
+html.phase-lobby {
+  background: radial-gradient(ellipse at 50% 60%, #1a0f0a 0%, #0a0806 60%, #030202 100%);
+}
+
+/* ── Game Over — winner variants ───────────────────────────────────────────── */
+html.winner-village {
+  background: radial-gradient(ellipse at 50% 30%, #2d2510 0%, #1a1408 60%, #0d0a04 100%);
+}
+
+html.winner-wolf {
+  background: radial-gradient(ellipse at 50% 30%, #2d0d0d 0%, #1a0808 60%, #0d0404 100%);
+}
+
+/* ── Ensure all overlaid components stack above grain pseudo-element ─────── */
+#root {
+  position: relative;
+  z-index: 1;
+}

@@ -1,0 +1,43 @@
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: ./backend-engine/Dockerfile
+    environment:
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  frontend-display:
+    build:
+      context: ./frontend-display
+      dockerfile: Dockerfile
+      args:
+        # Set HOST_IP to the LAN IP of this machine before building, e.g.:
+        #   HOST_IP=http://192.168.1.100 docker compose up --build
+        # Reads from the shell environment automatically if exported.
+        HOST_IP: ${HOST_IP:-}
+    restart: unless-stopped
+
+  frontend-mobile:
+    build:
+      context: ./frontend-mobile
+      dockerfile: Dockerfile
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+      - frontend-display
+      - frontend-mobile
+    restart: unless-stopped

@@ -1,0 +1,29 @@
+/* PRD-003 §5 — Color Semantic Tokens (same as display app) */
+
+:root {
+  --night-bg-deep:       #060810;
+  --night-bg-mid:        #0a0e1a;
+  --night-bg-glow:       #141b2e;
+
+  --timer-default:       #ffffff;
+  --timer-warning:       #f6ad55;
+  --timer-critical:      #fc8181;
+
+  --wolf-primary:        #e53e3e;
+  --village-primary:     #edc94b;
+
+  --role-wolf:           #e53e3e;
+  --role-seer:           #805ad5;
+  --role-doctor:         #38a169;
+  --role-villager:       #718096;
+
+  --eliminated-filter:   grayscale(1);
+
+  --glass-bg:            linear-gradient(-20deg, #0a1923 0%, #1a1529 100%);
+  --glass-border:        rgba(255, 255, 255, 0.15);
+  --glass-blur:          blur(24px);
+
+  /* Mobile-specific */
+  --mobile-safe-bottom:  env(safe-area-inset-bottom, 0px);
+  --mobile-safe-top:     env(safe-area-inset-top, 0px);
+}

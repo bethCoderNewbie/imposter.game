@@ -1,0 +1,15 @@
+.player-avatar {
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  font-size: 16px;
+  user-select: none;
+}

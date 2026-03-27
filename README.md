@@ -1,5 +1,7 @@
 # Werewolf — Digital Implementation
 
+[![CI](https://github.com/your-org/imposter/actions/workflows/ci.yml/badge.svg)](https://github.com/your-org/imposter/actions/workflows/ci.yml)
+
 A self-hosted, web-based digital implementation of *Werewolf* (Mafia), a social deduction party game for 5–18 players. Uses a **"Jackbox-style" dual-client architecture**: players use personal mobile devices as private role cards and action pads, while a shared TV display acts as the automated Game Master — driving narrative, managing timers, and animating public outcomes. No human moderator required.
 
 ---
@@ -80,16 +82,32 @@ LOBBY → ROLE_DEAL → [NIGHT → DAY]* → GAME_OVER
 
 ```
 Imposter/
+├── .github/
+│   └── workflows/
+│       └── ci.yml                                # GitHub Actions CI pipeline (5 jobs)
+├── backend-engine/
+│   ├── api/                                      # FastAPI routes, WS endpoint, queue
+│   ├── engine/                                   # Pure game logic (resolvers, FSM, stripper)
+│   ├── storage/                                  # Redis store
+│   └── tests/
+│       ├── engine/                               # Unit tests — pure engine logic
+│       ├── storage/                              # Unit tests — Redis store (fakeredis)
+│       ├── api/                                  # Integration tests — HTTP + WebSocket
+│       └── e2e/                                  # E2E tests — full game flow (real Redis)
+├── frontend-display/                             # React TV client
+├── frontend-mobile/                              # React mobile client
 ├── docs/
 │   ├── requirements/
 │   │   ├── PRD-001_werewolf_core_system.md      # Game rules, state schema, phase machine
 │   │   ├── PRD-002_werewolf_ui_design.md         # Display TV + Mobile UX/UI design
 │   │   └── PRD-003_werewolf_visual_design_system.md  # Design tokens, animation, typography
-│   └── architecture/
-│       ├── adr/
-│       │   └── ADR-001_werewolf_tech_stack.md    # Tech stack decisions
-│       ├── data_dictionary.md                    # MasterGameState + StrippedState schema
-│       └── roles.json                            # Role definitions
+│   ├── architecture/
+│   │   ├── adr/                                  # Architecture Decision Records
+│   │   ├── data_dictionary.md                    # MasterGameState + StrippedState schema
+│   │   └── roles.json                            # Role definitions
+│   └── ops/
+│       ├── runbook.md                            # Setup, testing, deployment, troubleshooting
+│       └── coding-practices.md                  # Backend patterns and conventions
 └── CLAUDE.md
 ```
 
@@ -102,21 +120,27 @@ Imposter/
 **Prerequisites:** Python 3.11+, Redis.
 
 ```bash
-# 1. Install dependencies
-cd backend-engine
-pip install -e ".[dev]"
+# 1. Create and activate the virtual environment
+python -m venv .venv
+source .venv/Scripts/activate        # Bash
+# .\.venv\Scripts\Activate.ps1       # PowerShell
+# If PowerShell blocks: Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
 
-# 2. Start Redis (Docker or local)
-docker run -d -p 6379:6379 redis
+# 2. Install dependencies
+pip install -e ".[dev,test]"
 
 # 3. Configure environment
 cp .env.example .env   # then set SECRET_KEY
 
-# 4. Run the server
+# 4. Start Redis (Docker or local)
+docker run -d -p 6379:6379 redis
+
+# 5. Run the server
 uvicorn api.main:app --reload --app-dir backend-engine
 
-# 5. Run tests
-pytest backend-engine/tests/ -m "not e2e" -v
+# 6. Run tests
+pytest -m "not e2e"           # unit + integration (no Redis required)
+REDIS_URL=redis://localhost:6379/15 pytest  # full suite including E2E
 ```
 
 ### Docker (full stack — Phases 4+)
@@ -132,9 +156,10 @@ cp .env.example .env   # set SECRET_KEY
 
 | Service | URL |
 |---|---|
-| Display client (shared TV) | `http://<LAN-IP>:3001` |
-| Mobile controller (each player) | `http://<LAN-IP>:3000` — opened via QR |
-| Backend API + WebSocket | `http://<LAN-IP>:8000` |
+| Mobile controller (each player) | `http://<LAN-IP>/` — opened via QR |
+| Display client (shared TV) | `http://<LAN-IP>/display/` |
+| REST API | `http://<LAN-IP>/api/` |
+| WebSocket | `ws://<LAN-IP>/ws/` |
 
 ### Match Lifecycle
 
@@ -177,6 +202,38 @@ The `MasterGameState` is never sent to any client directly. Before each broadcas
 
 ---
 
+## Testing
+
+The test suite is organized into three tiers, each with a pytest marker:
+
+| Marker | Count | Requires | Command |
+|---|---|---|---|
+| *(no marker)* unit | 154 | Nothing | `pytest -m "not integration and not e2e"` |
+| `integration` | 38 | Nothing (fakeredis) | `pytest -m "integration"` |
+| `e2e` | 11 | Real Redis | `REDIS_URL=redis://localhost:6379/15 pytest -m "e2e"` |
+| Frontend (Vitest) | 116 | None | `cd frontend-display && npm run test -- --run` |
+| **Total** | **319** | | |
+
+E2E tests automatically skip when Redis is unreachable, so `pytest` without `REDIS_URL` set is always safe to run locally.
+
+---
+
+## CI/CD
+
+GitHub Actions runs five jobs on every push and pull request:
+
+| Job | Marker / Tool | Redis service |
+|---|---|---|
+| `backend-unit` | `not integration and not e2e` | No |
+| `backend-integration` | `integration` | No (fakeredis) |
+| `backend-e2e` | `e2e` | Yes (`redis:7-alpine`) |
+| `frontend-display` | Vitest | No |
+| `frontend-mobile` | TypeScript build | No |
+
+See `.github/workflows/ci.yml` and `docs/architecture/adr/ADR-006_integration_e2e_cicd.md`.
+
+---
+
 ## Documentation
 
 | Type | Location | Contents |
@@ -185,6 +242,9 @@ The `MasterGameState` is never sent to any client directly. Before each broadcas
 | **PRD-002** | `docs/requirements/PRD-002_werewolf_ui_design.md` | Display TV + Mobile UX/UI screen-by-screen design spec |
 | **PRD-003** | `docs/requirements/PRD-003_werewolf_visual_design_system.md` | Typography tokens, CSS keyframes, color palette, layer architecture |
 | **ADR-001** | `docs/architecture/adr/ADR-001_werewolf_tech_stack.md` | Tech stack decisions (FastAPI, Redis, DOM-only Display, server-owned timers) |
+| **ADR-005** | `docs/architecture/adr/ADR-005_test_infrastructure.md` | Unit test infrastructure (Vitest, fakeredis, docker-compose.test.yml) |
+| **ADR-006** | `docs/architecture/adr/ADR-006_integration_e2e_cicd.md` | Integration + E2E test tiers and GitHub Actions CI/CD pipeline |
+| **Runbook** | `docs/ops/runbook.md` | Setup, test commands, deployment, Redis ops, WebSocket troubleshooting |
 | **Data Dictionary** | `docs/architecture/data_dictionary.md` | Full `MasterGameState` schema + state-stripper field removal map per view type |
 
 ---
@@ -194,7 +254,7 @@ The `MasterGameState` is never sent to any client directly. Before each broadcas
 | Phase | Gate | Status |
 |---|---|---|
 | 0 — Architecture | ADR-001 approved | ✅ Complete |
-| 1 — Backend Core | Tests passing | ✅ Complete |
+| 1 — Backend Core | 203 backend tests passing, CI green | ✅ Complete |
 | 2 — Mobile MVP | Manual QA | Not started |
 | 3 — Display MVP | Manual QA | Not started |
 | 4 — Integration | End-to-end game completes | Not started |

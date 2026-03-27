@@ -327,15 +327,8 @@ async def handle_submit_puzzle_answer(G, intent, redis_client, cm) -> MasterGame
                 if player.is_alive and RR.get(player.role or {}, {}).get("wakeOrder", -1) == 0:
                     await cm.unicast(G.game_id, pid, {"type": "hint_reward", **false_hint})
         else:
-            # Deliver a real hint (hint generation is out of scope for Phase 1 — stub)
-            await cm.unicast(G.game_id, player_id, {
-                "type": "hint_reward",
-                "hint_id": secrets.token_urlsafe(8),
-                "category": "role_present",
-                "text": "The Archives hold a secret...",
-                "round": G.round,
-                "expires_after_round": None,
-            })
+            from engine.puzzle_bank import generate_hint
+            await cm.unicast(G.game_id, player_id, generate_hint(G, player_id))
 
     return G
 

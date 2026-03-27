@@ -1,0 +1,52 @@
+/* PRD-003 §3 — Animation Vocabulary
+   Three shared keyframes + claw-slide-in for night resolution.
+   Reference these by name in component CSS — do not define one-off animations. */
+
+/* §3.1 — Night phase background entrance (2s, routes through black) */
+@keyframes night-enter {
+  0%   { opacity: 0; background-color: #000000; }
+  50%  { opacity: 0; background-color: #000000; }
+  100% { opacity: 1; }
+}
+
+/* §3.2 — Dramatic text reveal (1.2s flicker entrance) */
+@keyframes reveal-flicker {
+  0%   { opacity: 0; }
+  3%   { opacity: 1; }
+  10%  { opacity: 0; }
+  12%  { opacity: 0.7; }
+  16%  { opacity: 0.3; }
+  100% { opacity: 1; }
+}
+
+/* §3.3 — Vote target majority indicator (3s red pulse, infinite) */
+@keyframes vote-majority-pulse {
+  0%   { box-shadow: 0 0 0 3px rgba(229, 62, 62, 0.20); }
+  50%  { box-shadow: 0 0 0 8px rgba(229, 62, 62, 0.85); }
+  100% { box-shadow: 0 0 0 3px rgba(229, 62, 62, 0.20); }
+}
+
+/* PRD-002 §2.4 — Death reveal avatar slide-in */
+@keyframes claw-slide-in {
+  0%   { transform: translateX(-40px); opacity: 0; }
+  100% { transform: translateX(0);     opacity: 1; }
+}
+
+/* PRD-002 §2.2 — Lobby avatar pop-in */
+@keyframes avatar-pop-in {
+  0%   { transform: scale(0); opacity: 0; }
+  60%  { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); }
+}
+
+/* Vote-web line fade-in (staggered per line) */
+@keyframes line-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Timeline entry entrance (Game Over) */
+@keyframes timeline-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

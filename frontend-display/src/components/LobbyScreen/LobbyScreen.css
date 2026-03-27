@@ -1,0 +1,102 @@
+.lobby-screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3vmin;
+  padding: 2vmin;
+}
+
+/* Top-right player count — PRD-003 §6 */
+.lobby-screen__count {
+  position: fixed;
+  top: 1.1vmin;
+  right: 1.1vmin;
+  font-size: clamp(14px, 1.9vmin, 26px);
+  color: rgba(255, 255, 255, 0.6);
+  font-variant-numeric: tabular-nums;
+}
+
+/* QR + join info block */
+.lobby-screen__join {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.2vmin;
+}
+
+.lobby-screen__qr {
+  border-radius: 8px;
+  display: block;
+}
+
+.lobby-screen__url {
+  font-size: clamp(14px, 1.9vmin, 26px);
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 1vmin;
+}
+
+/* Room code — PRD-003 §2.2 */
+.lobby-screen__code {
+  font-size: clamp(40px, 7.4vmin, 96px);
+  font-weight: 900;
+  letter-spacing: 0.15em;
+  color: #fff;
+  font-family: 'Courier New', monospace;
+}
+
+/* Campfire + parade */
+.lobby-screen__parade {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2vmin;
+}
+
+.lobby-screen__campfire {
+  font-size: clamp(32px, 5vmin, 64px);
+}
+
+.lobby-screen__avatars {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1.5vmin;
+  max-width: 60vmin;
+}
+
+/* Pop-in animation on new arrival (PRD-002 §2.2) */
+.player-avatar.avatar-pop-in {
+  animation: avatar-pop-in 0.4s cubic-bezier(0.5, 1, 0.89, 1) forwards;
+}
+
+/* Bottom status */
+.lobby-screen__status {
+  position: fixed;
+  bottom: 1.1vmin;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: clamp(14px, 1.9vmin, 26px);
+  color: rgba(255, 255, 255, 0.4);
+  white-space: nowrap;
+}
+
+.lobby-screen__start-btn {
+  padding: 0.6em 2em;
+  font-size: clamp(14px, 2vmin, 28px);
+  font-weight: 700;
+  background: #fff;
+  color: #0a0a0a;
+  border: none;
+  border-radius: 0.5em;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.lobby-screen__start-btn:disabled {
+  background: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.5);
+  cursor: not-allowed;
+}

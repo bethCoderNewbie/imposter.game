@@ -1,0 +1,27 @@
+services:
+  redis-test:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
+
+  backend-test:
+    build:
+      context: .
+      dockerfile: ./backend-engine/Dockerfile.test
+    environment:
+      REDIS_URL: redis://redis-test:6379
+    depends_on:
+      redis-test:
+        condition: service_healthy
+    command: >
+      pytest backend-engine/tests/ -v --tb=short
+      --timeout=30 --cov=backend-engine --cov-report=term-missing
+
+  frontend-test:
+    build:
+      context: ./frontend-display
+      dockerfile: Dockerfile.test
+    command: npm run test

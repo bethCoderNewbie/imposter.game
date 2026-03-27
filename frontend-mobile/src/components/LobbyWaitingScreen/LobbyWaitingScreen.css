@@ -1,0 +1,93 @@
+.lobby-waiting {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 2rem 1.5rem calc(2rem + var(--mobile-safe-bottom));
+  gap: 1.5rem;
+}
+
+.lobby-waiting__header {
+  text-align: center;
+  padding-top: var(--mobile-safe-top);
+}
+
+.lobby-waiting__code {
+  font-size: 2.4rem;
+  font-weight: 900;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 0.2em;
+  color: #fff;
+}
+
+.lobby-waiting__sub {
+  color: rgba(255,255,255,0.5);
+  font-size: 0.9rem;
+  margin-top: 0.25rem;
+}
+
+.lobby-waiting__list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.lobby-waiting__player {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.05);
+}
+
+.lobby-waiting__name {
+  flex: 1;
+  font-size: 1rem;
+  color: #fff;
+}
+
+.lobby-waiting__you  { color: rgba(255,255,255,0.4); font-size: 0.85rem; }
+.lobby-waiting__host { color: #ffb74d; }
+
+/* Connection dot */
+.lobby-waiting__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.2);
+}
+
+.lobby-waiting__dot--on {
+  background: #81c784;
+}
+
+/* Start button */
+.lobby-waiting__start-area {
+  padding-top: 1rem;
+}
+
+.lobby-waiting__start-btn {
+  width: 100%;
+  padding: 1rem;
+  border-radius: 12px;
+  border: none;
+  background: #fff;
+  color: #000;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.lobby-waiting__start-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.lobby-waiting__waiting {
+  text-align: center;
+  color: rgba(255,255,255,0.4);
+  font-size: 0.9rem;
+}

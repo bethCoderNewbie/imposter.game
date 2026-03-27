@@ -1,0 +1,16 @@
+.player-avatar {
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+  /* Default size uses vmin — overridden by inline style when explicit px size given */
+  width: clamp(48px, 6vmin, 80px);
+  height: clamp(48px, 6vmin, 80px);
+  font-size: clamp(18px, 2.3vmin, 30px);
+  user-select: none;
+}

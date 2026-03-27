@@ -6,6 +6,7 @@ Display client connects as player_id="display" with no token (read-only, strippe
 
 from __future__ import annotations
 
+import json
 import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -13,7 +14,9 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from api.connection_manager import manager
 from api.game_queue import get_or_create_queue
 from api.intents.dispatch import dispatch_intent
-from storage.redis_store import validate_session_token
+from engine.config import get_settings
+from engine.stripper import player_view
+from storage.redis_store import load_game, validate_session_token
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +96,18 @@ async def websocket_endpoint(websocket: WebSocket, game_id: str, player_id: str)
     # Ensure the game queue run loop is active
     queue = get_or_create_queue(game_id)
     queue.start(redis, manager, dispatch_intent)
+
+    # Push current state immediately so the display doesn't wait for next event
+    G_init = await load_game(redis, game_id)
+    if G_init is not None:
+        settings = get_settings()
+        stripped = player_view(G_init, authenticated_player_id)
+        await websocket.send_text(json.dumps({
+            "type": "state_update",
+            "state_id": G_init.state_id,
+            "schema_version": settings.schema_version,
+            "state": stripped,
+        }))
 
     logger.info("WS connected: game=%s player=%s", game_id, authenticated_player_id or "display")
 

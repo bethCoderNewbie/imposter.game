@@ -1,0 +1,93 @@
+.day-discussion {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-image: linear-gradient(to top, #dad4ec 0%, #dad4ec 1%, #f3e7e9 100%);
+  padding: calc(1.5rem + var(--mobile-safe-top)) 1.5rem calc(2rem + var(--mobile-safe-bottom));
+  gap: 1rem;
+}
+
+.day-discussion__header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.day-discussion__round {
+  font-size: 0.8rem;
+  color: rgba(70,50,80,0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 600;
+}
+
+.day-discussion__timer {
+  font-size: 2.4rem;
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
+  font-variant-numeric: tabular-nums;
+  color: #4a3560;
+  transition: color 0.5s linear;
+}
+
+.day-discussion__timer.timer--warning  { color: #c05621; }
+.day-discussion__timer.timer--critical { color: #c53030; }
+
+.day-discussion__phase {
+  text-align: center;
+  color: rgba(70,50,80,0.6);
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+/* Notepad */
+.day-discussion__notepad {
+  border-radius: 12px;
+  background: rgba(255,255,255,0.5);
+  overflow: hidden;
+}
+
+.day-discussion__notepad-toggle {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: none;
+  border: none;
+  color: #4a3560;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+.day-discussion__notepad-content {
+  padding: 0 0.75rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.day-discussion__note-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.day-discussion__note-name {
+  flex: 1;
+  font-size: 0.9rem;
+  color: #4a3560;
+}
+
+.day-discussion__tag {
+  padding: 0.25rem 0.6rem;
+  border-radius: 6px;
+  border: none;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.day-discussion__tag--sus     { background: #fc8181; color: #fff; }
+.day-discussion__tag--safe    { background: #81c784; color: #fff; }
+.day-discussion__tag--unknown { background: rgba(0,0,0,0.1); color: rgba(70,50,80,0.6); }

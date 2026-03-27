@@ -1,0 +1,125 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Backend: unit tests (no Redis required) ──────────────────────────────────
+  backend-unit:
+    name: Backend — Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -e ".[test]"
+
+      - name: Run unit tests
+        run: pytest -m "not integration and not e2e" --cov=backend-engine --cov-report=xml --cov-report=term-missing
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        if: ${{ !cancelled() }}
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.xml
+          flags: backend-unit
+          fail_ci_if_error: false
+
+  # ── Backend: integration tests (fakeredis, no real Redis needed) ──────────────
+  backend-integration:
+    name: Backend — Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -e ".[test]"
+
+      - name: Run integration tests
+        run: pytest -m "integration" --timeout=30 -v
+
+  # ── Backend: E2E tests (requires real Redis) ─────────────────────────────────
+  backend-e2e:
+    name: Backend — E2E Tests
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -e ".[test]"
+
+      - name: Run E2E tests
+        run: pytest -m "e2e" --timeout=60 -v
+        env:
+          REDIS_URL: redis://localhost:6379/15
+
+  # ── Frontend-display: Vitest ─────────────────────────────────────────────────
+  frontend-display:
+    name: Frontend Display — Vitest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend-display/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: frontend-display
+
+      - name: Run tests
+        run: npm run test -- --run --reporter=verbose
+        working-directory: frontend-display
+
+  # ── Frontend-mobile: placeholder (add tests when available) ──────────────────
+  frontend-mobile:
+    name: Frontend Mobile — Build Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend-mobile/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: frontend-mobile
+
+      - name: TypeScript build check
+        run: npm run build
+        working-directory: frontend-mobile

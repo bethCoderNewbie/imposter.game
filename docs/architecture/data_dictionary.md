@@ -1,8 +1,8 @@
 # Data Dictionary: Werewolf — Game State Schemas
 
-**Last updated:** 2026-03-26 (schema v0.5: Framer Archives Hack — framer_action enum, false_hint_queued, false_hint_payload in NightActions; FalseHintPayload schema; Framer notes update; 3 new error codes; 2 new WebSocket intents)
+**Last updated:** 2026-03-26 (schema v0.5: Phase 1 corrections — investigationResult enum `"wolf"` not `"werewolf"`; round increment rule; timer_ends_at timed phases; GameConfig defaults; hunter_pending_timer added; player_id UUID; complete role enum including framer/tracker/cupid/infector/arsonist; full EliminationCause enum; post_match.winner enum; source path corrected)
 **Schema version:** 0.5
-**Source of truth:** `backend-engine/api/schemas/`, `backend-engine/engine/state/`
+**Source of truth:** `backend-engine/engine/state/` (models, enums); `backend-engine/api/intents/` (handlers, dispatch)
 **Static board data:** `docs/architecture/roles.json` (role definitions, dynamic composition templates, balance weights, win conditions, archive puzzle system)
 **Shared TypeScript types:** `backend-engine/api/schemas/shared_types.ts` (synced to `frontend-mobile/src/types/` and `frontend-display/src/types/`)
 
@@ -27,9 +27,24 @@ The server never sends role data to the wrong client. `player_view(G, player_id)
 
 ---
 
+## WebSocket Connection Lifecycle
+
+### Accept & register sequence
+
+1. `endpoint.py` calls `await websocket.accept()` — the sole accept point for each connection.
+2. Session token is validated (player connections) or the `"display"` sentinel is verified.
+3. `manager.connect(game_id, player_id, ws)` registers the already-accepted socket in `_rooms[game_id]`.
+4. `queue.start()` begins the per-game intent consumer.
+5. **Initial state unicast:** `load_game(redis, game_id)` → `player_view(G, player_id)` → `websocket.send_text(state_update)`. This ensures the connecting client receives current state immediately without waiting for the next game event.
+6. Receive loop begins.
+
+> **Why the initial push matters:** Without step 5, a display client connecting mid-game (or after a page refresh) shows "Waiting for game…" indefinitely. The dark-background symptom on `/display/` was caused by this missing push combined with a double `ws.accept()` bug (see ADR-004).
+
+---
+
 ## WebSocket Payload Wrapper (StatePayload)
 
-Top-level object sent server → all connected sockets on every state mutation.
+Top-level object sent server → all connected sockets on every state mutation, and also unicast to each client on connect (initial state push).
 
 | Field | Type | Description | Source / Logic | Nullable |
 |:------|:-----|:------------|:---------------|:---------|
@@ -91,7 +106,7 @@ Static, loaded at startup from `docs/architecture/roles.json`. Never mutated at 
 | `id` | `str` | Snake-case role key. E.g., `"alpha_wolf"`, `"serial_killer"`. Primary key — used as `PlayerState.role`. | No |
 | `name` | `str` | Display name shown on Role Reveal screen. E.g., `"Alpha Wolf"`. | No |
 | `team` | `str` enum | Faction membership. `"village"` \| `"werewolf"` \| `"neutral"`. Determines win condition eligibility. **Never sent to clients other than own player.** | No |
-| `investigationResult` | `str` enum | What the Seer's `inspect` action returns when targeting this role. `"village"` \| `"werewolf"` \| `"neutral"`. May differ from `team` (Alpha Wolf: `team="werewolf"`, `investigationResult="village"`). **Never sent to clients other than the Seer.** | No |
+| `investigationResult` | `str` enum | What the Seer's `inspect` action returns when targeting this role. `"village"` \| `"wolf"` \| `"neutral"`. May differ from `team` (Alpha Wolf: `team="werewolf"`, `investigationResult="village"`). **Never sent to clients other than the Seer.** | No |
 | `wakeOrder` | `int` | Night wake sequence position. `0` = no wake (decoy task). `1` = Cupid + wolf team (simultaneous). `2` = Seer + Framer (simultaneous). `3` = Doctor + Infector (simultaneous). `4` = Arsonist + Serial Killer (simultaneous). `5` = Tracker (always last — reads all resolved actions). Roles sharing a `wakeOrder` receive their prompts simultaneously on mobile but their server effects resolve in the order defined in `nightResolutionOrder`. | No |
 | `actionPhase` | `str` enum | When this role's action fires. `"none"` \| `"night"` \| `"night_one_only"` \| `"day"` \| `"on_death"`. `"night_one_only"` = role submits a night action only in round 1 (Cupid). After round 1 the role is treated as `"none"` and shown the decoy prompt. | No |
 | `actionType` | `str` enum | Mechanical action classification. Server uses this to route `submit_night_action` intents to the correct resolver. Values: `"none"` \| `"inspect"` \| `"protect"` \| `"eliminate_group"` \| `"eliminate_solo"` \| `"roleblock"` \| `"double_vote"` \| `"revenge_kill"` \| `"manipulate_or_hack"` (Framer — either sets `is_framed_tonight` OR queues false hint; branches on `framer_action`) \| `"convert"` (Infector — changes role/team) \| `"link_players"` (Cupid — establishes lovers_pair) \| `"multi_choice"` (Arsonist — douse or ignite) \| `"track"` (Tracker — returns target's action targets). | No |
@@ -107,7 +122,7 @@ Static, loaded at startup from `docs/architecture/roles.json`. Never mutated at 
 
 > **Note on Alpha Wolf:** `investigationResult: "village"` is the entire design of this role. The Seer gets a false negative. The server must use `investigationResult` — not `team` — when resolving Seer peeks. Using `team` by mistake silently breaks the Alpha Wolf mechanic.
 >
-> **Note on Framer + Seer interaction:** Framer's `manipulate` action sets `is_framed_tonight = true` on the target (step 2 of resolution). When the Seer's `inspect` resolves (step 6), the server checks `is_framed_tonight` first: if `true`, the result is forced to `"werewolf"` regardless of `investigationResult`. This means a Framer can make an Alpha Wolf appear as Werewolf to the Seer — the Framer's effect overrides the Alpha Wolf's disguise. `is_framed_tonight` is reset to `false` at the start of every new night phase.
+> **Note on Framer + Seer interaction:** Framer's `manipulate` action sets `is_framed_tonight = true` on the target (step 2 of resolution). When the Seer's `inspect` resolves (step 6), the server checks `is_framed_tonight` first: if `true`, the result is forced to `"wolf"` regardless of `investigationResult`. This means a Framer can make an Alpha Wolf appear as Werewolf to the Seer — the Framer's effect overrides the Alpha Wolf's disguise. `is_framed_tonight` is reset to `false` at the start of every new night phase.
 >
 > **Note on Framer Archives Hack:** When `framer_action == "hack_archives"`, `framer_target_id` is `null` and `is_framed_tonight` is not set on any player. Instead, `false_hint_queued = true` and `false_hint_payload` is stored server-only. The Tracker observing the Framer sees `tracker_result: []` — `"archives"` is not a player ID and is not reported. The Framer receives no confirmation that any delivery occurred. If no `wakeOrder=0` player solves a puzzle that round, `false_hint_queued` is cleared at phase transition with no delivery.
 >
@@ -123,9 +138,9 @@ Static, loaded at startup from `docs/architecture/roles.json`. Never mutated at 
 | `schema_version` | `str` | Schema version string. Clients compare against `StatePayload.schema_version` for reload detection. | Set at `setup_game()` | No | No |
 | `seed` | `str` | Master PRNG seed used for role assignment shuffle. Stored for post-game replay and audit. | Server-generated or host-supplied at setup | No | No |
 | `phase` | `str` enum | Current game phase. One of `"lobby"` \| `"role_deal"` \| `"night"` \| `"day"` \| `"day_vote"` \| `"hunter_pending"` \| `"game_over"`. `"hunter_pending"` is a blocking sub-phase inserted after any Hunter elimination — it exits back to the previous phase type after the Hunter fires or times out. | Phase machine FSM — advanced by `transition_phase()` | No | No |
-| `round` | `int` | Current round number. Starts at `1`. Increments each time the phase transitions from `"day_vote"` back to `"night"`. | `transition_phase()` on day→night | No | No |
+| `round` | `int` | Current round number. Starts at `1`. Increments each time `transition_phase()` targets `"night"` and the current phase is not `"lobby"` or `"role_deal"` — i.e., every night entry after the first. | `transition_phase()` on any→night (except lobby/role_deal→night) | No | No |
 | `host_player_id` | `str` | Player ID of the session host. Host has permission to start the game and advance timers manually. | Set on `POST /games` | No | No |
-| `timer_ends_at` | `str` ISO8601 UTC \| `null` | Absolute timestamp when the current timed phase expires. `null` during `lobby`, `role_deal`, and `game_over`. Server-owned — clients derive displayed countdown from `(timer_ends_at − Date.now())` only. **Never use client-side `setInterval` as source of truth.** | Set by `transition_phase()` on each timed phase entry; cancelled by `resolve_night()` on early auto-advance | Yes | No |
+| `timer_ends_at` | `str` ISO8601 UTC \| `null` | Absolute timestamp when the current timed phase expires. `null` only during `lobby` and `game_over`. Timed phases: `night`, `day`, `day_vote`, `role_deal`, `hunter_pending`. Server-owned — clients derive displayed countdown from `(timer_ends_at − Date.now())` only. **Never use client-side `setInterval` as source of truth.** | Set by `transition_phase()` on each timed phase entry; cancelled by `resolve_night()` on early auto-advance | Yes | No |
 | `players` | `map[str → PlayerState]` | All players in the game, keyed by `player_id` (e.g., `"p1"`, `"p2"`). | Populated on `POST /games/{id}/join`; mutated through the game | No | Partial — see PlayerState |
 | `night_actions` | `NightActions` | Current round's submitted night actions. Reset to empty at the start of each night phase. | Mutated by `submit_night_action`; resolved by `resolve_night()` | No | **Yes — heavily stripped per role** |
 | `day_votes` | `map[str → str]` | Maps voter `player_id` → target `player_id`. Updated live as votes arrive during `"day_vote"` phase. | Mutated by `submit_day_vote`; cleared at phase reset | No | No |
@@ -147,10 +162,11 @@ Frozen at game start. Host sets these in the lobby before pressing Start.
 
 | Field | Type | Description | Default | Nullable |
 |:------|:-----|:------------|:--------|:---------|
-| `night_timer_seconds` | `int` | Duration of the night phase timer. Auto-advance fires early if all active roles submit. | `180` | No |
-| `day_timer_seconds` | `int` | Duration of the discussion sub-phase timer before voting opens. | `360` | No |
+| `night_timer_seconds` | `int` | Duration of the night phase timer. Auto-advance fires early if all active roles submit. | `60` | No |
+| `day_timer_seconds` | `int` | Duration of the discussion sub-phase timer before voting opens. | `180` | No |
 | `vote_timer_seconds` | `int` | Duration of the voting sub-phase timer. | `90` | No |
-| `role_deal_timer_seconds` | `int` | Grace period for all players to confirm role reveal before auto-advancing. | `60` | No |
+| `role_deal_timer_seconds` | `int` | Grace period for all players to confirm role reveal before auto-advancing. | `30` | No |
+| `hunter_pending_timer_seconds` | `int` | Window for the Hunter to fire their revenge shot before auto-skipping. | `30` | No |
 | `player_count` | `int` | Total number of players. Range: 5–18. | Set at game creation | No |
 | `roles` | `map[str → int]` | Role ID → count for this session. Must sum to `player_count`. Validated against `roles.json` on setup. Example: `{"villager": 4, "werewolf": 2, "seer": 1, "doctor": 1}`. Generated by the dynamic composition engine: server selects the matching `dynamicTemplates` range, fills guaranteed roles, draws from `flexPools`, and runs the `balanceWeightSystem` check. Final resolved composition is frozen here at game start. | Resolved by `build_composition(player_count)` using `roles.json` `dynamicTemplates`; stored frozen at `setup_game()` | No |
 
@@ -160,11 +176,11 @@ Frozen at game start. Host sets these in the lobby before pressing Start.
 
 | Field | Type | Description | Source / Logic | Nullable | HiddenFromPlayer |
 |:------|:-----|:------------|:---------------|:---------|:----------------|
-| `player_id` | `str` | Slot identifier. E.g., `"p1"`. Assigned sequentially on join. | `POST /games/{id}/join` | No | No |
+| `player_id` | `str` (UUID) | Unique player identifier. Server-generated UUID on join. E.g., `"p1"` is used only in tests — production IDs are `uuid4()` strings. | `POST /games/{id}/join` | No | No |
 | `display_name` | `str` | Name chosen by the player at onboarding. Max 16 characters. | Player-supplied at join | No | No |
 | `avatar_id` | `str` | Key into the static avatar asset registry. E.g., `"wolf_01"`, `"village_03"`. | Player-chosen at onboarding | No | No |
 | `is_connected` | `bool` | Whether this player currently has an active WebSocket connection. Used to show disconnected-player indicator on Display lobby. | Updated on WebSocket connect/disconnect | No | No |
-| `role` | `str` enum \| `null` | The player's secret role. One of: `"villager"` \| `"werewolf"` \| `"alpha_wolf"` \| `"wolf_shaman"` \| `"seer"` \| `"doctor"` \| `"mayor"` \| `"hunter"` \| `"jester"` \| `"serial_killer"`. `null` during `lobby` phase (before assignment). | Assigned by `assign_roles()` at game start using shuffled PRNG draw | Yes | **Yes — sent only to own player, wolf-team teammates, and dead/game_over spectators** |
+| `role` | `str` enum \| `null` | The player's secret role. One of: `"villager"` \| `"werewolf"` \| `"alpha_wolf"` \| `"wolf_shaman"` \| `"framer"` \| `"seer"` \| `"doctor"` \| `"tracker"` \| `"cupid"` \| `"infector"` \| `"arsonist"` \| `"mayor"` \| `"hunter"` \| `"jester"` \| `"serial_killer"`. `null` during `lobby` phase (before assignment). | Assigned by `assign_roles()` at game start using shuffled PRNG draw | Yes | **Yes — sent only to own player, wolf-team teammates, and dead/game_over spectators** |
 | `team` | `str` enum \| `null` | Faction membership. `"village"` \| `"werewolf"` \| `"neutral"`. `null` during lobby. Derived from `role` via `roles.json`. Used for team win condition checks. **Distinct from `investigationResult`** — do not use `team` in Seer logic. | Derived from `role` on assignment | Yes | **Yes — same stripping rules as `role`** |
 | `hunter_fired` | `bool` | Tracks whether this Hunter has used their revenge kill. Server rejects `HUNTER_REVENGE` if `true`. Only present on Hunter players. | `false` at assignment; set `true` by `resolve_hunter_revenge()` | No | **Yes — server-only** |
 | `is_framed_tonight` | `bool` | Set to `true` by the Framer's `manipulate` action (resolution step 2). Forces Seer's result to `"werewolf"` at step 6 regardless of actual `investigationResult`. Reset to `false` at start of every night phase. | Set by `resolve_night()` step 2; reset by `transition_phase("night")` | No | **Yes — server-only; never sent to clients** |
@@ -193,7 +209,7 @@ Holds the current round's night action submissions. Fully reset at the start of 
 | `wolf_votes` | `map[str → str]` | Maps wolf-team `player_id` → chosen kill target `player_id`. Majority wins; ties result in no kill. Populated by all three wolf roles: `werewolf`, `alpha_wolf`, `wolf_shaman`. | `submit_night_action` for wolf-team players | No (empty map) | **Yes — wolf-team players only. Removed for all village, neutral, and Display client** |
 | `roleblock_target_id` | `str` \| `null` | Player ID hexed by the Wolf Shaman this round. That player's night ability is nullified before any other resolution. | `submit_night_action` secondary action from `wolf_shaman` only | Yes | **Yes — server-only; never sent to any client** |
 | `seer_target_id` | `str` \| `null` | The player ID the Seer chose to inspect this round. | `submit_night_action` for Seer | Yes | **Yes — sent only to the Seer** |
-| `seer_result` | `str` enum \| `null` | Result of the Seer's inspect this round. Returns `investigationResult` field of the target — `"village"` \| `"werewolf"` \| `"neutral"`. **Uses `investigationResult`, not `team`** — Alpha Wolf returns `"village"` here. Stored transiently for broadcast; cumulative record lives in `MasterGameState.seer_knowledge`. | Computed by `resolve_night()` from `players[seer_target_id].investigationResult` | Yes | **Yes — sent only to the Seer** |
+| `seer_result` | `str` enum \| `null` | Result of the Seer's inspect this round. Returns `investigationResult` field of the target — `"village"` \| `"wolf"` \| `"neutral"`. **Uses `investigationResult`, not `team`** — Alpha Wolf returns `"village"` here. Stored transiently for broadcast; cumulative record lives in `MasterGameState.seer_knowledge`. | Computed by `resolve_night()` from `players[seer_target_id].investigationResult` | Yes | **Yes — sent only to the Seer** |
 | `doctor_target_id` | `str` \| `null` | The player ID the Doctor chose to protect this round. | `submit_night_action` for Doctor | Yes | **Yes — server-only; never sent to any client** |
 | `serial_killer_target_id` | `str` \| `null` | Player ID the Serial Killer chose to eliminate. | `submit_night_action` for Serial Killer | Yes | **Yes — Serial Killer only; server-only until `game_over`** |
 | `framer_action` | `str` enum \| `null` | Framer's mode this round: `"frame"` \| `"hack_archives"` \| `null` (not yet submitted). When `"frame"`, `framer_target_id` is set and `is_framed_tonight` fires at step 2. When `"hack_archives"`, `framer_target_id` is `null` and `false_hint_queued` is set instead. | `submit_night_action` for Framer | Yes | **Yes — server-only; never sent to any client** |
@@ -222,7 +238,7 @@ Appended to `MasterGameState.elimination_log` by `resolve_night()` and `resolve_
 | `round` | `int` | Round number when elimination occurred. | `MasterGameState.round` at time of resolution | No | No |
 | `phase` | `str` enum | Phase that caused the elimination. `"night"` \| `"day"`. | Current phase at resolution | No | No |
 | `player_id` | `str` | The player who was eliminated. | Set by resolver | No | No |
-| `cause` | `str` enum | How they died. `"wolf_kill"` \| `"village_vote"`. | Set by resolver | No | No |
+| `cause` | `str` enum | How they died. `"wolf_kill"` \| `"village_vote"` \| `"arsonist_ignite"` \| `"serial_killer_kill"` \| `"broken_heart"` \| `"hunter_revenge"`. | Set by resolver | No | No |
 | `role` | `str` enum \| `null` | The eliminated player's true role. **Hidden until `game_over`** — sent as `null` in `elimination_log` entries during live play. Populated in final `game_over` broadcast. | `players[player_id].role` at time of elimination | Yes | **Yes — null during live play; revealed in `game_over` state broadcast** |
 | `saved_by_doctor` | `bool` | `true` if the Doctor's protection blocked a wolf kill targeting this player on the same night (player survived). This flag is only included in the `game_over` broadcast — during live play the Doctor's success is silent. | Set by `resolve_night()` when `is_protected == true` on wolf's target | No | **Yes — included only in `game_over` broadcast** |
 
@@ -235,7 +251,7 @@ On `game_over`, the server adds a `post_match` object to the state payload conta
 | Field | Type | Description | Nullable |
 |:------|:-----|:------------|:---------|
 | `post_match.timeline` | `array[TimelineEvent]` | Ordered list of key game events for the post-match reveal. Constructed server-side from `elimination_log`, `night_actions` history, and `seer_knowledge`. | No |
-| `post_match.winner` | `str` | `"village"` \| `"wolf"` | No |
+| `post_match.winner` | `str` | `"village"` \| `"werewolf"` \| `"neutral"` | No |
 | `post_match.rounds_played` | `int` | Total rounds completed. | No |
 
 ### TimelineEvent
@@ -283,7 +299,7 @@ Ephemeral object in `NightActions.puzzle_state`. Present only for `wakeOrder == 
 |:------|:-----|:------------|:---------|
 | `active` | `bool` | `true` while the puzzle window is open and awaiting a `submit_puzzle_answer` intent. Set to `false` on correct answer, timeout, or wrong answer. | No |
 | `puzzle_type` | `str` enum | One of `"math"` \| `"logic"` \| `"sequence"`. Determines how `puzzle_data` is structured. | No |
-| `puzzle_data` | `object` | Type-specific puzzle content. **math:** `{ "expression": str, "answer_options": [str, str, str], "correct_index": int }`. **logic:** `{ "question": str, "answer_options": [str, str], "correct_index": int }`. **sequence:** `{ "sequence": [str] }` — list of color IDs to replay. | No |
+| `puzzle_data` | `object` | Type-specific puzzle content. **math:** `{ "expression": str, "answer_options": [str, str, str], "correct_index": int }`. **logic:** `{ "question": str, "answer_options": [str, str], "correct_index": int }` — question drawn from `puzzles.md` static bank (400 trivia Q&A, project root); distractors generated server-side. **sequence:** `{ "sequence": [str] }` — list of color IDs to replay. | No |
 | `time_limit_seconds` | `int` | Seconds until puzzle times out. Derived from `archivePuzzleSystem.puzzleTypes[puzzle_type].timeLimitSeconds`. | No |
 | `solved` | `bool` \| `null` | `null` while active. `true` if player answered correctly. `false` on timeout or wrong answer. | Yes |
 | `hint_pending` | `bool` | Briefly `true` after a correct solve while the server constructs and dispatches the `HintPayload` unicast. Clients may use this to show a brief "clue incoming..." indicator. | No |

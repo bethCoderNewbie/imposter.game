@@ -167,7 +167,7 @@ class MasterGameState(BaseModel):
     seed: str
     phase: Phase = Phase.LOBBY
     round: int = 0
-    host_player_id: str
+    host_player_id: str | None = None
     timer_ends_at: str | None = None  # ISO8601 UTC | null
     config: GameConfig
     players: dict[str, PlayerState] = Field(default_factory=dict)  # player_id -> PlayerState
@@ -185,3 +185,6 @@ class MasterGameState(BaseModel):
 
     # Monotonic version counter — incremented on every state mutation
     state_id: int = 0
+
+    # Server-only — stripped before every broadcast, never sent to any client
+    host_secret: str | None = None

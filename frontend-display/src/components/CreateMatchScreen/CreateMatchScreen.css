@@ -1,0 +1,52 @@
+.create-match {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: #0a0a0a;
+  color: #fff;
+}
+
+.create-match__content {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.create-match__title {
+  font-size: 4rem;
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.create-match__sub {
+  font-size: 1.25rem;
+  color: #888;
+  margin: 0;
+}
+
+.create-match__btn {
+  padding: 1rem 3rem;
+  font-size: 1.5rem;
+  font-weight: 600;
+  background: #fff;
+  color: #0a0a0a;
+  border: none;
+  border-radius: 0.75rem;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.create-match__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.create-match__error {
+  color: #f87171;
+  font-size: 1rem;
+  margin: 0;
+}

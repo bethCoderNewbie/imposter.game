@@ -1,0 +1,80 @@
+.role-reveal {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.5rem calc(3rem + var(--mobile-safe-bottom));
+  gap: 2rem;
+  background-color: var(--night-bg-deep);
+  transition: background-color 0.15s ease-out;
+}
+
+/* Role content — visible only while held */
+.role-reveal__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  text-align: center;
+  animation: role-reveal-in 0.15s ease-out forwards;
+}
+
+.role-reveal__label {
+  font-size: 0.75rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.6);
+}
+
+.role-reveal__name {
+  font-size: 2rem;
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: 0.05em;
+}
+
+.role-reveal__icon {
+  font-size: 3rem;
+}
+
+.role-reveal__abilities {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  color: rgba(255,255,255,0.8);
+  font-size: 0.9rem;
+  font-style: italic;
+  max-width: 280px;
+}
+
+.role-reveal__abilities li::before {
+  content: '• ';
+}
+
+/* Hold button */
+.role-reveal__hold-btn {
+  position: fixed;
+  bottom: calc(3rem + var(--mobile-safe-bottom));
+  left: 1.5rem;
+  right: 1.5rem;
+  padding: 1.25rem;
+  border-radius: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.8);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+.role-reveal__hold-btn--active {
+  background: rgba(255,255,255,0.2);
+  border-color: rgba(255,255,255,0.6);
+  color: #fff;
+}

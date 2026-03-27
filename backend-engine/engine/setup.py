@@ -146,20 +146,22 @@ def assign_roles(player_ids: list[str], composition: dict[str, int], seed: str) 
 
 def setup_game(
     game_id: str,
-    host_player_id: str,
+    host_player_id: str | None = None,
     config: GameConfig | dict | None = None,
     joined_players: dict[str, PlayerState] | None = None,
+    host_secret: str | None = None,
 ) -> MasterGameState:
     """
     Create a fully initialized MasterGameState ready for the lobby phase.
     Pure function — no I/O.
     config may be a GameConfig, a plain dict (for tests), or None — all produce a default lobby config.
     """
+    initial_player_count = 1 if host_player_id else 0
     if not isinstance(config, GameConfig):
         from engine.config import get_settings
         s = get_settings()
         config = GameConfig(
-            player_count=1,
+            player_count=initial_player_count,
             roles={},
             night_timer_seconds=s.night_timer_seconds,
             day_timer_seconds=s.day_timer_seconds,
@@ -171,8 +173,8 @@ def setup_game(
 
     players: dict[str, PlayerState] = dict(joined_players) if joined_players else {}
 
-    # Ensure host player exists in the lobby
-    if host_player_id not in players:
+    # Ensure host player exists in the lobby (only when host_player_id provided)
+    if host_player_id and host_player_id not in players:
         players[host_player_id] = PlayerState(
             player_id=host_player_id,
             display_name="Host",
@@ -197,6 +199,7 @@ def setup_game(
         phase=Phase.LOBBY,
         round=0,
         host_player_id=host_player_id,
+        host_secret=host_secret,
         config=config,
         players=players,
         night_actions=NightActions(actions_required_count=0, actions_submitted_count=0),

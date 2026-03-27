@@ -89,6 +89,9 @@ def transition_phase(G: MasterGameState, new_phase: Phase) -> MasterGameState:
             actions_submitted_count=0,
             actions_required_count=required,
         )
+        # Generate Archive puzzle for wakeOrder==0 players (logic/math/sequence)
+        from engine.puzzle_bank import generate_night_puzzle
+        G.night_actions.puzzle_state = generate_night_puzzle(G)
 
     elif new_phase == Phase.DAY:
         # Clear day votes for fresh discussion phase

@@ -6,6 +6,38 @@ All commands assume you are in the project root `C:\Users\bichn\MSBA\Imposter\` 
 
 ## Environment Setup
 
+### Create Python virtual environment (run once)
+
+| | Command |
+|---|---|
+| **Bash** | `python -m venv .venv` |
+| **PowerShell** | `python -m venv .venv` |
+
+### Activate virtual environment
+
+| | Command |
+|---|---|
+| **Bash** | `source .venv/Scripts/activate` |
+| **PowerShell** | `.\.venv\Scripts\Activate.ps1` |
+
+> If PowerShell blocks activation: `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`
+
+### Install dependencies (after activating)
+
+| | Command |
+|---|---|
+| **Bash** | `pip install -e ".[dev,test]"` |
+| **PowerShell** | `pip install -e ".[dev,test]"` |
+
+### Deactivate virtual environment
+
+| | Command |
+|---|---|
+| **Bash** | `deactivate` |
+| **PowerShell** | `deactivate` |
+
+---
+
 ### Copy `.env.example` → `.env`
 
 | | Command |
@@ -131,14 +163,16 @@ key=secrets.token_urlsafe(32)
 
 ## Testing
 
-All `pytest` commands run from the project root.
+### Backend (pytest)
 
-### Run all unit tests (no Redis required)
+All `pytest` commands run from the project root. No live Redis required — storage tests use `fakeredis`.
+
+### Run all backend tests
 
 | | Command |
 |---|---|
-| **Bash** | `pytest backend-engine/tests/ -m "not e2e and not integration" -v` |
-| **PowerShell** | `pytest backend-engine/tests/ -m "not e2e and not integration" -v` |
+| **Bash** | `pytest backend-engine/tests/ -v` |
+| **PowerShell** | `pytest backend-engine/tests/ -v` |
 
 ### Run stripper security tests only (highest priority)
 
@@ -146,6 +180,13 @@ All `pytest` commands run from the project root.
 |---|---|
 | **Bash** | `pytest backend-engine/tests/engine/test_stripper.py -v` |
 | **PowerShell** | `pytest backend-engine/tests/engine/test_stripper.py -v` |
+
+### Run Redis store tests only
+
+| | Command |
+|---|---|
+| **Bash** | `pytest backend-engine/tests/storage/ -v` |
+| **PowerShell** | `pytest backend-engine/tests/storage/ -v` |
 
 ### Run night resolver tests
 
@@ -165,29 +206,15 @@ All `pytest` commands run from the project root.
 
 | | Command |
 |---|---|
-| **Bash** | `pytest backend-engine/tests/ -m "not e2e" --cov=backend-engine --cov-report=term-missing` |
-| **PowerShell** | `pytest backend-engine/tests/ -m "not e2e" --cov=backend-engine --cov-report=term-missing` |
-
-### Run integration tests (requires live Redis)
-
-| | Command |
-|---|---|
-| **Bash** | `pytest backend-engine/tests/ -m "integration" -v` |
-| **PowerShell** | `pytest backend-engine/tests/ -m "integration" -v` |
-
-### Run e2e tests (requires full stack)
-
-| | Command |
-|---|---|
-| **Bash** | `pytest backend-engine/tests/e2e/ -m "e2e" -v` |
-| **PowerShell** | `pytest backend-engine/tests/e2e/ -m "e2e" -v` |
+| **Bash** | `pytest backend-engine/tests/ --cov=backend-engine --cov-report=term-missing` |
+| **PowerShell** | `pytest backend-engine/tests/ --cov=backend-engine --cov-report=term-missing` |
 
 ### Stop on first failure
 
 | | Command |
 |---|---|
-| **Bash** | `pytest backend-engine/tests/ -m "not e2e" -x` |
-| **PowerShell** | `pytest backend-engine/tests/ -m "not e2e" -x` |
+| **Bash** | `pytest backend-engine/tests/ -x` |
+| **PowerShell** | `pytest backend-engine/tests/ -x` |
 
 ### Show print output during tests
 
@@ -195,6 +222,72 @@ All `pytest` commands run from the project root.
 |---|---|
 | **Bash** | `pytest backend-engine/tests/ -s -v` |
 | **PowerShell** | `pytest backend-engine/tests/ -s -v` |
+
+---
+
+### Frontend (Vitest)
+
+All `npm` commands run from `frontend-display/`.
+
+### Run all frontend tests once
+
+| | Command |
+|---|---|
+| **Bash** | `cd frontend-display && npm run test` |
+| **PowerShell** | `cd frontend-display; npm run test` |
+
+### Watch mode (re-runs on file change)
+
+| | Command |
+|---|---|
+| **Bash** | `cd frontend-display && npm run test:watch` |
+| **PowerShell** | `cd frontend-display; npm run test:watch` |
+
+### With V8 coverage report
+
+| | Command |
+|---|---|
+| **Bash** | `cd frontend-display && npm run test:coverage` |
+| **PowerShell** | `cd frontend-display; npm run test:coverage` |
+
+### Run a specific test file
+
+| | Command |
+|---|---|
+| **Bash** | `cd frontend-display && npx vitest run src/test/hooks/useWebSocket.test.ts` |
+| **PowerShell** | `cd frontend-display; npx vitest run src/test/hooks/useWebSocket.test.ts` |
+
+---
+
+### Full suite via Docker (no local Python/Node required)
+
+### Run backend tests in Docker
+
+| | Command |
+|---|---|
+| **Bash** | `docker compose -f docker-compose.test.yml run --rm backend-test` |
+| **PowerShell** | `docker compose -f docker-compose.test.yml run --rm backend-test` |
+
+### Run frontend tests in Docker
+
+| | Command |
+|---|---|
+| **Bash** | `docker compose -f docker-compose.test.yml run --rm frontend-test` |
+| **PowerShell** | `docker compose -f docker-compose.test.yml run --rm frontend-test` |
+
+### Run both suites (sequential)
+
+| | Command |
+|---|---|
+| **Bash** | `docker compose -f docker-compose.test.yml run --rm backend-test && docker compose -f docker-compose.test.yml run --rm frontend-test` |
+| **PowerShell** | `docker compose -f docker-compose.test.yml run --rm backend-test; docker compose -f docker-compose.test.yml run --rm frontend-test` |
+
+### Rebuild test images (after dependency changes)
+
+| | Command |
+|---|---|
+| **Bash** | `docker compose -f docker-compose.test.yml build --no-cache` |
+| **PowerShell** | `docker compose -f docker-compose.test.yml build --no-cache` |
 
 ---
 

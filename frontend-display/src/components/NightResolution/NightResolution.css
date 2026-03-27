@@ -1,0 +1,51 @@
+.night-resolution {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4vmin;
+  background-image: linear-gradient(to right, #434343 0%, black 100%);
+}
+
+/* Headline — reveal-flicker entrance (PRD-003 §3.2) */
+.night-resolution__headline {
+  font-size: clamp(28px, 4.5vmin, 60px);
+  color: rgba(255, 255, 255, 0.9);
+  text-align: center;
+  animation: reveal-flicker 1.2s cubic-bezier(0.5, 1, 0.89, 1) forwards;
+  font-style: italic;
+}
+
+/* Death reveal block — slides in with claw animation (PRD-002 §2.4) */
+.night-resolution__death {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5vmin;
+  position: relative;
+  animation: claw-slide-in 1.2s ease-out both;
+  opacity: 0;
+}
+
+.night-resolution__death[style] {
+  animation-fill-mode: both;
+}
+
+/* Claw mark overlay */
+.night-resolution__claw-mark {
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  font-size: clamp(64px, 9vmin, 120px);
+  color: rgba(229, 62, 62, 0.7);
+  line-height: 1;
+  animation: claw-slide-in 1.2s ease-out both;
+  animation-delay: inherit;
+}
+
+.night-resolution__player-name {
+  font-size: clamp(16px, 2.4vmin, 32px);
+  color: rgba(255, 255, 255, 0.8);
+}

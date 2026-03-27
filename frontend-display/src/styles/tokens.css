@@ -1,0 +1,32 @@
+/* PRD-003 §5 — Color Semantic Tokens
+   Single source of truth. Reference tokens in components; never hardcode hex values. */
+
+:root {
+  /* Backgrounds */
+  --night-bg-deep:       #060810;
+  --night-bg-mid:        #0a0e1a;
+  --night-bg-glow:       #141b2e;
+
+  /* Timer states */
+  --timer-default:       #ffffff;
+  --timer-warning:       #f6ad55;   /* ≤30s */
+  --timer-critical:      #fc8181;   /* ≤10s */
+
+  /* Team colors */
+  --wolf-primary:        #e53e3e;
+  --village-primary:     #edc94b;
+
+  /* Role colors */
+  --role-wolf:           #e53e3e;
+  --role-seer:           #805ad5;
+  --role-doctor:         #38a169;
+  --role-villager:       #718096;
+
+  /* Dead state */
+  --eliminated-filter:   grayscale(1);
+
+  /* Glass panel (dark overlay menus) */
+  --glass-bg:            linear-gradient(-20deg, #0a1923 0%, #1a1529 100%);
+  --glass-border:        rgba(255, 255, 255, 0.15);
+  --glass-blur:          blur(24px);
+}

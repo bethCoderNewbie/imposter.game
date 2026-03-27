@@ -1,0 +1,37 @@
+.night-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-image: linear-gradient(to right, #434343 0%, black 100%);
+  animation: night-enter 2s ease-in-out forwards;
+}
+
+.night-shell__label {
+  padding: calc(1rem + var(--mobile-safe-top)) 1.5rem 0.5rem;
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.4);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.night-shell__moon { font-size: 1rem; }
+
+.night-shell__content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem 1.5rem calc(2rem + var(--mobile-safe-bottom));
+}
+
+.night-shell__waiting {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255,255,255,0.3);
+  font-style: italic;
+  font-size: 0.9rem;
+}

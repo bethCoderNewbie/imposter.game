@@ -26,8 +26,7 @@ router = APIRouter(prefix="/api/games", tags=["lobby"])
 
 
 class CreateGameRequest(BaseModel):
-    host_display_name: str = Field(..., min_length=1, max_length=16)
-    avatar_id: str = "default_01"
+    pass  # Display creates the game; no host player needed
 
 
 class JoinGameRequest(BaseModel):
@@ -39,19 +38,23 @@ class RejoinGameRequest(BaseModel):
     session_token: str
 
 
+class StartGameRequest(BaseModel):
+    host_secret: str
+
+
 def _get_redis(request: Request):
     return request.app.state.redis
 
 
 @router.post("")
 async def create_game(body: CreateGameRequest, redis=Depends(_get_redis)):
-    """Create a new game lobby. Returns game_id, host player_id, session token, and join URL."""
+    """Create a new game lobby. Returns game_id and host_secret for the Display client."""
     game_id = secrets.token_urlsafe(6).upper()
-    host_player_id = str(uuid.uuid4())
+    host_secret = secrets.token_urlsafe(32)
 
     settings = get_settings()
     cfg = GameConfig(
-        player_count=1,
+        player_count=0,
         roles={},
         night_timer_seconds=settings.night_timer_seconds,
         day_timer_seconds=settings.day_timer_seconds,
@@ -59,19 +62,12 @@ async def create_game(body: CreateGameRequest, redis=Depends(_get_redis)):
         role_deal_timer_seconds=settings.role_deal_timer_seconds,
         hunter_pending_timer_seconds=settings.hunter_pending_timer_seconds,
     )
-    G = setup_game(game_id, host_player_id, cfg)
-    G.players[host_player_id].display_name = body.host_display_name
-    G.players[host_player_id].avatar_id = body.avatar_id
-
-    token = await issue_session_token(redis, game_id, host_player_id)
-    G.players[host_player_id].session_token = token
-
+    G = setup_game(game_id, host_player_id=None, config=cfg, host_secret=host_secret)
     await save_game(redis, game_id, G)
 
     return {
         "game_id": game_id,
-        "player_id": host_player_id,
-        "session_token": token,
+        "host_secret": host_secret,
         "join_code": game_id,
     }
 
@@ -94,6 +90,10 @@ async def join_game(game_id: str, body: JoinGameRequest, redis=Depends(_get_redi
         display_name=body.display_name,
         avatar_id=body.avatar_id,
     )
+
+    # First player to join becomes the host
+    if G.host_player_id is None:
+        G.host_player_id = player_id
 
     token = await issue_session_token(redis, game_id, player_id)
     G.players[player_id].session_token = token
@@ -138,3 +138,34 @@ async def rejoin_game(game_id: str, body: RejoinGameRequest, redis=Depends(_get_
         "player_id": player_id,
         "session_token": body.session_token,
     }
+
+
+@router.post("/{game_id}/start")
+async def start_game_via_display(game_id: str, body: StartGameRequest, redis=Depends(_get_redis)):
+    """Allow the Display client to start the game using its host_secret."""
+    G = await load_game(redis, game_id)
+    if G is None:
+        raise HTTPException(status_code=404, detail="Game not found.")
+    if G.host_secret != body.host_secret:
+        raise HTTPException(status_code=403, detail="Invalid host secret.")
+    if G.phase != Phase.LOBBY:
+        raise HTTPException(status_code=409, detail="Game already started.")
+    if G.host_player_id is None:
+        raise HTTPException(status_code=409, detail="No players have joined yet.")
+    if len(G.players) < 5:
+        shortage = 5 - len(G.players)
+        raise HTTPException(status_code=409, detail=f"Need {shortage} more player{'s' if shortage != 1 else ''} to start.")
+
+    from api.connection_manager import manager
+    from api.game_queue import get_or_create_queue
+    from api.intents.dispatch import dispatch_intent
+
+    queue = get_or_create_queue(game_id)
+    queue.start(redis, manager, dispatch_intent)
+    await queue.enqueue({
+        "type": "start_game",
+        "game_id": game_id,
+        "player_id": G.host_player_id,
+    })
+
+    return {"ok": True}

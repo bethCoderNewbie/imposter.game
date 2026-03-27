@@ -27,7 +27,6 @@ class ConnectionManager:
         self._rooms: dict[str, dict[str | None, WebSocket]] = {}
 
     async def connect(self, game_id: str, player_id: str | None, ws: WebSocket) -> None:
-        await ws.accept()
         if game_id not in self._rooms:
             self._rooms[game_id] = {}
         self._rooms[game_id][player_id] = ws

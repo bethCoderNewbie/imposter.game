@@ -53,7 +53,7 @@ def player_view(G: MasterGameState, player_id: str | None) -> dict[str, Any]:
     Return a stripped copy of game state appropriate for the given player.
     player_id=None means the Display client (all role data removed).
     """
-    state = G.model_dump(mode="json")
+    state = G.model_dump(mode="json", exclude={"host_secret"})
     is_game_over = G.phase == Phase.GAME_OVER
 
     # Determine view type

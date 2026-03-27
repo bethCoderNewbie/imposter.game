@@ -1,0 +1,5 @@
+/* Staggered line entrance — ADR-003 §2 reveal-all-at-once */
+.vote-web__line {
+  opacity: 0;
+  animation: line-fade-in 0.4s ease-out forwards;
+}

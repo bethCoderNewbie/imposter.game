@@ -1058,7 +1058,7 @@
         "choices": 2,
         "timeLimitSeconds": 20,
         "difficulty": "medium",
-        "generationNote": "Server selects from a static puzzle bank (stored separately). Bank rotated per-game using the game seed to prevent repetition."
+        "generationNote": "Server selects from the static puzzle bank in `puzzles.md` (project root). 400 trivia questions across 8 categories (Classic Riddles, Geography & Nature, Science & Technology, History & Pop Culture, Food & Drink, Travel & Geography, History & Art, Pop Culture / Movies / Music, Animals & Nature). Bank rotated per-game using the game seed to prevent question repetition across rounds. Distractors (wrong answer options) are generated server-side; the correct answer is the canonical answer from the bank."
       },
       {
         "id": "sequence",

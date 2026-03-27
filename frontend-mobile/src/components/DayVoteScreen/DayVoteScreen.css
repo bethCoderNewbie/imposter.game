@@ -1,0 +1,75 @@
+.day-vote {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-image: linear-gradient(to top, #dad4ec 0%, #dad4ec 1%, #f3e7e9 100%);
+  padding: calc(1.5rem + var(--mobile-safe-top)) 1.5rem calc(2rem + var(--mobile-safe-bottom));
+  gap: 1.25rem;
+}
+
+.day-vote__header {
+  text-align: center;
+}
+
+.day-vote__round {
+  font-size: 0.75rem;
+  color: rgba(70,50,80,0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.day-vote__title {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #4a3560;
+  margin-top: 0.25rem;
+}
+
+.day-vote__list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.day-vote__row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.5);
+}
+
+.day-vote__name {
+  flex: 1;
+  font-size: 0.95rem;
+  color: #4a3560;
+  font-weight: 500;
+}
+
+.day-vote__btn {
+  padding: 0.4rem 0.9rem;
+  border-radius: 8px;
+  border: 1px solid rgba(74,53,96,0.3);
+  background: rgba(74,53,96,0.08);
+  color: #4a3560;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.day-vote__voted {
+  font-size: 0.85rem;
+  color: #38a169;
+  font-weight: 600;
+}
+
+.day-vote__status {
+  text-align: center;
+  color: rgba(70,50,80,0.5);
+  font-size: 0.85rem;
+  font-style: italic;
+}

@@ -1,0 +1,43 @@
+import PlayerAvatar from '../PlayerAvatar/PlayerAvatar'
+import type { PlayerState } from '../../types/game'
+import './PlayerCard.css'
+
+interface Props {
+  player: PlayerState
+  voteCount: number
+  hasMajority: boolean
+}
+
+export default function PlayerCard({ player, voteCount, hasMajority }: Props) {
+  const isDead = !player.is_alive
+
+  return (
+    <div
+      className={`player-card ${isDead ? 'player-card--dead' : ''} ${hasMajority ? 'player-card--majority' : ''}`}
+      data-player-id={player.player_id}
+    >
+      <div className="player-card__avatar-wrap">
+        <PlayerAvatar player={player} />
+
+        {/* Tombstone overlay for eliminated players */}
+        {isDead && (
+          <div className="player-card__tombstone" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M6 21V10a6 6 0 1 1 12 0v11" />
+              <path d="M3 21h18" />
+              <path d="M10 14v3" />
+              <path d="M14 14v3" />
+            </svg>
+          </div>
+        )}
+
+        {/* Vote tally badge — PRD-003 §2.2 */}
+        {voteCount > 0 && (
+          <div className="player-card__vote-badge">{voteCount}</div>
+        )}
+      </div>
+
+      <p className="player-card__name">{player.display_name}</p>
+    </div>
+  )
+}

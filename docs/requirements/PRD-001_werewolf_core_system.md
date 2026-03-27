@@ -32,7 +32,7 @@ The defining security challenge is **role secrecy**: a player's role must never 
 
 | Role | Team | Night Action | Count (8-player default) |
 |------|------|-------------|--------------------------|
-| Villager | Village | Decoy task (count sheep) | 4 |
+| Villager | Village | Archive puzzle — trivia Q&A from `puzzles.md` bank; correct solve rewards a `HintPayload` (game composition truth). Pure decoy from observers' perspective — screen is dark and identical to active roles at 2 feet. | 4 |
 | Werewolf | Wolf | Vote to kill a living player | 2 |
 | Seer | Village | Peek at one player's `investigationResult` (`"village"` / `"werewolf"` / `"neutral"`) | 1 |
 | Doctor | Village | Protect one player from elimination | 1 |

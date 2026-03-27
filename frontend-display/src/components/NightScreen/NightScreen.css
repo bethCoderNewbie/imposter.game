@@ -1,0 +1,62 @@
+.night-screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  animation: night-enter 2s ease-in-out forwards;
+}
+
+/* Moon — top center */
+.night-screen__moon {
+  position: fixed;
+  top: 1.1vmin;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: clamp(36px, 5vmin, 64px);
+}
+
+/* Countdown timer — PRD-003 §2.2 */
+.night-screen__timer {
+  font-size: clamp(64px, 11.1vmin, 160px);
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+  color: var(--timer-default);
+  transition: color 0.5s linear, text-shadow 0.5s linear;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.05em;
+}
+
+.night-screen__timer.timer--warning {
+  color: var(--timer-warning);
+}
+
+.night-screen__timer.timer--critical {
+  color: var(--timer-critical);
+  text-shadow: 0 0 12px currentColor;
+}
+
+/* Narrative carousel — PRD-003 §2.2 */
+.night-screen__narrative {
+  font-size: clamp(22px, 3.1vmin, 44px);
+  color: rgba(255, 255, 255, 0.7);
+  margin-top: 3vmin;
+  text-align: center;
+  animation: fade-in 0.6s ease-in-out forwards;
+  font-style: italic;
+}
+
+/* Action progress — bottom-left — PRD-003 §6 */
+.night-screen__progress {
+  position: fixed;
+  bottom: 1.1vmin;
+  left: 1.1vmin;
+  font-size: clamp(14px, 1.9vmin, 26px);
+  color: rgba(255, 255, 255, 0.4);
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}

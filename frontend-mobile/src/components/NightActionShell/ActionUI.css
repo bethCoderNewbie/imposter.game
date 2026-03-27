@@ -1,0 +1,268 @@
+/* Shared styles for all four night role UIs */
+
+.action-ui {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow: hidden;
+}
+
+.action-ui--centered {
+  align-items: center;
+  justify-content: center;
+}
+
+/* Header text — dim, small (PRD-002 §3.4 secrecy from distance) */
+.action-ui__header {
+  font-size: 0.78rem;
+  color: rgba(255,255,255,0.35);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* Player list */
+.action-ui__list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.action-ui__row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.8);
+  font-size: 0.95rem;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: background 0.1s;
+}
+
+.action-ui__row--selected {
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.3);
+}
+
+/* Wolf-specific selected: subtle red — not bright enough to be visible at distance */
+.action-ui__row--wolf.action-ui__row--selected {
+  background: rgba(229, 62, 62, 0.12);
+  border-color: rgba(229, 62, 62, 0.3);
+}
+
+.action-ui__row--disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.action-ui__tag {
+  margin-left: auto;
+  font-size: 0.7rem;
+  color: rgba(255,255,255,0.3);
+  font-style: italic;
+}
+
+/* Confirm button */
+.action-ui__confirm {
+  padding: 0.9rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.8);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  margin-top: auto;
+}
+
+.action-ui__confirm:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+/* Seer result */
+.action-ui__result {
+  font-size: 0.9rem;
+  text-align: center;
+  padding: 0.5rem;
+  border-radius: 6px;
+}
+
+.action-ui__result--wolf    { color: rgba(229, 62, 62, 0.9);  background: rgba(229,62,62,0.1); }
+.action-ui__result--village { color: rgba(129, 199, 132, 0.9); background: rgba(129,199,132,0.1); }
+.action-ui__result--neutral { color: rgba(255,255,255,0.6); }
+
+/* Seer history */
+.action-ui__history {
+  border-top: 1px solid rgba(255,255,255,0.08);
+  padding-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.action-ui__history-label {
+  font-size: 0.7rem;
+  color: rgba(255,255,255,0.3);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.action-ui__history-row {
+  font-size: 0.85rem;
+}
+
+/* Rest state */
+.action-ui__rest {
+  font-size: 1.2rem;
+  color: rgba(255,255,255,0.25);
+  font-style: italic;
+}
+
+/* ── Archive puzzle ─────────────────────────────────────────────────────────── */
+
+/* Timer bar — same width track as puzzle panel */
+.action-ui__timer-bar-track {
+  height: 3px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.action-ui__timer-bar {
+  height: 100%;
+  background: rgba(246,173,85,0.6);   /* amber — PRD-003 --timer-warning */
+  border-radius: 2px;
+  transition: width 0.25s linear, background 0.3s;
+}
+
+.action-ui__timer-bar--warning {
+  background: rgba(252,129,129,0.8);  /* red — PRD-003 --timer-critical */
+}
+
+/* Puzzle panel — same silhouette dimensions as .action-ui__list (anti-cheat) */
+.action-ui__puzzle-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow: hidden;
+}
+
+.action-ui__puzzle-question {
+  font-size: 0.95rem;
+  color: rgba(255,255,255,0.75);
+  line-height: 1.5;
+}
+
+/* Answer buttons (2 for logic, 3 for math) */
+.action-ui__answer-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.action-ui__answer-btn {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.8);
+  font-size: 0.9rem;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.action-ui__answer-btn:active {
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.25);
+}
+
+/* Sequence tiles — 2×2 grid */
+.action-ui__seq-tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.action-ui__seq-tile {
+  aspect-ratio: 1;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.action-ui__seq-tile:disabled {
+  cursor: default;
+}
+
+.action-ui__seq-tile--flash {
+  animation: tile-flash 0.35s ease-out;
+}
+
+@keyframes tile-flash {
+  0%   { opacity: 0.3; }
+  40%  { opacity: 1; }
+  100% { opacity: 0.3; }
+}
+
+.action-ui__seq-progress {
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.3);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Hint display — amber (PRD-003 --timer-warning: #f6ad55) */
+.action-ui__hint-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  background: rgba(246,173,85,0.07);
+  border: 1px solid rgba(246,173,85,0.2);
+  border-radius: 10px;
+  padding: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.action-ui__hint-label {
+  font-size: 0.7rem;
+  color: rgba(246,173,85,0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.action-ui__hint {
+  font-size: 0.95rem;
+  color: rgba(246,173,85,0.85);
+  line-height: 1.5;
+}
+
+.action-ui__hint-expiry {
+  font-size: 0.75rem;
+  color: rgba(246,173,85,0.4);
+  font-style: italic;
+}
+
+.action-ui__hint-pending {
+  font-size: 0.95rem;
+  color: rgba(246,173,85,0.6);
+  font-style: italic;
+}
+
+.action-ui__no-clue {
+  font-size: 0.95rem;
+  color: rgba(255,255,255,0.3);
+  font-style: italic;
+}

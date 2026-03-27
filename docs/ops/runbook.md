@@ -41,20 +41,109 @@ npm run dev
 
 ## Running Tests
 
+The test suite uses pytest markers to separate tiers by dependency level. No tier leaks into a faster tier.
+
+### Tier 1 — Unit tests (no external services)
+
 ```bash
-# Unit tests (no Redis required)
-cd backend-engine
-pytest tests/ -m "not e2e and not integration" -v
+# All unit tests (engine, storage, intent handlers)
+pytest -m "not integration and not e2e" -v
 
-# Stripper security tests (highest priority — run first)
-pytest tests/engine/test_stripper.py -v
+# Stripper security tests only (highest priority — run these first)
+pytest backend-engine/tests/engine/test_stripper.py -v
 
-# Integration tests (requires live Redis at localhost:6379)
-pytest tests/ -m "integration" -v
+# Redis store tests only (uses fakeredis in-process)
+pytest backend-engine/tests/storage/ -v
 
-# End-to-end (requires full stack running)
-pytest tests/e2e/ -m "e2e" -v
+# With coverage report
+pytest -m "not integration and not e2e" --cov=backend-engine --cov-report=term-missing
 ```
+
+### Tier 2 — Integration tests (fakeredis, no real Redis)
+
+Integration tests exercise the full HTTP and WebSocket stack via `starlette.TestClient` with an in-process `FakeRedis` instance replacing the production Redis connection.
+
+```bash
+pytest -m "integration" -v
+```
+
+### Tier 3 — E2E tests (real Redis required)
+
+E2E tests run the complete request path through a real Redis instance. They automatically skip when Redis is unreachable, so running `pytest` without `REDIS_URL` set is always safe.
+
+```bash
+# Requires Redis at the URL specified (defaults to localhost:6379/15)
+REDIS_URL=redis://localhost:6379/15 pytest -m "e2e" -v
+
+# Or start a throwaway Redis container first:
+docker run -d --rm -p 6379:6379 redis
+pytest -m "e2e" -v
+```
+
+### Frontend (Vitest + jsdom — no browser required)
+
+```bash
+cd frontend-display
+
+# Run all tests once (CI mode)
+npm run test -- --run
+
+# Watch mode (re-runs on file change)
+npm run test:watch
+
+# With V8 coverage report
+npm run test:coverage
+```
+
+### Full suite (all tiers)
+
+```bash
+# Single command — runs all 203 backend + 116 frontend tests
+REDIS_URL=redis://localhost:6379/15 pytest && cd frontend-display && npm run test -- --run
+```
+
+### Full suite via Docker (no local Python/Node required)
+
+```bash
+# Backend tests (unit + integration)
+docker compose -f docker-compose.test.yml run --rm backend-test
+
+# Frontend tests
+docker compose -f docker-compose.test.yml run --rm frontend-test
+```
+
+### Test counts (as of 2026-03-27)
+
+| Suite | Marker | Tests |
+|-------|--------|-------|
+| Backend — engine (pure unit) | *(none)* | 114 |
+| Backend — storage/Redis (fakeredis) | *(none)* | 35 |
+| Backend — intent handlers (unit) | *(none)* | 13 |
+| Backend — lobby REST API (integration) | `integration` | 25 |
+| Backend — WebSocket (integration) | `integration` | 13 |
+| Backend — full game flow (E2E) | `e2e` | 11 |
+| Frontend — hooks | — | 35 |
+| Frontend — components | — | 81 |
+| **Total** | | **327** |
+
+---
+
+### Common test failure symptoms
+
+**`FileNotFoundError: roles.json not found`** (backend Docker tests)
+- The test container is missing `docs/architecture/roles.json`
+- Fix: add `COPY docs/architecture/roles.json ./docs/architecture/roles.json` to `backend-engine/Dockerfile.test`
+
+**`FileNotFoundError: puzzles.md not found`** (backend Docker tests)
+- The test container is missing `puzzles.md` at the project root
+- Fix: add `COPY puzzles.md ./puzzles.md` to `backend-engine/Dockerfile.test`
+
+**`play spy was called unexpectedly`** (NightScreen / GameOverScreen frontend tests)
+- Mock call counts not reset between tests
+- Fix: ensure `clearMocks: true` is set in `vitest.config.ts`
+
+**`jsdom does not implement HTMLMediaElement.play`** (audio component tests)
+- Fix: confirm `src/test/setup.ts` stubs `HTMLMediaElement.prototype.play` with `vi.fn().mockResolvedValue(undefined)`
 
 ---
 
@@ -200,6 +289,45 @@ docker compose down
 ```bash
 docker compose logs -f backend
 ```
+
+---
+
+## CI/CD (GitHub Actions)
+
+The pipeline is defined in `.github/workflows/ci.yml`. It runs automatically on every push and pull request.
+
+### Jobs
+
+| Job | Trigger | Redis service | Pytest marker |
+|-----|---------|---------------|---------------|
+| `backend-unit` | push/PR | No | `not integration and not e2e` |
+| `backend-integration` | push/PR | No (fakeredis) | `integration` |
+| `backend-e2e` | push/PR | `redis:7-alpine` | `e2e` |
+| `frontend-display` | push/PR | No | Vitest (`npm run test -- --run`) |
+| `frontend-mobile` | push/PR | No | TypeScript build check |
+
+All jobs run in parallel (`fail-fast: false`) so a failure in one does not cancel the others.
+
+### Checking a failed run
+
+```bash
+# View the run in the GitHub UI:
+gh run list --limit 5
+
+# Download logs for a specific run:
+gh run view <run-id> --log-failed
+```
+
+### Secrets
+
+| Secret | Purpose |
+|--------|---------|
+| `CODECOV_TOKEN` | Coverage upload (optional — CI does not fail without it) |
+
+### Adding a new marker
+
+1. Add the marker declaration to `pyproject.toml` `[tool.pytest.ini_options].markers`.
+2. Add a job (or a `run` step) to `.github/workflows/ci.yml` that runs `pytest -m "<new-marker>"`.
 
 ---
 
