@@ -1,0 +1,1010 @@
+{
+  "_meta": {
+    "description": "Static role definitions and dynamic composition engine for Werewolf. Canonical source of truth loaded by the server at startup. Clients receive role metadata via the initial state payload. This is the board_data equivalent — never mutated at runtime.",
+    "schema_version": "0.5",
+    "last_updated": "2026-03-26",
+    "changelog": "v0.5 — Framer Archives Hack: actionType updated to manipulate_or_hack; nightAction expanded with framerActionEnum, frame/hack_archives sub-objects; archivePuzzleSystem.framerHackSystem added. v0.4 — Pool-and-Points dynamicTemplates; balanceWeight per role; balanceWeightSystem; archivePuzzleSystem."
+  },
+
+  "roles": [
+
+    // ─── TEAM: VILLAGE ───────────────────────────────────────────────────────
+
+    {
+      "id": "villager",
+      "name": "Villager",
+      "team": "village",
+      "investigationResult": "village",
+      "balanceWeight": 1,
+      "wakeOrder": 0,
+      "actionPhase": "none",
+      "actionType": "none",
+      "maxUses": null,
+      "description": "You have no special abilities. Find the wolves and vote them out.",
+      "uiPromptNight": "The Archives await. Solve the puzzle to earn a clue.",
+      "abilities": [
+        "No special power.",
+        "Vote during the day to eliminate suspicious players.",
+        "Win when all Werewolves are eliminated."
+      ],
+      "winCondition": "wolves_eliminated",
+      "ui": {
+        "colorToken": "--role-villager",
+        "icon": "villager.svg",
+        "revealBackground": "#718096"
+      }
+    },
+
+    {
+      "id": "seer",
+      "name": "Seer",
+      "team": "village",
+      "investigationResult": "village",
+      "balanceWeight": 3,
+      "wakeOrder": 2,
+      "actionPhase": "night",
+      "actionType": "inspect",
+      "maxUses": null,
+      "description": "Every night, you can discover the true alignment of one player.",
+      "uiPromptNight": "Choose a player to inspect.",
+      "abilities": [
+        "Each night, choose one living player to investigate.",
+        "You learn their investigationResult: Werewolf or Village.",
+        "Your knowledge is private and accumulates on your device across rounds."
+      ],
+      "winCondition": "wolves_eliminated",
+      "nightAction": {
+        "targetPool": "living_all",
+        "resultField": "investigationResult",
+        "resultValues": ["village", "werewolf", "neutral"],
+        "historyVisible": true,
+        "canBeBlocked": true
+      },
+      "ui": {
+        "colorToken": "--role-seer",
+        "icon": "seer.svg",
+        "revealBackground": "#805ad5"
+      }
+    },
+
+    {
+      "id": "doctor",
+      "name": "Doctor",
+      "team": "village",
+      "investigationResult": "village",
+      "balanceWeight": 2,
+      "wakeOrder": 3,
+      "actionPhase": "night",
+      "actionType": "protect",
+      "maxUses": null,
+      "description": "Every night, protect one player from being eliminated. You cannot choose the same person twice in a row.",
+      "uiPromptNight": "Choose a player to protect.",
+      "abilities": [
+        "Each night, choose one player to protect from elimination.",
+        "You may protect yourself.",
+        "You cannot protect the same player two nights in a row."
+      ],
+      "winCondition": "wolves_eliminated",
+      "nightAction": {
+        "targetPool": "living_all_including_self",
+        "consecutiveProtectBan": true,
+        "resultSilent": true,
+        "canBeBlocked": true
+      },
+      "ui": {
+        "colorToken": "--role-doctor",
+        "icon": "doctor.svg",
+        "revealBackground": "#38a169"
+      }
+    },
+
+    {
+      "id": "mayor",
+      "name": "Mayor",
+      "team": "village",
+      "investigationResult": "village",
+      "balanceWeight": 1,
+      "wakeOrder": 0,
+      "actionPhase": "day",
+      "actionType": "double_vote",
+      "maxUses": null,
+      "description": "Your vote counts as two during the day phase.",
+      "uiPromptNight": "The Archives await. Solve the puzzle to earn a clue.",
+      "abilities": [
+        "Your vote counts as two during day voting.",
+        "Your identity as Mayor is secret — no one else knows you have double vote.",
+        "Win when all Werewolves are eliminated."
+      ],
+      "winCondition": "wolves_eliminated",
+      "dayAction": {
+        "voteWeight": 2,
+        "passive": true,
+        "revealOnDeath": true
+      },
+      "ui": {
+        "colorToken": "--role-mayor",
+        "icon": "mayor.svg",
+        "revealBackground": "#d69e2e"
+      }
+    },
+
+    {
+      "id": "hunter",
+      "name": "Hunter",
+      "team": "village",
+      "investigationResult": "village",
+      "balanceWeight": 2,
+      "wakeOrder": 0,
+      "actionPhase": "on_death",
+      "actionType": "revenge_kill",
+      "maxUses": 1,
+      "description": "If you are killed, you immediately shoot and take another player down with you.",
+      "uiPromptNight": "Keep your weapon ready. Tap the shooting stars.",
+      "abilities": [
+        "When you are eliminated (by wolves OR village vote), you immediately choose one player to eliminate with you.",
+        "Your revenge shot fires before win conditions are checked.",
+        "This ability triggers once and only once."
+      ],
+      "winCondition": "wolves_eliminated",
+      "onDeathAction": {
+        "targetPool": "living_all_excluding_self",
+        "triggersOn": ["wolf_kill", "village_vote"],
+        "interstitialDisplay": "The Hunter takes aim...",
+        "maxUses": 1
+      },
+      "ui": {
+        "colorToken": "--role-hunter",
+        "icon": "hunter.svg",
+        "revealBackground": "#c05621"
+      }
+    },
+
+    {
+      "id": "cupid",
+      "name": "Cupid",
+      "team": "village",
+      "investigationResult": "village",
+      "balanceWeight": 1,
+      "wakeOrder": 1,
+      "actionPhase": "night_one_only",
+      "actionType": "link_players",
+      "maxUses": 1,
+      "description": "Link two players together. If one dies, the other dies.",
+      "uiPromptNight": "Shoot your arrows. Select two players to link.",
+      "abilities": [
+        "On Night 1 only, secretly link two players as Lovers.",
+        "If one Lover dies for any reason, the other immediately dies of heartbreak.",
+        "You and the Lovers are the only ones who know who is linked."
+      ],
+      "winCondition": "wolves_eliminated",
+      "nightAction": {
+        "targetPool": "living_all_excluding_self",
+        "selectCount": 2,
+        "roundRestriction": 1,
+        "canBeBlocked": false,
+        "loversNotifiedOf": "partner_id_only"
+      },
+      "ui": {
+        "colorToken": "--role-cupid",
+        "icon": "cupid.svg",
+        "revealBackground": "#ed64a6"
+      }
+    },
+
+    {
+      "id": "tracker",
+      "name": "Tracker",
+      "team": "village",
+      "investigationResult": "village",
+      "balanceWeight": 2,
+      "wakeOrder": 5,
+      "actionPhase": "night",
+      "actionType": "track",
+      "maxUses": null,
+      "description": "Select a player. You will see who they visited tonight.",
+      "uiPromptNight": "Whose muddy footprints will you follow tonight?",
+      "abilities": [
+        "Each night, choose one player to track.",
+        "You learn every player they targeted with a night action.",
+        "If they had no action or were roleblocked, you see nothing."
+      ],
+      "winCondition": "wolves_eliminated",
+      "nightAction": {
+        "targetPool": "living_all_excluding_self",
+        "resultField": "night_action_targets",
+        "resolveAfterAllActions": true,
+        "canBeBlocked": true,
+        "historyVisible": true
+      },
+      "ui": {
+        "colorToken": "--role-tracker",
+        "icon": "tracker.svg",
+        "revealBackground": "#2f855a"
+      }
+    },
+
+    // ─── TEAM: WEREWOLF ──────────────────────────────────────────────────────
+
+    {
+      "id": "werewolf",
+      "name": "Werewolf",
+      "team": "werewolf",
+      "investigationResult": "werewolf",
+      "balanceWeight": -3,
+      "wakeOrder": 1,
+      "actionPhase": "night",
+      "actionType": "eliminate_group",
+      "maxUses": null,
+      "description": "Wake up with the pack and eliminate one player each night.",
+      "uiPromptNight": "Vote with your pack on a target to eliminate.",
+      "abilities": [
+        "Each night, vote with your pack to eliminate one villager.",
+        "You know who your fellow Werewolves are.",
+        "Win when Werewolves equal or outnumber the remaining village."
+      ],
+      "winCondition": "wolves_equal_or_exceed_village",
+      "nightAction": {
+        "targetPool": "living_non_wolf",
+        "requiresConsensus": true,
+        "tieResult": "no_kill",
+        "seesTeammates": true
+      },
+      "ui": {
+        "colorToken": "--role-wolf",
+        "icon": "werewolf.svg",
+        "revealBackground": "#e53e3e"
+      }
+    },
+
+    {
+      "id": "alpha_wolf",
+      "name": "Alpha Wolf",
+      "team": "werewolf",
+      "investigationResult": "village",
+      "balanceWeight": -4,
+      "wakeOrder": 1,
+      "actionPhase": "night",
+      "actionType": "eliminate_group",
+      "maxUses": null,
+      "description": "You are a Werewolf, but you appear as a harmless Villager to the Seer.",
+      "uiPromptNight": "Vote with your pack on a target to eliminate.",
+      "abilities": [
+        "You wake and vote with the wolf pack each night.",
+        "If the Seer investigates you, they see 'Village' — not 'Werewolf'.",
+        "Win when Werewolves equal or outnumber the remaining village."
+      ],
+      "winCondition": "wolves_equal_or_exceed_village",
+      "nightAction": {
+        "targetPool": "living_non_wolf",
+        "requiresConsensus": true,
+        "tieResult": "no_kill",
+        "seesTeammates": true
+      },
+      "ui": {
+        "colorToken": "--role-wolf",
+        "icon": "alpha_wolf.svg",
+        "revealBackground": "#c53030"
+      }
+    },
+
+    {
+      "id": "wolf_shaman",
+      "name": "Wolf Shaman",
+      "team": "werewolf",
+      "investigationResult": "werewolf",
+      "balanceWeight": -3,
+      "wakeOrder": 1,
+      "actionPhase": "night",
+      "actionType": "roleblock",
+      "maxUses": null,
+      "description": "Wake up with the wolves. Additionally, choose one player to block their night ability.",
+      "uiPromptNight": "Select your pack's target, then select a player to hex (block).",
+      "abilities": [
+        "You wake and vote with the wolf pack each night.",
+        "You also choose one player to hex — their night ability is blocked for this round.",
+        "Win when Werewolves equal or outnumber the remaining village."
+      ],
+      "winCondition": "wolves_equal_or_exceed_village",
+      "nightAction": {
+        "targetPool": "living_non_wolf",
+        "requiresConsensus": true,
+        "tieResult": "no_kill",
+        "seesTeammates": true,
+        "secondaryAction": {
+          "actionType": "roleblock",
+          "targetPool": "living_all_excluding_self",
+          "prompt": "Choose a player to hex (block their ability tonight).",
+          "appliesBeforeResolution": true
+        }
+      },
+      "ui": {
+        "colorToken": "--role-wolf",
+        "icon": "wolf_shaman.svg",
+        "revealBackground": "#702459"
+      }
+    },
+
+    {
+      "id": "framer",
+      "name": "Framer",
+      "team": "werewolf",
+      "investigationResult": "werewolf",
+      "balanceWeight": -3,
+      "wakeOrder": 2,
+      "actionPhase": "night",
+      "actionType": "manipulate_or_hack",
+      "maxUses": null,
+      "description": "Each night, either frame a player (Seer sees them as Werewolf) or hack The Archives (puzzle-solving Villagers receive your fabricated hint).",
+      "uiPromptNight": "Frame a player, or hack The Archives tonight?",
+      "abilities": [
+        "Each night, choose one player to frame. If the Seer inspects that player tonight, they will see 'Werewolf' — regardless of their true role.",
+        "Your frame lasts one night only and resets each round.",
+        "Alternatively: hack The Archives. Any Villager who solves their puzzle tonight receives your fabricated clue instead of a real one."
+      ],
+      "winCondition": "wolves_equal_or_exceed_village",
+      "nightAction": {
+        "framerActionEnum": ["frame", "hack_archives"],
+        "frame": {
+          "targetPool": "living_all_excluding_self",
+          "effect": "set_is_framed_tonight",
+          "appliesBeforeSeerResolves": true,
+          "overridesInvestigationResult": "werewolf"
+        },
+        "hack_archives": {
+          "targetPool": "none",
+          "effect": "queue_false_hint",
+          "allowedFalseCategories": ["wolf_count", "no_role_present", "role_present"],
+          "deliveryTrigger": "wakeOrder0_puzzle_solve",
+          "deliveryScope": "all_solvers_this_round",
+          "framerReceivesConfirmation": false
+        },
+        "canBeBlocked": true,
+        "trackerBehaviorOnHack": "hack_archives registers as tracker_result: [] — 'archives' is not a player ID"
+      },
+      "ui": {
+        "colorToken": "--role-wolf",
+        "icon": "framer.svg",
+        "revealBackground": "#744210"
+      }
+    },
+
+    {
+      "id": "infector",
+      "name": "Infector",
+      "team": "werewolf",
+      "investigationResult": "werewolf",
+      "balanceWeight": -4,
+      "wakeOrder": 3,
+      "actionPhase": "night",
+      "actionType": "convert",
+      "maxUses": 1,
+      "description": "Once per game, instead of a kill, your pack can infect a player, turning them into a Werewolf.",
+      "uiPromptNight": "Will you use your infection tonight? If yes, select the target.",
+      "abilities": [
+        "Once per game, choose a non-wolf player to infect instead of killing.",
+        "The infected player's role secretly becomes Werewolf. They join your pack the next night.",
+        "If you skip or are blocked, the normal wolf kill proceeds."
+      ],
+      "winCondition": "wolves_equal_or_exceed_village",
+      "nightAction": {
+        "targetPool": "living_non_wolf",
+        "skippable": true,
+        "skipMeaning": "proceed_with_wolf_kill",
+        "onUse": "cancel_wolf_kill_this_round",
+        "convertedRoleId": "werewolf",
+        "canBeBlocked": true
+      },
+      "ui": {
+        "colorToken": "--role-wolf",
+        "icon": "infector.svg",
+        "revealBackground": "#553c9a"
+      }
+    },
+
+    // ─── TEAM: NEUTRAL ───────────────────────────────────────────────────────
+
+    {
+      "id": "jester",
+      "name": "Jester",
+      "team": "neutral",
+      "investigationResult": "neutral",
+      "balanceWeight": -1,
+      "wakeOrder": 0,
+      "actionPhase": "none",
+      "actionType": "none",
+      "maxUses": null,
+      "description": "Trick the village into voting you out during the day to win the game.",
+      "uiPromptNight": "The Archives await. Solve the puzzle to earn a clue.",
+      "abilities": [
+        "You have no night ability.",
+        "Win only if the village votes you out during the day phase.",
+        "If you are killed by wolves at night, you lose."
+      ],
+      "winCondition": "voted_out_by_village",
+      "ui": {
+        "colorToken": "--role-jester",
+        "icon": "jester.svg",
+        "revealBackground": "#6b46c1"
+      }
+    },
+
+    {
+      "id": "arsonist",
+      "name": "Arsonist",
+      "team": "neutral",
+      "investigationResult": "neutral",
+      "balanceWeight": -3,
+      "wakeOrder": 4,
+      "actionPhase": "night",
+      "actionType": "multi_choice",
+      "maxUses": null,
+      "description": "Douse a player in gas, or choose to ignite all previously doused players.",
+      "uiPromptNight": "Douse a new victim, or press IGNITE to burn them all?",
+      "abilities": [
+        "Each night, choose to DOUSE one player (adds them to your ignite list).",
+        "Or choose IGNITE — all doused living players die simultaneously.",
+        "Win when you are the last player standing."
+      ],
+      "winCondition": "last_player_standing",
+      "nightAction": {
+        "choiceType": "binary",
+        "choices": [
+          {
+            "id": "douse",
+            "label": "Douse",
+            "targetPool": "living_all_excluding_self",
+            "effect": "add_to_doused_list"
+          },
+          {
+            "id": "ignite",
+            "label": "Ignite",
+            "targetPool": "none",
+            "effect": "eliminate_all_doused_living",
+            "requiresMinDoused": 1
+          }
+        ],
+        "canBeBlocked": true,
+        "blockPreventsIgnite": true
+      },
+      "ui": {
+        "colorToken": "--role-arsonist",
+        "icon": "arsonist.svg",
+        "revealBackground": "#c05621"
+      }
+    },
+
+    {
+      "id": "serial_killer",
+      "name": "Serial Killer",
+      "team": "neutral",
+      "investigationResult": "neutral",
+      "balanceWeight": -3,
+      "wakeOrder": 4,
+      "actionPhase": "night",
+      "actionType": "eliminate_solo",
+      "maxUses": null,
+      "description": "You win if you are the last player standing. Eliminate one player every night.",
+      "uiPromptNight": "Choose your victim.",
+      "abilities": [
+        "Each night, secretly eliminate one player — independent of the wolves.",
+        "You are immune to wolf kills (you fight them off).",
+        "Win when you are the last player remaining."
+      ],
+      "winCondition": "last_player_standing",
+      "nightAction": {
+        "targetPool": "living_all_excluding_self",
+        "requiresConsensus": false,
+        "immuneToWolfKill": true,
+        "canBeBlocked": true
+      },
+      "ui": {
+        "colorToken": "--role-serial-killer",
+        "icon": "serial_killer.svg",
+        "revealBackground": "#1a202c"
+      }
+    }
+
+  ],
+
+  "winConditions": {
+    "wolves_eliminated": {
+      "team": "village",
+      "description": "All Werewolves are eliminated.",
+      "check": "wolf_team_alive_count == 0",
+      "priority": 2
+    },
+    "wolves_equal_or_exceed_village": {
+      "team": "werewolf",
+      "description": "Living Werewolves are equal to or outnumber all other living players.",
+      "check": "wolf_team_alive_count >= non_wolf_alive_count",
+      "priority": 2
+    },
+    "voted_out_by_village": {
+      "team": "neutral",
+      "role": "jester",
+      "description": "The Jester was eliminated by a village day vote.",
+      "check": "elimination_cause == 'village_vote' AND eliminated_role == 'jester'",
+      "priority": 1,
+      "note": "Checked immediately on village vote resolution, before standard win checks. Jester win is solo — the game continues for all other players."
+    },
+    "last_player_standing": {
+      "team": "neutral",
+      "roles": ["serial_killer", "arsonist"],
+      "description": "The neutral killer is the only living player.",
+      "check": "living_count == 1 AND (serial_killer_alive OR arsonist_alive)",
+      "priority": 2,
+      "note": "Both Serial Killer and Arsonist share this win condition. If both are alive and all other players die simultaneously, the game is a draw — server declares no winner and triggers game_over."
+    }
+  },
+
+  "winCheckPriority": {
+    "description": "Win conditions are evaluated in priority order after every elimination. Lower number = checked first. If multiple conditions trigger simultaneously (e.g., last wolf eliminated + serial killer alive alone), priority 1 wins resolve first.",
+    "order": [
+      { "priority": 1, "conditions": ["voted_out_by_village"] },
+      { "priority": 2, "conditions": ["wolves_eliminated", "wolves_equal_or_exceed_village", "last_player_standing"] }
+    ]
+  },
+
+  "nightResolutionOrder": [
+    {
+      "step": 1,
+      "role": "wolf_shaman",
+      "action": "roleblock",
+      "description": "Wolf Shaman hex applied first. Sets roleblocked_player_id. Any action submitted by the hexed player is discarded before processing. Cupid cannot be blocked (canBeBlocked: false)."
+    },
+    {
+      "step": 2,
+      "role": "framer",
+      "action": "manipulate",
+      "description": "Framer sets is_framed_tonight = true on their chosen target (if not roleblocked). Must resolve before Seer so the Seer sees the framed result. Framer effect is reset to false at the start of each new night phase."
+    },
+    {
+      "step": 3,
+      "role": "cupid",
+      "action": "link_players",
+      "description": "Round 1 only. Cupid's link establishes lovers_pair in MasterGameState. Both linked players receive lovers_partner_id in their stripped state. Cupid cannot be roleblocked."
+    },
+    {
+      "step": 4,
+      "role": "infector",
+      "action": "convert",
+      "description": "Infector submits infector_target_id (non-null = use infection this round) or null (skip). If infecting: wolf kill is cancelled this round; infection is queued. Skipped if Infector was roleblocked or infect_used == true."
+    },
+    {
+      "step": 5,
+      "role": "doctor",
+      "action": "protect",
+      "description": "Doctor sets is_protected = true on their target (if not roleblocked). Consecutive protect ban enforced here."
+    },
+    {
+      "step": 6,
+      "role": "seer",
+      "action": "inspect",
+      "description": "Seer's inspect resolved (if not roleblocked). If target.is_framed_tonight == true, result is forced to 'werewolf' regardless of actual investigationResult. Otherwise returns target.investigationResult. Result stored in seer_knowledge."
+    },
+    {
+      "step": 7,
+      "role": "werewolf",
+      "action": "eliminate_group_or_infect",
+      "description": "If infector used this round: apply conversion — target.role = 'werewolf', target.team = 'werewolf'. No kill. If no infect: tally wolf votes. Majority wins; ties = no kill. Serial Killer and Arsonist are NOT immune to wolf kill by default. If target is_protected, kill is silently blocked."
+    },
+    {
+      "step": 8,
+      "role": "arsonist",
+      "action": "douse_or_ignite",
+      "description": "If action == 'douse': add target to arsonist's doused_player_ids (if not roleblocked). If action == 'ignite': eliminate all living players in doused_player_ids simultaneously, cause = 'arsonist_ignite'. Ignite is blocked if Arsonist was roleblocked this round."
+    },
+    {
+      "step": 9,
+      "role": "serial_killer",
+      "action": "eliminate_solo",
+      "description": "Serial Killer's solo kill applied (if not roleblocked). Independent of wolf kill. Can eliminate a Doctor-protected player."
+    },
+    {
+      "step": 10,
+      "role": "cupid",
+      "action": "link_death_chain",
+      "description": "After all kills: check if either Lover in lovers_pair was eliminated this step. If so, the surviving Lover is immediately eliminated, cause = 'broken_heart'. Chain can trigger Hunter."
+    },
+    {
+      "step": 11,
+      "role": "tracker",
+      "action": "track",
+      "description": "Tracker result computed last — after all actions resolved. tracker_result = list of player IDs targeted by the tracked player this round (from night_actions). If tracked player was roleblocked or had no action (wakeOrder=0), result is empty. Stored in tracker_knowledge."
+    },
+    {
+      "step": 12,
+      "role": "hunter",
+      "action": "revenge_kill",
+      "description": "If any Hunter was eliminated in steps 7–10, hunter_queue is populated and phase = 'hunter_pending'. Game pauses for Hunter to select revenge target. Win check does NOT run until hunter_queue is empty."
+    },
+    {
+      "step": 13,
+      "action": "win_check",
+      "description": "check_win_condition() runs in priority order: Jester (priority 1), then team/neutral wins (priority 2). If multiple priority-2 conditions are met simultaneously (e.g., last wolf eliminated and SK alone), wolf victory takes priority over SK standalone."
+    }
+  ],
+
+  "balanceWeightSystem": {
+    "description": "Each role is assigned a balanceWeight quantifying its expected net impact on game balance. Positive = pro-village advantage. Negative = pro-wolf or pro-chaos disadvantage for village. The server uses these weights to validate dynamic compositions and re-roll pools that push balance outside the acceptable range.",
+    "formula": "sum(balanceWeight for each role in final composition)",
+    "targetRange": [-2, 2],
+    "rerollStrategy": "If abs(sum) > 2 after initial pool draws, pools with rerollable: true are each re-drawn once. If the sum is still out of range after one re-roll pass, the composition is accepted — prevents infinite loops on small player counts or constrained pools.",
+    "referenceWeights": {
+      "villager":      "+1  — headcount only; no threat value",
+      "seer":          "+3  — strongest village info; identifies wolves if unblocked/unframed",
+      "doctor":        "+2  — negates one wolf kill per night",
+      "mayor":         "+1  — double vote is a mild day-phase advantage",
+      "hunter":        "+2  — forces wolves to trade two lives for one elimination",
+      "cupid":         "+1  — village-aligned but introduces chaotic death chain risk",
+      "tracker":       "+2  — village info; weaker than Seer (no history, no guaranteed result)",
+      "werewolf":      "-3  — standard wolf kill threat",
+      "alpha_wolf":    "-4  — wolf kill + Seer immunity; hardest wolf to identify and purge",
+      "wolf_shaman":   "-3  — wolf kill + one targeted ability block per night",
+      "framer":        "-3  — neutralizes the Seer entirely for one round",
+      "infector":      "-4  — can grow wolf team; highest long-run wolf threat",
+      "jester":        "-1  — disrupts village vote discipline; net chaos harm to village",
+      "arsonist":      "-3  — independent mass-kill threat; can bypass Doctor",
+      "serial_killer": "-3  — independent kill every night; immune to wolf elimination"
+    }
+  },
+
+  "dynamicTemplates": {
+    "_meta": {
+      "description": "Server selects a template by matching current player_count to a range. Guaranteed roles fill first. Then each flexPool is drawn: the server picks `picks` options uniformly at random from the pool's options array (duplicates allowed if listed twice). 'none' as an option means this slot is left empty. After all pools, remaining player slots are filled from the filler pool. Balance check runs against balanceWeightSystem.targetRange; rerollable pools are re-drawn once if out of range.",
+      "noneOption": "Including 'none' in an options array makes the role optional — the server may select it, in which case no role is added for that pool slot.",
+      "remainingSlotsRule": "Filler pool with picks: 'remaining_slots' fills exactly (playerCount - sum of all other assigned roles). The server selects options from the filler list repeatedly until slots are full, sampling with replacement."
+    },
+
+    "5": {
+      "playerCount": { "min": 5, "max": 5 },
+      "guaranteed": { "werewolf": 1, "seer": 1 },
+      "flexPools": [
+        {
+          "type": "village_anchor",
+          "picks": 1,
+          "rerollable": true,
+          "options": ["doctor", "hunter", "villager"]
+        },
+        {
+          "type": "filler",
+          "picks": "remaining_slots",
+          "rerollable": false,
+          "options": ["villager", "villager", "villager"]
+        }
+      ]
+    },
+
+    "6_to_7": {
+      "playerCount": { "min": 6, "max": 7 },
+      "guaranteed": { "villager": 1, "werewolf": 1, "seer": 1 },
+      "flexPools": [
+        {
+          "type": "protection",
+          "picks": 1,
+          "rerollable": true,
+          "options": ["doctor", "hunter", "none"]
+        },
+        {
+          "type": "wolf_upgrade",
+          "picks": 1,
+          "rerollable": true,
+          "options": ["werewolf", "alpha_wolf", "none"]
+        },
+        {
+          "type": "filler",
+          "picks": "remaining_slots",
+          "rerollable": false,
+          "options": ["villager", "villager", "mayor"]
+        }
+      ]
+    },
+
+    "8_to_9": {
+      "playerCount": { "min": 8, "max": 9 },
+      "guaranteed": { "villager": 2, "werewolf": 2, "seer": 1 },
+      "flexPools": [
+        {
+          "type": "protection",
+          "picks": 1,
+          "rerollable": true,
+          "options": ["doctor", "hunter", "none"]
+        },
+        {
+          "type": "village_support",
+          "picks": 1,
+          "rerollable": true,
+          "options": ["tracker", "mayor", "cupid", "none"]
+        },
+        {
+          "type": "wolf_upgrade",
+          "picks": 1,
+          "rerollable": true,
+          "options": ["alpha_wolf", "wolf_shaman", "none"]
+        },
+        {
+          "type": "filler",
+          "picks": "remaining_slots",
+          "rerollable": false,
+          "options": ["villager", "villager", "mayor"]
+        }
+      ]
+    },
+
+    "10_to_12": {
+      "playerCount": { "min": 10, "max": 12 },
+      "guaranteed": { "villager": 2, "werewolf": 2, "seer": 1 },
+      "flexPools": [
+        {
+          "type": "protection",
+          "picks": 1,
+          "rerollable": true,
+          "options": ["doctor", "hunter", "none"]
+        },
+        {
+          "type": "wolf_support",
+          "picks": 1,
+          "rerollable": true,
+          "options": ["alpha_wolf", "wolf_shaman", "werewolf"]
+        },
+        {
+          "type": "chaos_neutral",
+          "picks": 1,
+          "rerollable": true,
+          "options": ["jester", "serial_killer", "arsonist", "none"]
+        },
+        {
+          "type": "filler",
+          "picks": "remaining_slots",
+          "rerollable": false,
+          "options": ["villager", "villager", "mayor", "hunter"]
+        }
+      ]
+    },
+
+    "13_to_15": {
+      "playerCount": { "min": 13, "max": 15 },
+      "guaranteed": { "villager": 2, "werewolf": 2, "seer": 1, "doctor": 1 },
+      "flexPools": [
+        {
+          "type": "wolf_support",
+          "picks": 1,
+          "rerollable": true,
+          "options": ["alpha_wolf", "wolf_shaman", "werewolf"]
+        },
+        {
+          "type": "wolf_special",
+          "picks": 1,
+          "rerollable": true,
+          "options": ["framer", "infector", "none"]
+        },
+        {
+          "type": "village_info",
+          "picks": 1,
+          "rerollable": true,
+          "options": ["tracker", "cupid", "mayor"]
+        },
+        {
+          "type": "village_anchor",
+          "picks": 1,
+          "rerollable": true,
+          "options": ["hunter", "mayor", "cupid"]
+        },
+        {
+          "type": "chaos_neutral",
+          "picks": 1,
+          "rerollable": true,
+          "options": ["jester", "serial_killer", "arsonist", "none"]
+        },
+        {
+          "type": "filler",
+          "picks": "remaining_slots",
+          "rerollable": false,
+          "options": ["villager", "villager", "hunter", "mayor"]
+        }
+      ]
+    },
+
+    "16_to_18": {
+      "playerCount": { "min": 16, "max": 18 },
+      "guaranteed": { "villager": 2, "werewolf": 2, "seer": 1, "doctor": 1, "hunter": 1 },
+      "flexPools": [
+        {
+          "type": "wolf_support",
+          "picks": 1,
+          "rerollable": true,
+          "options": ["alpha_wolf", "wolf_shaman"]
+        },
+        {
+          "type": "wolf_special_a",
+          "picks": 1,
+          "rerollable": true,
+          "options": ["framer", "infector", "none"]
+        },
+        {
+          "type": "wolf_special_b",
+          "picks": 1,
+          "rerollable": true,
+          "options": ["framer", "infector", "none"]
+        },
+        {
+          "type": "village_info",
+          "picks": 1,
+          "rerollable": true,
+          "options": ["tracker", "cupid", "mayor"]
+        },
+        {
+          "type": "village_support",
+          "picks": 1,
+          "rerollable": true,
+          "options": ["mayor", "cupid", "tracker"]
+        },
+        {
+          "type": "chaos_neutral_a",
+          "picks": 1,
+          "rerollable": true,
+          "options": ["jester", "serial_killer", "arsonist", "none"]
+        },
+        {
+          "type": "chaos_neutral_b",
+          "picks": 1,
+          "rerollable": true,
+          "options": ["jester", "arsonist", "none"]
+        },
+        {
+          "type": "filler",
+          "picks": "remaining_slots",
+          "rerollable": false,
+          "options": ["villager", "villager", "villager", "mayor"]
+        }
+      ]
+    }
+  },
+
+  "archivePuzzleSystem": {
+    "_meta": {
+      "description": "Villager (and Mayor, and post-round-1 Cupid) night phase experience. Replaces the passive 'tap the shooting stars' decoy with rapid-fire puzzles. Solving a puzzle rewards a HintPayload — a partial truth drawn from the actual dynamically-generated composition. This is an engagement mechanic, not a game-altering power: hints are probabilistic nudges, never definitive role reveals.",
+      "appliesTo": ["villager", "mayor", "jester", "cupid_after_round_1"],
+      "note": "Jester is included intentionally — they have no night action but benefit from hints just like Villager. The server treats all wakeOrder=0 non-hunter roles as Archives participants."
+    },
+    "antiCheatConstraint": {
+      "description": "The Archives screen must be visually indistinguishable from the Werewolf wolf-vote screen at a viewing distance of 2 feet. This prevents wolves from recognizing non-wolf players by watching their phone screens.",
+      "requirements": [
+        "Same dark background: #0a0e1a (matches night substrate from PRD-003 §4.1)",
+        "Same centered rectangular content panel: same max-width, same border-radius, same glass-bg token",
+        "Same layout density: comparable number of visible UI elements in the content area",
+        "No role-identifying color: the content panel must not use a role color token (e.g., --role-villager) that differs from the wolf voting panel's color"
+      ],
+      "crossReference": "PRD-002 §3.3 Night Phase (Mobile) — anti-cheat visual consistency rule"
+    },
+    "puzzleTypes": [
+      {
+        "id": "math",
+        "label": "Math Equation",
+        "description": "Rapid arithmetic problem. Player selects the correct answer from three options.",
+        "example": "15 × 4 - 12 = ?",
+        "answerType": "multiple_choice",
+        "choices": 3,
+        "timeLimitSeconds": 15,
+        "difficulty": "easy",
+        "generationNote": "Server generates random integers; difficulty scales with round number (round 1-2: basic ops, round 3+: two-step equations)."
+      },
+      {
+        "id": "logic",
+        "label": "Logic Deduction",
+        "description": "Short deductive reasoning question. True/False or three-option selection.",
+        "example": "A is faster than B. B is faster than C. Is A the fastest?",
+        "answerType": "multiple_choice",
+        "choices": 2,
+        "timeLimitSeconds": 20,
+        "difficulty": "medium",
+        "generationNote": "Server selects from a static puzzle bank (stored separately). Bank rotated per-game using the game seed to prevent repetition."
+      },
+      {
+        "id": "sequence",
+        "label": "Memory Sequence",
+        "description": "Simon Says-style tap sequence. Four colored tiles flash in order; player must replay the exact sequence.",
+        "answerType": "tap_sequence",
+        "sequenceLength": 4,
+        "timeLimitSeconds": 30,
+        "difficulty": "medium",
+        "generationNote": "Sequence generated server-side from game seed + round + player_id. Client receives sequence via puzzle_state broadcast before display."
+      }
+    ],
+    "hintCategories": [
+      {
+        "id": "wolf_count",
+        "template": "There are {N} Wolves total in this game.",
+        "derivedFrom": "count of players with team == 'werewolf' in the generated composition",
+        "expiry": "permanent",
+        "sensitivity": "high"
+      },
+      {
+        "id": "no_role_present",
+        "template": "There is NO {role_name} in this game.",
+        "derivedFrom": "randomly selected absent high-impact role from: [alpha_wolf, framer, serial_killer, infector, arsonist]",
+        "expiry": "permanent",
+        "sensitivity": "high"
+      },
+      {
+        "id": "role_present",
+        "template": "There IS a {role_name} in this game.",
+        "derivedFrom": "randomly selected present special role, excluding guaranteed baseline roles (villager, werewolf, seer)",
+        "expiry": "permanent",
+        "sensitivity": "high"
+      },
+      {
+        "id": "neutral_exists",
+        "template": "At least one Neutral player is alive in this game.",
+        "derivedFrom": "any living player with team == 'neutral' in current state",
+        "expiry": "expires_after_1_round",
+        "sensitivity": "medium",
+        "note": "Uses current alive state, not composition — hint becomes stale if the neutral player dies."
+      },
+      {
+        "id": "seer_blocked_last_night",
+        "template": "The Seer was unable to see clearly last night.",
+        "derivedFrom": "roleblocked_player_id matched seer's player_id in the previous round's resolution",
+        "expiry": "expires_after_1_round",
+        "sensitivity": "medium",
+        "note": "Only delivered if a Seer is in the game and was roleblocked last round."
+      }
+    ],
+    "hintPayload": {
+      "description": "Sent server → solving player as a targeted unicast immediately after puzzle resolution. Never broadcast. Display client and other players never receive hint content.",
+      "deliveryMethod": "unicast — targeted to solving player's WebSocket only",
+      "schema": {
+        "type": "string — always 'hint_reward'",
+        "hint_id": "string — UUID; unique per hint delivery; prevents duplicate delivery on reconnect",
+        "category": "string — one of hintCategories[].id",
+        "text": "string — pre-formatted hint string, e.g. 'There are 3 Wolves total in this game.'",
+        "round": "int — round number when hint was earned",
+        "expires_after_round": "int | null — hint becomes stale after this round number. null = permanent composition hints. Set to (round + 1) for behavioral hints."
+      },
+      "deduplicationRule": "Server tracks hint_ids delivered to each player in Redis. A player who reconnects receives their hint history but not re-delivery of already-sent hints."
+    },
+    "puzzleState": {
+      "description": "Ephemeral state broadcast to the wakeOrder=0 player at night phase start. Cleared on phase transition.",
+      "schema": {
+        "active": "bool — true while puzzle window is open",
+        "puzzle_type": "string — one of puzzleTypes[].id",
+        "puzzle_data": "object — type-specific puzzle content. For 'math': { expression, answer_options, correct_index }. For 'logic': { question, answer_options, correct_index }. For 'sequence': { sequence: [color_id] }",
+        "time_limit_seconds": "int — from puzzleTypes[].timeLimitSeconds",
+        "solved": "bool | null — null while active, true on correct answer, false on timeout or wrong answer",
+        "hint_pending": "bool — true if server is about to send a hint_reward unicast (set briefly after solve, before delivery)"
+      },
+      "stripping": "puzzle_state is included only in the solving player's own strip. Never in Display or other players' strips."
+    },
+    "framerHackSystem": {
+      "description": "Documents how the Framer's hack_archives action integrates with the Archives hint delivery pipeline. See ADR-002 for the architectural rationale.",
+      "deliveryPriority": "false_hint_payload takes precedence over real hint generation. When false_hint_queued == true, the hint delivery handler substitutes false_hint_payload for any real hint that would otherwise be generated. The real hint is discarded — not queued for later.",
+      "allowedFalseCategories": ["wolf_count", "no_role_present", "role_present"],
+      "forbiddenFalseCategories": ["seer_blocked_last_night", "neutral_exists"],
+      "forbiddenRationale": "Behavioral categories reference prior-round server events (roleblock state, alive counts) that the Framer cannot control or predict. Allowing them would produce incoherent hints (e.g., claiming the Seer was blocked when no Shaman exists).",
+      "serverValidation": "Server does NOT validate whether the crafted hint is actually false. The wolves are responsible for constructing a convincing lie. If a Framer accidentally crafts a true hint, it is queued and delivered as-is.",
+      "trackerBehavior": "When the Framer chooses hack_archives, framer_target_id is null. The Tracker observing the Framer sees tracker_result: [] — an empty array, identical to observing a wakeOrder=0 player. The Archives hack is invisible to the Tracker.",
+      "wastedAction": "If no wakeOrder=0 player solves a puzzle in the round when false_hint_queued is true, false_hint_payload is cleared at phase transition with no delivery. The Framer's action is wasted. This is intentional — creates risk for the wolf team.",
+      "simultaneousSolvers": "If multiple wakeOrder=0 players solve puzzles in the same round, each receives the same false_hint_payload (same hint_id, same text). This is by design — uniform misinformation across the village.",
+      "crossReference": "PRD-004 §2.3 Delivery Pipeline, ADR-002"
+    }
+  },
+
+  "targetPools": {
+    "living_all":                  "All living players including self.",
+    "living_all_including_self":   "All living players including self. Alias of living_all.",
+    "living_all_excluding_self":   "All living players excluding the acting player.",
+    "living_non_wolf":             "All living players whose team is not 'werewolf'. Used by wolves to prevent intra-pack voting."
+  },
+
+  "validationRules": {
+    "minPlayers": 5,
+    "maxPlayers": 18,
+    "requiredRoles": ["werewolf"],
+    "compositionMustSumToPlayerCount": true,
+    "wolfCountMustBeLessThanVillage": "At game start: wolf_team_count < (player_count - wolf_team_count). Server rejects compositions where wolves already meet or exceed win condition.",
+    "doctorConsecutiveProtectBan": "last_protected_player_id tracked server-side. Re-protecting same target returns CONSECUTIVE_PROTECT.",
+    "hunterMaxUses": "Hunter revenge_kill available exactly once. Server ignores HUNTER_REVENGE intent if hunter_fired == true.",
+    "serialKillerImmunity": "Serial Killer is immune to wolf kills. If wolf vote targets SK, kill is silently blocked — no Doctor protection consumed.",
+    "dynamicCompositionBalanceCheck": "After drawing from all flexPools, server computes sum(balanceWeight). If abs(sum) > balanceWeightSystem.targetRange[1], rerollable pools are each re-drawn once. Composition accepted regardless after one re-roll pass."
+  }
+}
