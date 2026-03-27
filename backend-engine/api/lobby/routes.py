@@ -11,9 +11,10 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from engine.config import get_settings
 from engine.setup import setup_game
 from engine.state.enums import Phase
-from engine.state.models import PlayerState
+from engine.state.models import GameConfig, PlayerState
 from storage.redis_store import (
     issue_session_token,
     load_game,
@@ -48,7 +49,17 @@ async def create_game(body: CreateGameRequest, redis=Depends(_get_redis)):
     game_id = secrets.token_urlsafe(6).upper()
     host_player_id = str(uuid.uuid4())
 
-    G = setup_game(game_id, host_player_id, {})
+    settings = get_settings()
+    cfg = GameConfig(
+        player_count=1,
+        roles={},
+        night_timer_seconds=settings.night_timer_seconds,
+        day_timer_seconds=settings.day_timer_seconds,
+        vote_timer_seconds=settings.vote_timer_seconds,
+        role_deal_timer_seconds=settings.role_deal_timer_seconds,
+        hunter_pending_timer_seconds=settings.hunter_pending_timer_seconds,
+    )
+    G = setup_game(game_id, host_player_id, cfg)
     G.players[host_player_id].display_name = body.host_display_name
     G.players[host_player_id].avatar_id = body.avatar_id
 

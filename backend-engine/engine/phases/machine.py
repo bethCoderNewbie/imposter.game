@@ -71,12 +71,18 @@ def transition_phase(G: MasterGameState, new_phase: Phase) -> MasterGameState:
     G = G.model_copy(deep=True)
 
     if new_phase == Phase.NIGHT:
-        G.round += 1
+        # Increment round only when coming from a phase after the initial role_deal
+        if G.phase not in (Phase.ROLE_DEAL, Phase.LOBBY):
+            G.round += 1
         # Reset all per-night player fields
         for player in G.players.values():
             player.is_protected = False
             player.is_framed_tonight = False
             player.night_action_submitted = False
+        # Clear votes from previous round
+        G.day_votes = {}
+        for player in G.players.values():
+            player.vote_target_id = None
         # Reset night actions
         required = compute_actions_required(G)
         G.night_actions = NightActions(
@@ -121,7 +127,12 @@ def should_auto_advance(G: MasterGameState) -> bool:
         living = [p for p in G.players.values() if p.is_alive]
         if not living:
             return False
-        return all(p.vote_target_id is not None for p in living)
+        alive_count = len(living)
+        # Check vote_target_id first (set by handler), fall back to day_votes count
+        voted_via_field = sum(1 for p in living if p.vote_target_id is not None)
+        voted_via_dict = sum(1 for pid in G.day_votes if G.players.get(pid) and G.players[pid].is_alive)
+        voted = max(voted_via_field, voted_via_dict)
+        return voted >= alive_count
 
     if G.phase == Phase.ROLE_DEAL:
         return all(p.role_confirmed for p in G.players.values())

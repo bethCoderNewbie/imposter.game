@@ -5,11 +5,7 @@
     "last_updated": "2026-03-26",
     "changelog": "v0.5 — Framer Archives Hack: actionType updated to manipulate_or_hack; nightAction expanded with framerActionEnum, frame/hack_archives sub-objects; archivePuzzleSystem.framerHackSystem added. v0.4 — Pool-and-Points dynamicTemplates; balanceWeight per role; balanceWeightSystem; archivePuzzleSystem."
   },
-
   "roles": [
-
-    // ─── TEAM: VILLAGE ───────────────────────────────────────────────────────
-
     {
       "id": "villager",
       "name": "Villager",
@@ -34,7 +30,6 @@
         "revealBackground": "#718096"
       }
     },
-
     {
       "id": "seer",
       "name": "Seer",
@@ -56,7 +51,11 @@
       "nightAction": {
         "targetPool": "living_all",
         "resultField": "investigationResult",
-        "resultValues": ["village", "werewolf", "neutral"],
+        "resultValues": [
+          "village",
+          "werewolf",
+          "neutral"
+        ],
         "historyVisible": true,
         "canBeBlocked": true
       },
@@ -66,7 +65,6 @@
         "revealBackground": "#805ad5"
       }
     },
-
     {
       "id": "doctor",
       "name": "Doctor",
@@ -97,7 +95,6 @@
         "revealBackground": "#38a169"
       }
     },
-
     {
       "id": "mayor",
       "name": "Mayor",
@@ -127,7 +124,6 @@
         "revealBackground": "#d69e2e"
       }
     },
-
     {
       "id": "hunter",
       "name": "Hunter",
@@ -148,7 +144,10 @@
       "winCondition": "wolves_eliminated",
       "onDeathAction": {
         "targetPool": "living_all_excluding_self",
-        "triggersOn": ["wolf_kill", "village_vote"],
+        "triggersOn": [
+          "wolf_kill",
+          "village_vote"
+        ],
         "interstitialDisplay": "The Hunter takes aim...",
         "maxUses": 1
       },
@@ -158,7 +157,6 @@
         "revealBackground": "#c05621"
       }
     },
-
     {
       "id": "cupid",
       "name": "Cupid",
@@ -190,7 +188,6 @@
         "revealBackground": "#ed64a6"
       }
     },
-
     {
       "id": "tracker",
       "name": "Tracker",
@@ -222,14 +219,11 @@
         "revealBackground": "#2f855a"
       }
     },
-
-    // ─── TEAM: WEREWOLF ──────────────────────────────────────────────────────
-
     {
       "id": "werewolf",
       "name": "Werewolf",
       "team": "werewolf",
-      "investigationResult": "werewolf",
+      "investigationResult": "wolf",
       "balanceWeight": -3,
       "wakeOrder": 1,
       "actionPhase": "night",
@@ -255,7 +249,6 @@
         "revealBackground": "#e53e3e"
       }
     },
-
     {
       "id": "alpha_wolf",
       "name": "Alpha Wolf",
@@ -286,12 +279,11 @@
         "revealBackground": "#c53030"
       }
     },
-
     {
       "id": "wolf_shaman",
       "name": "Wolf Shaman",
       "team": "werewolf",
-      "investigationResult": "werewolf",
+      "investigationResult": "wolf",
       "balanceWeight": -3,
       "wakeOrder": 1,
       "actionPhase": "night",
@@ -323,12 +315,11 @@
         "revealBackground": "#702459"
       }
     },
-
     {
       "id": "framer",
       "name": "Framer",
       "team": "werewolf",
-      "investigationResult": "werewolf",
+      "investigationResult": "wolf",
       "balanceWeight": -3,
       "wakeOrder": 2,
       "actionPhase": "night",
@@ -343,7 +334,10 @@
       ],
       "winCondition": "wolves_equal_or_exceed_village",
       "nightAction": {
-        "framerActionEnum": ["frame", "hack_archives"],
+        "framerActionEnum": [
+          "frame",
+          "hack_archives"
+        ],
         "frame": {
           "targetPool": "living_all_excluding_self",
           "effect": "set_is_framed_tonight",
@@ -353,7 +347,11 @@
         "hack_archives": {
           "targetPool": "none",
           "effect": "queue_false_hint",
-          "allowedFalseCategories": ["wolf_count", "no_role_present", "role_present"],
+          "allowedFalseCategories": [
+            "wolf_count",
+            "no_role_present",
+            "role_present"
+          ],
           "deliveryTrigger": "wakeOrder0_puzzle_solve",
           "deliveryScope": "all_solvers_this_round",
           "framerReceivesConfirmation": false
@@ -367,12 +365,11 @@
         "revealBackground": "#744210"
       }
     },
-
     {
       "id": "infector",
       "name": "Infector",
       "team": "werewolf",
-      "investigationResult": "werewolf",
+      "investigationResult": "wolf",
       "balanceWeight": -4,
       "wakeOrder": 3,
       "actionPhase": "night",
@@ -400,9 +397,6 @@
         "revealBackground": "#553c9a"
       }
     },
-
-    // ─── TEAM: NEUTRAL ───────────────────────────────────────────────────────
-
     {
       "id": "jester",
       "name": "Jester",
@@ -427,7 +421,6 @@
         "revealBackground": "#6b46c1"
       }
     },
-
     {
       "id": "arsonist",
       "name": "Arsonist",
@@ -472,7 +465,6 @@
         "revealBackground": "#c05621"
       }
     },
-
     {
       "id": "serial_killer",
       "name": "Serial Killer",
@@ -503,9 +495,7 @@
         "revealBackground": "#1a202c"
       }
     }
-
   ],
-
   "winConditions": {
     "wolves_eliminated": {
       "team": "village",
@@ -529,22 +519,35 @@
     },
     "last_player_standing": {
       "team": "neutral",
-      "roles": ["serial_killer", "arsonist"],
+      "roles": [
+        "serial_killer",
+        "arsonist"
+      ],
       "description": "The neutral killer is the only living player.",
       "check": "living_count == 1 AND (serial_killer_alive OR arsonist_alive)",
       "priority": 2,
       "note": "Both Serial Killer and Arsonist share this win condition. If both are alive and all other players die simultaneously, the game is a draw — server declares no winner and triggers game_over."
     }
   },
-
   "winCheckPriority": {
     "description": "Win conditions are evaluated in priority order after every elimination. Lower number = checked first. If multiple conditions trigger simultaneously (e.g., last wolf eliminated + serial killer alive alone), priority 1 wins resolve first.",
     "order": [
-      { "priority": 1, "conditions": ["voted_out_by_village"] },
-      { "priority": 2, "conditions": ["wolves_eliminated", "wolves_equal_or_exceed_village", "last_player_standing"] }
+      {
+        "priority": 1,
+        "conditions": [
+          "voted_out_by_village"
+        ]
+      },
+      {
+        "priority": 2,
+        "conditions": [
+          "wolves_eliminated",
+          "wolves_equal_or_exceed_village",
+          "last_player_standing"
+        ]
+      }
     ]
   },
-
   "nightResolutionOrder": [
     {
       "step": 1,
@@ -624,247 +627,404 @@
       "description": "check_win_condition() runs in priority order: Jester (priority 1), then team/neutral wins (priority 2). If multiple priority-2 conditions are met simultaneously (e.g., last wolf eliminated and SK alone), wolf victory takes priority over SK standalone."
     }
   ],
-
   "balanceWeightSystem": {
     "description": "Each role is assigned a balanceWeight quantifying its expected net impact on game balance. Positive = pro-village advantage. Negative = pro-wolf or pro-chaos disadvantage for village. The server uses these weights to validate dynamic compositions and re-roll pools that push balance outside the acceptable range.",
     "formula": "sum(balanceWeight for each role in final composition)",
-    "targetRange": [-2, 2],
+    "targetRange": [
+      -2,
+      2
+    ],
     "rerollStrategy": "If abs(sum) > 2 after initial pool draws, pools with rerollable: true are each re-drawn once. If the sum is still out of range after one re-roll pass, the composition is accepted — prevents infinite loops on small player counts or constrained pools.",
     "referenceWeights": {
-      "villager":      "+1  — headcount only; no threat value",
-      "seer":          "+3  — strongest village info; identifies wolves if unblocked/unframed",
-      "doctor":        "+2  — negates one wolf kill per night",
-      "mayor":         "+1  — double vote is a mild day-phase advantage",
-      "hunter":        "+2  — forces wolves to trade two lives for one elimination",
-      "cupid":         "+1  — village-aligned but introduces chaotic death chain risk",
-      "tracker":       "+2  — village info; weaker than Seer (no history, no guaranteed result)",
-      "werewolf":      "-3  — standard wolf kill threat",
-      "alpha_wolf":    "-4  — wolf kill + Seer immunity; hardest wolf to identify and purge",
-      "wolf_shaman":   "-3  — wolf kill + one targeted ability block per night",
-      "framer":        "-3  — neutralizes the Seer entirely for one round",
-      "infector":      "-4  — can grow wolf team; highest long-run wolf threat",
-      "jester":        "-1  — disrupts village vote discipline; net chaos harm to village",
-      "arsonist":      "-3  — independent mass-kill threat; can bypass Doctor",
+      "villager": "+1  — headcount only; no threat value",
+      "seer": "+3  — strongest village info; identifies wolves if unblocked/unframed",
+      "doctor": "+2  — negates one wolf kill per night",
+      "mayor": "+1  — double vote is a mild day-phase advantage",
+      "hunter": "+2  — forces wolves to trade two lives for one elimination",
+      "cupid": "+1  — village-aligned but introduces chaotic death chain risk",
+      "tracker": "+2  — village info; weaker than Seer (no history, no guaranteed result)",
+      "werewolf": "-3  — standard wolf kill threat",
+      "alpha_wolf": "-4  — wolf kill + Seer immunity; hardest wolf to identify and purge",
+      "wolf_shaman": "-3  — wolf kill + one targeted ability block per night",
+      "framer": "-3  — neutralizes the Seer entirely for one round",
+      "infector": "-4  — can grow wolf team; highest long-run wolf threat",
+      "jester": "-1  — disrupts village vote discipline; net chaos harm to village",
+      "arsonist": "-3  — independent mass-kill threat; can bypass Doctor",
       "serial_killer": "-3  — independent kill every night; immune to wolf elimination"
     }
   },
-
   "dynamicTemplates": {
     "_meta": {
       "description": "Server selects a template by matching current player_count to a range. Guaranteed roles fill first. Then each flexPool is drawn: the server picks `picks` options uniformly at random from the pool's options array (duplicates allowed if listed twice). 'none' as an option means this slot is left empty. After all pools, remaining player slots are filled from the filler pool. Balance check runs against balanceWeightSystem.targetRange; rerollable pools are re-drawn once if out of range.",
       "noneOption": "Including 'none' in an options array makes the role optional — the server may select it, in which case no role is added for that pool slot.",
       "remainingSlotsRule": "Filler pool with picks: 'remaining_slots' fills exactly (playerCount - sum of all other assigned roles). The server selects options from the filler list repeatedly until slots are full, sampling with replacement."
     },
-
     "5": {
-      "playerCount": { "min": 5, "max": 5 },
-      "guaranteed": { "werewolf": 1, "seer": 1 },
+      "playerCount": {
+        "min": 5,
+        "max": 5
+      },
+      "guaranteed": {
+        "werewolf": 1,
+        "seer": 1
+      },
       "flexPools": [
         {
           "type": "village_anchor",
           "picks": 1,
           "rerollable": true,
-          "options": ["doctor", "hunter", "villager"]
+          "options": [
+            "doctor",
+            "hunter",
+            "villager"
+          ]
         },
         {
           "type": "filler",
           "picks": "remaining_slots",
           "rerollable": false,
-          "options": ["villager", "villager", "villager"]
+          "options": [
+            "villager",
+            "villager",
+            "villager"
+          ]
         }
       ]
     },
-
     "6_to_7": {
-      "playerCount": { "min": 6, "max": 7 },
-      "guaranteed": { "villager": 1, "werewolf": 1, "seer": 1 },
+      "playerCount": {
+        "min": 6,
+        "max": 7
+      },
+      "guaranteed": {
+        "villager": 1,
+        "werewolf": 1,
+        "seer": 1
+      },
       "flexPools": [
         {
           "type": "protection",
           "picks": 1,
           "rerollable": true,
-          "options": ["doctor", "hunter", "none"]
+          "options": [
+            "doctor",
+            "hunter",
+            "none"
+          ]
         },
         {
           "type": "wolf_upgrade",
           "picks": 1,
           "rerollable": true,
-          "options": ["werewolf", "alpha_wolf", "none"]
+          "options": [
+            "werewolf",
+            "alpha_wolf",
+            "none"
+          ]
         },
         {
           "type": "filler",
           "picks": "remaining_slots",
           "rerollable": false,
-          "options": ["villager", "villager", "mayor"]
+          "options": [
+            "villager",
+            "villager",
+            "mayor"
+          ]
         }
       ]
     },
-
     "8_to_9": {
-      "playerCount": { "min": 8, "max": 9 },
-      "guaranteed": { "villager": 2, "werewolf": 2, "seer": 1 },
+      "playerCount": {
+        "min": 8,
+        "max": 9
+      },
+      "guaranteed": {
+        "villager": 2,
+        "werewolf": 2,
+        "seer": 1
+      },
       "flexPools": [
         {
           "type": "protection",
           "picks": 1,
           "rerollable": true,
-          "options": ["doctor", "hunter", "none"]
+          "options": [
+            "doctor",
+            "hunter",
+            "none"
+          ]
         },
         {
           "type": "village_support",
           "picks": 1,
           "rerollable": true,
-          "options": ["tracker", "mayor", "cupid", "none"]
+          "options": [
+            "tracker",
+            "mayor",
+            "cupid",
+            "none"
+          ]
         },
         {
           "type": "wolf_upgrade",
           "picks": 1,
           "rerollable": true,
-          "options": ["alpha_wolf", "wolf_shaman", "none"]
+          "options": [
+            "alpha_wolf",
+            "wolf_shaman",
+            "none"
+          ]
         },
         {
           "type": "filler",
           "picks": "remaining_slots",
           "rerollable": false,
-          "options": ["villager", "villager", "mayor"]
+          "options": [
+            "villager",
+            "villager",
+            "mayor"
+          ]
         }
       ]
     },
-
     "10_to_12": {
-      "playerCount": { "min": 10, "max": 12 },
-      "guaranteed": { "villager": 2, "werewolf": 2, "seer": 1 },
+      "playerCount": {
+        "min": 10,
+        "max": 12
+      },
+      "guaranteed": {
+        "villager": 2,
+        "werewolf": 2,
+        "seer": 1
+      },
       "flexPools": [
         {
           "type": "protection",
           "picks": 1,
           "rerollable": true,
-          "options": ["doctor", "hunter", "none"]
+          "options": [
+            "doctor",
+            "hunter",
+            "none"
+          ]
         },
         {
           "type": "wolf_support",
           "picks": 1,
           "rerollable": true,
-          "options": ["alpha_wolf", "wolf_shaman", "werewolf"]
+          "options": [
+            "alpha_wolf",
+            "wolf_shaman",
+            "werewolf"
+          ]
         },
         {
           "type": "chaos_neutral",
           "picks": 1,
           "rerollable": true,
-          "options": ["jester", "serial_killer", "arsonist", "none"]
+          "options": [
+            "jester",
+            "serial_killer",
+            "arsonist",
+            "none"
+          ]
         },
         {
           "type": "filler",
           "picks": "remaining_slots",
           "rerollable": false,
-          "options": ["villager", "villager", "mayor", "hunter"]
+          "options": [
+            "villager",
+            "villager",
+            "mayor",
+            "hunter"
+          ]
         }
       ]
     },
-
     "13_to_15": {
-      "playerCount": { "min": 13, "max": 15 },
-      "guaranteed": { "villager": 2, "werewolf": 2, "seer": 1, "doctor": 1 },
+      "playerCount": {
+        "min": 13,
+        "max": 15
+      },
+      "guaranteed": {
+        "villager": 2,
+        "werewolf": 2,
+        "seer": 1,
+        "doctor": 1
+      },
       "flexPools": [
         {
           "type": "wolf_support",
           "picks": 1,
           "rerollable": true,
-          "options": ["alpha_wolf", "wolf_shaman", "werewolf"]
+          "options": [
+            "alpha_wolf",
+            "wolf_shaman",
+            "werewolf"
+          ]
         },
         {
           "type": "wolf_special",
           "picks": 1,
           "rerollable": true,
-          "options": ["framer", "infector", "none"]
+          "options": [
+            "framer",
+            "infector",
+            "none"
+          ]
         },
         {
           "type": "village_info",
           "picks": 1,
           "rerollable": true,
-          "options": ["tracker", "cupid", "mayor"]
+          "options": [
+            "tracker",
+            "cupid",
+            "mayor"
+          ]
         },
         {
           "type": "village_anchor",
           "picks": 1,
           "rerollable": true,
-          "options": ["hunter", "mayor", "cupid"]
+          "options": [
+            "hunter",
+            "mayor",
+            "cupid"
+          ]
         },
         {
           "type": "chaos_neutral",
           "picks": 1,
           "rerollable": true,
-          "options": ["jester", "serial_killer", "arsonist", "none"]
+          "options": [
+            "jester",
+            "serial_killer",
+            "arsonist",
+            "none"
+          ]
         },
         {
           "type": "filler",
           "picks": "remaining_slots",
           "rerollable": false,
-          "options": ["villager", "villager", "hunter", "mayor"]
+          "options": [
+            "villager",
+            "villager",
+            "hunter",
+            "mayor"
+          ]
         }
       ]
     },
-
     "16_to_18": {
-      "playerCount": { "min": 16, "max": 18 },
-      "guaranteed": { "villager": 2, "werewolf": 2, "seer": 1, "doctor": 1, "hunter": 1 },
+      "playerCount": {
+        "min": 16,
+        "max": 18
+      },
+      "guaranteed": {
+        "villager": 2,
+        "werewolf": 2,
+        "seer": 1,
+        "doctor": 1,
+        "hunter": 1
+      },
       "flexPools": [
         {
           "type": "wolf_support",
           "picks": 1,
           "rerollable": true,
-          "options": ["alpha_wolf", "wolf_shaman"]
+          "options": [
+            "alpha_wolf",
+            "wolf_shaman"
+          ]
         },
         {
           "type": "wolf_special_a",
           "picks": 1,
           "rerollable": true,
-          "options": ["framer", "infector", "none"]
+          "options": [
+            "framer",
+            "infector",
+            "none"
+          ]
         },
         {
           "type": "wolf_special_b",
           "picks": 1,
           "rerollable": true,
-          "options": ["framer", "infector", "none"]
+          "options": [
+            "framer",
+            "infector",
+            "none"
+          ]
         },
         {
           "type": "village_info",
           "picks": 1,
           "rerollable": true,
-          "options": ["tracker", "cupid", "mayor"]
+          "options": [
+            "tracker",
+            "cupid",
+            "mayor"
+          ]
         },
         {
           "type": "village_support",
           "picks": 1,
           "rerollable": true,
-          "options": ["mayor", "cupid", "tracker"]
+          "options": [
+            "mayor",
+            "cupid",
+            "tracker"
+          ]
         },
         {
           "type": "chaos_neutral_a",
           "picks": 1,
           "rerollable": true,
-          "options": ["jester", "serial_killer", "arsonist", "none"]
+          "options": [
+            "jester",
+            "serial_killer",
+            "arsonist",
+            "none"
+          ]
         },
         {
           "type": "chaos_neutral_b",
           "picks": 1,
           "rerollable": true,
-          "options": ["jester", "arsonist", "none"]
+          "options": [
+            "jester",
+            "arsonist",
+            "none"
+          ]
         },
         {
           "type": "filler",
           "picks": "remaining_slots",
           "rerollable": false,
-          "options": ["villager", "villager", "villager", "mayor"]
+          "options": [
+            "villager",
+            "villager",
+            "villager",
+            "mayor"
+          ]
         }
       ]
     }
   },
-
   "archivePuzzleSystem": {
     "_meta": {
       "description": "Villager (and Mayor, and post-round-1 Cupid) night phase experience. Replaces the passive 'tap the shooting stars' decoy with rapid-fire puzzles. Solving a puzzle rewards a HintPayload — a partial truth drawn from the actual dynamically-generated composition. This is an engagement mechanic, not a game-altering power: hints are probabilistic nudges, never definitive role reveals.",
-      "appliesTo": ["villager", "mayor", "jester", "cupid_after_round_1"],
+      "appliesTo": [
+        "villager",
+        "mayor",
+        "jester",
+        "cupid_after_round_1"
+      ],
       "note": "Jester is included intentionally — they have no night action but benefit from hints just like Villager. The server treats all wakeOrder=0 non-hunter roles as Archives participants."
     },
     "antiCheatConstraint": {
@@ -978,8 +1138,15 @@
     "framerHackSystem": {
       "description": "Documents how the Framer's hack_archives action integrates with the Archives hint delivery pipeline. See ADR-002 for the architectural rationale.",
       "deliveryPriority": "false_hint_payload takes precedence over real hint generation. When false_hint_queued == true, the hint delivery handler substitutes false_hint_payload for any real hint that would otherwise be generated. The real hint is discarded — not queued for later.",
-      "allowedFalseCategories": ["wolf_count", "no_role_present", "role_present"],
-      "forbiddenFalseCategories": ["seer_blocked_last_night", "neutral_exists"],
+      "allowedFalseCategories": [
+        "wolf_count",
+        "no_role_present",
+        "role_present"
+      ],
+      "forbiddenFalseCategories": [
+        "seer_blocked_last_night",
+        "neutral_exists"
+      ],
       "forbiddenRationale": "Behavioral categories reference prior-round server events (roleblock state, alive counts) that the Framer cannot control or predict. Allowing them would produce incoherent hints (e.g., claiming the Seer was blocked when no Shaman exists).",
       "serverValidation": "Server does NOT validate whether the crafted hint is actually false. The wolves are responsible for constructing a convincing lie. If a Framer accidentally crafts a true hint, it is queued and delivered as-is.",
       "trackerBehavior": "When the Framer chooses hack_archives, framer_target_id is null. The Tracker observing the Framer sees tracker_result: [] — an empty array, identical to observing a wakeOrder=0 player. The Archives hack is invisible to the Tracker.",
@@ -988,18 +1155,18 @@
       "crossReference": "PRD-004 §2.3 Delivery Pipeline, ADR-002"
     }
   },
-
   "targetPools": {
-    "living_all":                  "All living players including self.",
-    "living_all_including_self":   "All living players including self. Alias of living_all.",
-    "living_all_excluding_self":   "All living players excluding the acting player.",
-    "living_non_wolf":             "All living players whose team is not 'werewolf'. Used by wolves to prevent intra-pack voting."
+    "living_all": "All living players including self.",
+    "living_all_including_self": "All living players including self. Alias of living_all.",
+    "living_all_excluding_self": "All living players excluding the acting player.",
+    "living_non_wolf": "All living players whose team is not 'werewolf'. Used by wolves to prevent intra-pack voting."
   },
-
   "validationRules": {
     "minPlayers": 5,
     "maxPlayers": 18,
-    "requiredRoles": ["werewolf"],
+    "requiredRoles": [
+      "werewolf"
+    ],
     "compositionMustSumToPlayerCount": true,
     "wolfCountMustBeLessThanVillage": "At game start: wolf_team_count < (player_count - wolf_team_count). Server rejects compositions where wolves already meet or exceed win condition.",
     "doctorConsecutiveProtectBan": "last_protected_player_id tracked server-side. Re-protecting same target returns CONSECUTIVE_PROTECT.",

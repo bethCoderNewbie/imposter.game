@@ -159,8 +159,9 @@ class TestComputeActionsRequired:
     def test_villager_never_blocks_auto_advance(self):
         G, _ = _eight_player_game()
         count = compute_actions_required(G)
-        # wakeOrder > 0: seer(p3), doctor(p4), tracker(p5) = 3
-        assert count == 3
+        # wakeOrder > 0: wolf(p1), wolf(p2), seer(p3), doctor(p4), tracker(p5) = 5
+        # villagers (p6,p7,p8) have wakeOrder=0 and are excluded
+        assert count == 5
 
     def test_cupid_excluded_after_round1(self):
         G, _ = _eight_player_game()
@@ -169,8 +170,8 @@ class TestComputeActionsRequired:
         G.round = 2  # after round 1
         count = compute_actions_required(G)
         # Cupid excluded after round 1
-        # seer(p3), doctor(p4) = 2
-        assert count == 2
+        # wolf(p1), wolf(p2), seer(p3), doctor(p4) = 4
+        assert count == 4
 
     def test_cupid_included_in_round1(self):
         G, _ = _eight_player_game()
@@ -178,13 +179,13 @@ class TestComputeActionsRequired:
         G.players["p5"].role = "cupid"
         G.round = 1
         count = compute_actions_required(G)
-        # seer(p3), doctor(p4), cupid(p5) = 3
-        assert count == 3
+        # wolf(p1), wolf(p2), seer(p3), doctor(p4), cupid(p5) = 5
+        assert count == 5
 
     def test_dead_players_excluded(self):
         G, _ = _eight_player_game()
         G = G.model_copy(deep=True)
         G.players["p3"].is_alive = False  # seer dead
         count = compute_actions_required(G)
-        # doctor(p4), tracker(p5) = 2
-        assert count == 2
+        # wolf(p1), wolf(p2), doctor(p4), tracker(p5) = 4
+        assert count == 4

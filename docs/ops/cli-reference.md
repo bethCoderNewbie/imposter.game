@@ -14,6 +14,7 @@ All commands assume you are in the project root `C:\Users\bichn\MSBA\Imposter\` 
 | **PowerShell** | `Copy-Item .env.example .env` |
 
 ### Generate a secure `SECRET_KEY` (≥ 32 chars)
+key=secrets.token_urlsafe(32)
 
 | | Command |
 |---|---|

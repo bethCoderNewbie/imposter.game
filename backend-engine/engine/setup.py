@@ -24,9 +24,11 @@ from engine.state.models import GameConfig, MasterGameState, NightActions, Playe
 
 def _find_template(player_count: int) -> dict[str, Any]:
     """Return the dynamic template matching the given player count."""
-    for tpl in DYNAMIC_TEMPLATES:
-        pc = tpl["playerCount"]
-        if pc["min"] <= player_count <= pc["max"]:
+    for tpl in DYNAMIC_TEMPLATES.values():
+        if not isinstance(tpl, dict):
+            continue
+        pc = tpl.get("playerCount", {})
+        if isinstance(pc, dict) and pc.get("min", 0) <= player_count <= pc.get("max", 0):
             return tpl
     raise ValueError(f"No dynamic template found for {player_count} players (valid: 5–18)")
 
@@ -145,27 +147,47 @@ def assign_roles(player_ids: list[str], composition: dict[str, int], seed: str) 
 def setup_game(
     game_id: str,
     host_player_id: str,
-    config: GameConfig,
+    config: GameConfig | dict | None = None,
     joined_players: dict[str, PlayerState] | None = None,
 ) -> MasterGameState:
     """
     Create a fully initialized MasterGameState ready for the lobby phase.
     Pure function — no I/O.
+    config may be a GameConfig, a plain dict (for tests), or None — all produce a default lobby config.
     """
+    if not isinstance(config, GameConfig):
+        from engine.config import get_settings
+        s = get_settings()
+        config = GameConfig(
+            player_count=1,
+            roles={},
+            night_timer_seconds=s.night_timer_seconds,
+            day_timer_seconds=s.day_timer_seconds,
+            vote_timer_seconds=s.vote_timer_seconds,
+            role_deal_timer_seconds=s.role_deal_timer_seconds,
+            hunter_pending_timer_seconds=s.hunter_pending_timer_seconds,
+        )
     seed = secrets.token_hex(16)
 
-    players: dict[str, PlayerState] = joined_players or {}
+    players: dict[str, PlayerState] = dict(joined_players) if joined_players else {}
+
+    # Ensure host player exists in the lobby
+    if host_player_id not in players:
+        players[host_player_id] = PlayerState(
+            player_id=host_player_id,
+            display_name="Host",
+        )
 
     # If players are already joined (from lobby), assign roles now
-    if players and len(players) == config.player_count:
+    if players and config.player_count >= 5 and len(players) == config.player_count:
         composition = build_composition(config.player_count, seed)
         role_map = assign_roles(list(players.keys()), composition, seed)
         for pid, role_id in role_map.items():
             role_def = ROLE_REGISTRY[role_id]
             players[pid].role = role_id
             players[pid].team = role_def["team"]
-    elif not config.roles:
-        # Build composition eagerly so it's stored in config
+    elif not config.roles and config.player_count >= 5:
+        # Build composition eagerly so it's stored in config (only when player_count is valid)
         composition = build_composition(config.player_count, seed)
         config = config.model_copy(update={"roles": composition})
 

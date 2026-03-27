@@ -262,14 +262,17 @@ class TestDeadSpectatorView:
         for pid in ["p1", "p2", "p3", "p4"]:
             assert view["players"][pid]["role"] is not None, f"Dead spectator missing role for {pid}"
 
-    def test_dead_player_during_live_play(self):
+    def test_dead_player_during_live_play_sees_all_roles(self):
         G, _ = _eight_player_game()
         G = G.model_copy(deep=True)
         G.players["p6"].is_alive = False
-        # During live play, dead player should not leak other roles
+        # Dead players see all roles (they are spectators — can't affect game)
         view = _view(G, "p6")
-        for pid in ["p1", "p2", "p3", "p4", "p5", "p7", "p8"]:
-            assert view["players"][pid]["role"] is None
+        assert view["players"]["p1"]["role"] == "werewolf"
+        assert view["players"]["p3"]["role"] == "seer"
+        # But night_actions sensitive fields are stripped
+        na = view.get("night_actions", {})
+        assert "wolf_votes" not in na or na.get("wolf_votes") == {}
 
 
 # ── Role-specific private fields ───────────────────────────────────────────────

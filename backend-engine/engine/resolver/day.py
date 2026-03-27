@@ -26,20 +26,27 @@ def resolve_day_vote(G: MasterGameState) -> MasterGameState:
         # No votes cast — no elimination, move on
         return G
 
-    # Build weighted vote tally
+    # Total eligible vote weight = sum of all alive players' weights
+    total_eligible_weight: float = sum(
+        _voter_weight(pid, G)
+        for pid, p in G.players.items()
+        if p.is_alive
+    )
+
+    # Build weighted vote tally from actual votes cast
     vote_weight: dict[str, float] = {}
-    total_weight: float = 0.0
 
     for voter_pid, target_pid in G.day_votes.items():
         voter = G.players.get(voter_pid)
         if not voter or not voter.is_alive:
-            continue  # dead players cannot vote (server-hard; double-check here)
+            continue  # dead players cannot vote
         if voter_pid == target_pid:
             continue  # self-vote not allowed
 
         weight = _voter_weight(voter_pid, G)
         vote_weight[target_pid] = vote_weight.get(target_pid, 0.0) + weight
-        total_weight += weight
+
+    total_weight = total_eligible_weight
 
     if not vote_weight or total_weight == 0:
         return G

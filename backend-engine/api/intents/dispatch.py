@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import Any
 
 from engine.state.models import MasterGameState
+from api.intents.errors import IntentError
 from api.intents.handlers import (
     handle_advance_phase,
     handle_confirm_role_reveal,
@@ -20,13 +21,8 @@ from api.intents.handlers import (
     handle_submit_puzzle_answer,
 )
 
-
-class IntentError(Exception):
-    def __init__(self, code: str, message: str) -> None:
-        self.code = code
-        self.message = message
-        super().__init__(message)
-
+# Re-export IntentError so callers can import from dispatch as before
+__all__ = ["dispatch_intent", "IntentError"]
 
 _HANDLERS = {
     "start_game": handle_start_game,

@@ -328,23 +328,30 @@ def _step11_tracker(G: MasterGameState) -> MasterGameState:
         G.night_actions.tracker_result = []
         return G
 
-    # Collect all player IDs that the tracked player targeted in any action
+    # Collect all player IDs who visited (targeted) the tracked player
     visited: list[str] = []
     na = G.night_actions
 
-    # Check all known action fields for the tracked player's involvement as actor
-    if target_id in (na.wolf_votes or {}):
-        voted = na.wolf_votes[target_id]
-        if voted:
-            visited.append(voted)
-    if na.seer_target_id and _find_role_player(G, "seer") == target_id:
-        visited.append(na.seer_target_id)
-    if na.doctor_target_id and _find_role_player(G, "doctor") == target_id:
-        visited.append(na.doctor_target_id)
-    if na.serial_killer_target_id and _find_role_player(G, "serial_killer") == target_id:
-        visited.append(na.serial_killer_target_id)
-    if na.arsonist_douse_target_id and _find_role_player(G, "arsonist") == target_id:
-        visited.append(na.arsonist_douse_target_id)
+    # Wolves who voted to kill the tracked player
+    for wolf_pid, kill_target in (na.wolf_votes or {}).items():
+        if kill_target == target_id:
+            visited.append(wolf_pid)
+    # Seer who inspected the tracked player
+    seer_pid = _find_role_player(G, "seer")
+    if na.seer_target_id == target_id and seer_pid:
+        visited.append(seer_pid)
+    # Doctor who protected the tracked player
+    doctor_pid = _find_role_player(G, "doctor")
+    if na.doctor_target_id == target_id and doctor_pid:
+        visited.append(doctor_pid)
+    # Serial Killer who targeted the tracked player
+    sk_pid = _find_role_player(G, "serial_killer")
+    if na.serial_killer_target_id == target_id and sk_pid:
+        visited.append(sk_pid)
+    # Arsonist who doused the tracked player
+    arsonist_pid = _find_role_player(G, "arsonist")
+    if na.arsonist_douse_target_id == target_id and arsonist_pid:
+        visited.append(arsonist_pid)
 
     unique_visited = list(dict.fromkeys(visited))  # preserve order, deduplicate
     G.night_actions.tracker_result = unique_visited

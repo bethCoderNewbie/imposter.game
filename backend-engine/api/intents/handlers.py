@@ -9,7 +9,7 @@ from __future__ import annotations
 import secrets
 from typing import Any
 
-from api.intents.dispatch import IntentError
+from api.intents.errors import IntentError
 from api.timer_tasks import cancel_phase_timer, start_phase_timer
 from engine.phases.machine import should_auto_advance, transition_phase
 from engine.resolver.day import resolve_day_vote
