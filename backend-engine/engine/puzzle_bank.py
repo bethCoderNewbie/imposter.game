@@ -34,13 +34,13 @@ _BASELINE_ROLES = {"villager", "werewolf", "seer"}
 
 # ── Puzzle generation ─────────────────────────────────────────────────────────
 
-def generate_night_puzzle(G: "MasterGameState") -> "PuzzleState":
+def generate_night_puzzle(G: "MasterGameState", player_id: str) -> "PuzzleState":
     """
-    Select and generate a PuzzleState for the current night round.
-    Seeded by (game seed : round) — deterministic, no side effects.
+    Select and generate a PuzzleState for the given player in the current night round.
+    Seeded by (game seed : round : player_id) — deterministic, per-player distinct puzzle.
     Weights: 50% logic, 25% math, 25% sequence.
     """
-    rng = random.Random(f"{G.seed}:{G.round}:puzzle")
+    rng = random.Random(f"{G.seed}:{G.round}:{player_id}:puzzle")
     puzzle_type = rng.choices(
         ["logic", "math", "sequence"],
         weights=[50, 25, 25],

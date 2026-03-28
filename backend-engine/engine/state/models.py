@@ -83,6 +83,16 @@ class PlayerState(BaseModel):
     lovers_partner_id: str | None = None  # linked players only
     puzzles_solved_count: int = 0       # own player only
     hints_received: list[str] = Field(default_factory=list)  # server-only
+    puzzle_state: PuzzleState | None = None  # own player only; correct_index stripped before broadcast
+
+
+class FalseHintPayload(BaseModel):
+    hint_id: str
+    category: str
+    text: str
+    round: int
+    expires_after_round: int | None = None
+    is_fabricated: bool = True          # server-only; stripped before delivery
 
 
 class NightActions(BaseModel):
@@ -106,7 +116,7 @@ class NightActions(BaseModel):
     framer_action: str | None = None         # server-only: "frame" | "hack_archives"
     framer_target_id: str | None = None      # server-only
     false_hint_queued: bool = False          # server-only
-    false_hint_payload: dict[str, Any] | None = None  # server-only
+    false_hint_payload: FalseHintPayload | None = None  # server-only
 
     # Arsonist
     arsonist_action: str | None = None       # Arsonist-only: "douse" | "ignite"
@@ -129,8 +139,6 @@ class NightActions(BaseModel):
     actions_submitted_count: int = 0
     actions_required_count: int = 0
 
-    # Archive puzzle (wakeOrder == 0 players)
-    puzzle_state: PuzzleState | None = None  # eligible player only; correct_index stripped
 
 
 class EliminationEvent(BaseModel):

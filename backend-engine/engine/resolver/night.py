@@ -65,8 +65,9 @@ def _step2_framer(G: MasterGameState) -> MasterGameState:
 
     elif framer_action == "hack_archives":
         # Queue false hint — delivery triggered on puzzle solve by wakeOrder==0 player
-        G.night_actions.false_hint_queued = True
-        # false_hint_payload was already set from the intent
+        if G.night_actions.false_hint_payload is not None:
+            G.night_actions.false_hint_queued = True
+        # else: payload missing (malformed state) — silent no-op
 
     return G
 

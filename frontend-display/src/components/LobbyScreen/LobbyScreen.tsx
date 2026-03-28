@@ -22,13 +22,13 @@ export default function LobbyScreen({ gameState, hostSecret, gameId }: Props) {
   const [starting, setStarting] = useState(false)
 
   async function handleStart() {
-    if (!hostSecret || !gameId || starting) return
+    if (!gameId || starting) return
     setStarting(true)
     try {
       await fetch(`/api/games/${gameId}/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ host_secret: hostSecret }),
+        body: JSON.stringify(hostSecret ? { host_secret: hostSecret } : {}),
       })
     } finally {
       setStarting(false)
@@ -100,7 +100,7 @@ export default function LobbyScreen({ gameState, hostSecret, gameId }: Props) {
       <div className="lobby-screen__status">
         {isDealing ? (
           'Dealing roles…'
-        ) : hostSecret ? (
+        ) : (
           <button
             className="lobby-screen__start-btn"
             disabled={!canStart || starting}
@@ -108,8 +108,6 @@ export default function LobbyScreen({ gameState, hostSecret, gameId }: Props) {
           >
             {starting ? 'Starting…' : canStart ? 'Start Game' : `Need ${5 - playerCount} more player${5 - playerCount !== 1 ? 's' : ''}`}
           </button>
-        ) : (
-          'Waiting for host to start…'
         )}
       </div>
     </div>

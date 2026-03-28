@@ -3,11 +3,15 @@ import './CreateMatchScreen.css'
 
 interface Props {
   onCreated: (gameId: string, hostSecret: string) => void
+  onResumed: (gameId: string) => void
 }
 
-export default function CreateMatchScreen({ onCreated }: Props) {
+export default function CreateMatchScreen({ onCreated, onResumed }: Props) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showResume, setShowResume] = useState(false)
+  const [resumeId, setResumeId] = useState('')
+  const [resumeError, setResumeError] = useState<string | null>(null)
 
   async function handleCreate() {
     if (loading) return
@@ -34,6 +38,15 @@ export default function CreateMatchScreen({ onCreated }: Props) {
     }
   }
 
+  function handleResume() {
+    if (!resumeId.trim()) {
+      setResumeError('Please enter a game ID.')
+      return
+    }
+    setResumeError(null)
+    onResumed(resumeId.trim())
+  }
+
   return (
     <div className="create-match">
       <div className="create-match__content">
@@ -49,6 +62,34 @@ export default function CreateMatchScreen({ onCreated }: Props) {
         >
           {loading ? 'Creating…' : 'Create New Match'}
         </button>
+
+        <button
+          className="create-match__btn"
+          onClick={() => { setShowResume(v => !v); setResumeError(null) }}
+        >
+          {showResume ? 'Cancel' : 'Resume Match'}
+        </button>
+
+        {showResume && (
+          <div className="create-match__resume">
+            {resumeError && <p className="create-match__error">{resumeError}</p>}
+            <input
+              className="create-match__resume-input"
+              type="text"
+              placeholder="Game ID"
+              value={resumeId}
+              onChange={e => setResumeId(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleResume() }}
+            />
+            <button
+              className="create-match__btn"
+              disabled={!resumeId.trim()}
+              onClick={handleResume}
+            >
+              Resume
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

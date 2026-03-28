@@ -104,8 +104,15 @@ export interface StrippedGameState {
   role_registry?: Record<string, Record<string, unknown>>
 }
 
-export interface StateUpdateMessage {
-  type: 'state_update'
+export interface SyncMessage {
+  type: 'sync'
+  state_id: number
+  schema_version: string
+  state: StrippedGameState
+}
+
+export interface UpdateMessage {
+  type: 'update'
   state_id: number
   schema_version: string
   state: StrippedGameState
@@ -117,7 +124,7 @@ export interface ErrorMessage {
   message: string
 }
 
-export type ServerMessage = StateUpdateMessage | ErrorMessage
+export type ServerMessage = SyncMessage | UpdateMessage | ErrorMessage
 
 // Avatar color palette — 8 preset colors for avatar_01…avatar_08
 export const AVATAR_COLORS: Record<string, string> = {

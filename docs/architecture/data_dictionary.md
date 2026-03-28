@@ -195,6 +195,7 @@ Frozen at game start. Host sets these in the lobby before pressing Start.
 | `session_token` | `str` \| `null` | Opaque reconnect token. Set on join; re-issued on `/rejoin`. Stored in browser `sessionStorage` key `wolf_token`. Allows seamless reconnect on page refresh. | Server-generated UUID on join | Yes | **Yes — sent only to own player on join/rejoin; never in state broadcasts** |
 | `puzzles_solved_count` | `int` | Total puzzles the player has solved correctly across all rounds. Used by the Archives system to track engagement; not surfaced to other players. Only present on players with `wakeOrder == 0`. | Incremented by `resolve_puzzle()` on correct answer | No | **Yes — sent only to own player** |
 | `hints_received` | `array[str]` | List of `hint_id` strings for hints delivered to this player. Used as a deduplication registry — server checks this before delivering a new hint to prevent re-send on reconnect. Only present on players with `wakeOrder == 0`. | Appended by hint delivery handler | No (empty array) | **Yes — server-only; never sent in state broadcasts** |
+| `puzzle_state` | `PuzzleState` \| `null` | Active Archive puzzle for this player during the night phase. `null` for `wakeOrder != 0` players, dead players, and outside the night phase. Each eligible player receives a **distinct** puzzle seeded by `f"{G.seed}:{G.round}:{player_id}:puzzle"`. | Set by `transition_phase("night")` loop per eligible player; cleared to `null` on phase transition | Yes | **Yes — sent only to own player; `correct_index` stripped before broadcast; `null` in all other players' views** |
 
 > **`display_name` is not re-sent in every state broadcast** — it is included in `PlayerState` only for the game duration convenience. The canonical join-time name record lives in Redis match metadata (`meta:{game_id}:roster`).
 
@@ -225,7 +226,6 @@ Holds the current round's night action submissions. Fully reset at the start of 
 | `roleblocked_player_id` | `str` \| `null` | Computed at step 1: the player whose action is nullified this round. Any action submitted by this player is discarded. | Computed from `roleblock_target_id` at resolution start | Yes | **Yes — server-only** |
 | `actions_submitted_count` | `int` | Count of players with `wakeOrder > 0` (accounting for `night_one_only` after round 1) who have submitted. Computed at broadcast time. | `sum(p.night_action_submitted for active_role_players)` | No | No — public. Display: `"X / Y players have acted"` |
 | `actions_required_count` | `int` | Total players with `wakeOrder > 0` this round. Cupid is excluded after round 1. | Computed from living players' roles at phase entry | No | No — public |
-| `puzzle_state` | `PuzzleState` \| `null` | Active puzzle for a `wakeOrder == 0` player this night round. `null` for all players with `wakeOrder > 0`, and for all wakeOrder=0 players outside the night phase. Sent only in the individual player's own strip — never broadcast globally. | Set by `start_night_phase()` for each eligible player; cleared on phase transition | Yes | **Yes — sent only to the eligible player; null in all other strips** |
 
 ---
 
@@ -293,7 +293,7 @@ One draw pool within a `DynamicTemplate`.
 
 ## PuzzleState
 
-Ephemeral object in `NightActions.puzzle_state`. Present only for `wakeOrder == 0` players during the `night` phase. Stripped from all other players' views.
+Ephemeral object in `PlayerState.puzzle_state`. Present only for `wakeOrder == 0` players during the `night` phase. Each eligible player receives a distinct puzzle instance seeded per-player. Stripped from all other players' views.
 
 | Field | Type | Description | Nullable |
 |:------|:-----|:------------|:---------|

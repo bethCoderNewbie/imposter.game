@@ -39,9 +39,9 @@ def resolve_puzzle_answer(
     if not player:
         raise PuzzleError("PLAYER_NOT_FOUND", f"Player {player_id} not found.")
 
-    puzzle = G.night_actions.puzzle_state
+    puzzle = G.players[player_id].puzzle_state
     if not puzzle:
-        raise PuzzleError("NO_PUZZLE_ACTIVE", "No puzzle is active for this game.")
+        raise PuzzleError("NO_PUZZLE_ACTIVE", "No puzzle is active for this player.")
     if not puzzle.active:
         raise PuzzleError("PUZZLE_NOT_ACTIVE", "Puzzle is no longer active.")
     if puzzle.solved is not None:

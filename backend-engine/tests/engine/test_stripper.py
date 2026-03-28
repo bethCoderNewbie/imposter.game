@@ -140,16 +140,16 @@ class TestAlwaysStripped:
     def test_puzzle_correct_index_stripped(self):
         G, _ = _eight_player_game()
         G = G.model_copy(deep=True)
-        G.night_actions.puzzle_state = PuzzleState(
+        G.players["p6"].puzzle_state = PuzzleState(
             puzzle_type="math",
             puzzle_data={"options": [1, 2, 3], "correct_index": 1},
             time_limit_seconds=30,
         )
-        view = _view(G, "p6")  # villager sees puzzle
-        na = view.get("night_actions", {})
-        if na.get("puzzle_state"):
-            pd = na["puzzle_state"].get("puzzle_data", {})
-            assert "correct_index" not in pd, "correct_index leaked to client!"
+        view = _view(G, "p6")  # villager sees own puzzle
+        ps = view["players"]["p6"].get("puzzle_state")
+        assert ps is not None, "Villager should receive their own puzzle_state"
+        pd = ps.get("puzzle_data", {})
+        assert "correct_index" not in pd, "correct_index leaked to client!"
 
 
 # ── Wolf team view ─────────────────────────────────────────────────────────────

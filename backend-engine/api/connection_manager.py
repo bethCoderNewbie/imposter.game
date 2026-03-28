@@ -51,7 +51,7 @@ class ConnectionManager:
         for pid, ws in list(room.items()):
             stripped = player_view(G, pid)
             payload = {
-                "type": "state_update",
+                "type": "update",
                 "state_id": G.state_id,
                 "schema_version": settings.schema_version,
                 "state": stripped,

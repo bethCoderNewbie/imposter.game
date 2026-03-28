@@ -103,7 +103,7 @@ async def websocket_endpoint(websocket: WebSocket, game_id: str, player_id: str)
         settings = get_settings()
         stripped = player_view(G_init, authenticated_player_id)
         await websocket.send_text(json.dumps({
-            "type": "state_update",
+            "type": "sync",
             "state_id": G_init.state_id,
             "schema_version": settings.schema_version,
             "state": stripped,

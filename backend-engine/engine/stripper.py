@@ -106,6 +106,7 @@ def _display_view(state: dict[str, Any], is_game_over: bool) -> dict[str, Any]:
         p["lovers_partner_id"] = None
         p["puzzles_solved_count"] = 0
         p["vote_target_id"] = None
+        p["puzzle_state"] = None
 
     # Strip night_actions entirely — keep only aggregate counts
     na = s.get("night_actions", {})
@@ -142,6 +143,13 @@ def _wolf_team_view(
         p["doused_player_ids"] = []
         p["lovers_partner_id"] = None if G.players[pid].lovers_partner_id is None or pid != player_id else p["lovers_partner_id"]
         p["puzzles_solved_count"] = 0 if pid != player_id else p["puzzles_solved_count"]
+        if pid == player_id:
+            _ps = G.players[player_id].puzzle_state
+            p["puzzle_state"] = _strip_puzzle_for_player(
+                _ps.model_dump(mode="json") if _ps else None, player_id, G
+            )
+        else:
+            p["puzzle_state"] = None
 
     # Night actions: wolf team sees wolf_votes only (plus aggregate counts)
     na = s.get("night_actions", {})
@@ -149,8 +157,6 @@ def _wolf_team_view(
         "wolf_votes": na.get("wolf_votes", {}),
         "actions_submitted_count": na.get("actions_submitted_count", 0),
         "actions_required_count": na.get("actions_required_count", 0),
-        # puzzle_state: only if this wolf is wakeOrder==0 (uncommon, but handled)
-        "puzzle_state": _strip_puzzle_for_player(na.get("puzzle_state"), player_id, G),
     }
     _strip_night_action_always(s)
 
@@ -225,13 +231,19 @@ def _baseline_alive_view(
         if pid != player_id:
             p["lovers_partner_id"] = None
         p["puzzles_solved_count"] = 0 if pid != player_id else p["puzzles_solved_count"]
+        if pid == player_id:
+            _ps = G.players[player_id].puzzle_state
+            p["puzzle_state"] = _strip_puzzle_for_player(
+                _ps.model_dump(mode="json") if _ps else None, player_id, G
+            )
+        else:
+            p["puzzle_state"] = None
 
-    # Night actions: only aggregate counts + own puzzle if applicable
+    # Night actions: only aggregate counts
     na = state.get("night_actions", {})
     s["night_actions"] = {
         "actions_submitted_count": na.get("actions_submitted_count", 0),
         "actions_required_count": na.get("actions_required_count", 0),
-        "puzzle_state": _strip_puzzle_for_player(na.get("puzzle_state"), player_id, G),
     }
 
     s["seer_knowledge"] = {}
@@ -258,6 +270,7 @@ def _dead_spectator_view(
         p["lovers_partner_id"] = None
         p["night_action_submitted"] = None
         p["puzzles_solved_count"] = 0
+        p["puzzle_state"] = None
 
     # night_actions: entirely removed during live play
     s["night_actions"] = {

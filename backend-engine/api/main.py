@@ -42,11 +42,13 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # CORS — permissive for LAN play; tighten for production
+    # CORS — permissive for LAN play; tighten for production.
+    # allow_credentials must NOT be combined with allow_origins=["*"] — the CORS
+    # spec forbids it and Safari strictly rejects the response.  Session tokens
+    # are carried in headers/body (not cookies), so credentials are not needed.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
-        allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )

@@ -18,7 +18,7 @@ class TestDisplayClientConnection:
         game_id = client.post("/api/games", json={}).json()["game_id"]
         with client.websocket_connect(f"/ws/{game_id}/display") as ws:
             msg = ws.receive_json()
-            assert msg["type"] == "state_update"
+            assert msg["type"] == "sync"
 
     def test_display_receives_initial_state(self, client):
         game_id = client.post("/api/games", json={}).json()["game_id"]
@@ -100,7 +100,7 @@ class TestPlayerAuthentication:
         with client.websocket_connect(f"/ws/{game_id}/{player_id}") as ws:
             ws.send_json({"type": "auth", "session_token": token})
             msg = ws.receive_json()
-            assert msg["type"] == "state_update"
+            assert msg["type"] == "sync"
             assert msg["state"]["phase"] == "lobby"
 
     def test_player_token_wrong_game_receives_auth_error(self, client):
@@ -134,5 +134,5 @@ class TestJoinBroadcast:
 
             # Display should receive the updated state
             updated = ws.receive_json()
-            assert updated["type"] == "state_update"
+            assert updated["type"] == "update"
             assert len(updated["state"]["players"]) == 1

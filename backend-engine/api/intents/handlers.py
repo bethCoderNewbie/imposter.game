@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import secrets
 from typing import Any
+from uuid import uuid4
 
 from api.intents.errors import IntentError
 from api.timer_tasks import cancel_phase_timer, start_phase_timer
@@ -19,7 +20,7 @@ from engine.resolver.puzzle import PuzzleError, resolve_puzzle_answer
 from engine.roles_loader import CLIENT_SAFE_ROLE_REGISTRY, ROLE_REGISTRY
 from engine.setup import assign_roles, build_composition
 from engine.state.enums import Phase, Team
-from engine.state.models import MasterGameState, PlayerState
+from engine.state.models import FalseHintPayload, MasterGameState, PlayerState
 
 
 def _require_phase(G: MasterGameState, *phases: Phase) -> None:
@@ -174,8 +175,22 @@ async def handle_submit_night_action(G, intent, redis_client, cm) -> MasterGameS
                 raise IntentError("INVALID_TARGET", "Invalid frame target.")
             na.framer_target_id = target_id
         else:
-            # hack_archives: store false hint payload
-            na.false_hint_payload = intent.get("false_hint_payload")
+            # hack_archives: server constructs typed payload from client-supplied text fields
+            category = intent.get("false_hint_category")
+            text = intent.get("false_hint_text")
+            if not category or not text:
+                raise IntentError(
+                    "MISSING_HINT_FIELDS",
+                    "false_hint_category and false_hint_text are required for hack_archives.",
+                )
+            na.false_hint_payload = FalseHintPayload(
+                hint_id=str(uuid4()),
+                category=category,
+                text=text,
+                round=G.round,
+                expires_after_round=None,
+                is_fabricated=True,
+            )
         # Framer also participates in wolf vote
         kill_target = intent.get("wolf_vote_target_id")
         if kill_target:
@@ -320,11 +335,11 @@ async def handle_submit_puzzle_answer(G, intent, redis_client, cm) -> MasterGame
         # Deliver hint — check if false hint is queued first
         if G.night_actions.false_hint_queued and G.night_actions.false_hint_payload:
             from engine.stripper import strip_fabricated_flag
-            false_hint = strip_fabricated_flag(G.night_actions.false_hint_payload)
+            false_hint = strip_fabricated_flag(G.night_actions.false_hint_payload.model_dump(mode="json"))
             # Broadcast to ALL wakeOrder==0 players (all receive the same false hint)
             from engine.roles_loader import ROLE_REGISTRY as RR
             for pid, player in G.players.items():
-                if player.is_alive and RR.get(player.role or {}, {}).get("wakeOrder", -1) == 0:
+                if player.is_alive and RR.get(player.role or "", {}).get("wakeOrder", -1) == 0:
                     await cm.unicast(G.game_id, pid, {"type": "hint_reward", **false_hint})
         else:
             from engine.puzzle_bank import generate_hint

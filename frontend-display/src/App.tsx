@@ -20,14 +20,13 @@ const PHASE_TO_CLASS: Record<string, string> = {
   game_over:       'phase-day',
 }
 
-const HOST_SECRET_KEY = 'ww_host_secret'
 const initParams = new URLSearchParams(window.location.search)
 
 export default function App() {
   const [audioUnlocked, setAudioUnlocked] = useState(false)
   const [gameId, setGameId] = useState<string | null>(initParams.get('g'))
-  const [hostSecret, setHostSecret] = useState<string | null>(() =>
-    initParams.get('g') ? sessionStorage.getItem(HOST_SECRET_KEY) : null
+  const [hostSecret, setHostSecret] = useState<string | null>(
+    initParams.get('g') ? initParams.get('host_secret') : null
   )
   // Show NightResolution interstitial on night→day transition
   const [showResolution, setShowResolution] = useState(false)
@@ -38,10 +37,15 @@ export default function App() {
   const prevPhaseRef = useRef<string | null>(null)
 
   function handleCreated(newGameId: string, newHostSecret: string) {
-    sessionStorage.setItem(HOST_SECRET_KEY, newHostSecret)
-    history.pushState({}, '', `?g=${newGameId}`)
+    history.pushState({}, '', `?g=${newGameId}&host_secret=${newHostSecret}`)
     setGameId(newGameId)
     setHostSecret(newHostSecret)
+  }
+
+  function handleResumed(resumeGameId: string) {
+    history.pushState({}, '', `?g=${resumeGameId}`)
+    setGameId(resumeGameId)
+    // hostSecret stays null — resumed/spectator flow
   }
 
   const { gameState, status } = useGameState({
@@ -95,7 +99,7 @@ export default function App() {
 
   // ── No game ID → Create match screen ────────────────────────────────────────
   if (!gameId) {
-    return <CreateMatchScreen onCreated={handleCreated} />
+    return <CreateMatchScreen onCreated={handleCreated} onResumed={handleResumed} />
   }
 
   // ── Night Resolution interstitial (4 s, non-skippable) ──────────────────────

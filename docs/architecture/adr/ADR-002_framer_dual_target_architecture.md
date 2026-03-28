@@ -1,7 +1,7 @@
 # ADR-002: Framer Dual-Target Architecture — Deferred False Hint Injection
 
 ## Status
-Proposed
+Accepted
 
 ## Date
 2026-03-26
@@ -81,24 +81,21 @@ The Framer selects a specific player to receive the false hint, rather than broa
 ### `nightResolutionOrder` step 2 — branch on `framer_action`
 
 ```python
-# resolve_night() step 2
-if framer.is_roleblocked:
-    pass  # no-op — both paths skipped
+# resolve_night() step 2  (engine/resolver/night.py: _step2_framer)
+# framer_action is None → early return (no submission)
+# framer is roleblocked → early return (action discarded)
 
-elif night_actions.framer_action == "frame":
-    players[night_actions.framer_target_id].is_framed_tonight = True
+elif framer_action == "frame":
+    G.players[G.night_actions.framer_target_id].is_framed_tonight = True
 
-elif night_actions.framer_action == "hack_archives":
-    G.false_hint_queued = True
-    G.false_hint_payload = FalseHintPayload(
-        hint_id=uuid4(),
-        category=night_actions.false_hint_category,
-        text=night_actions.false_hint_text,
-        round=G.round,
-        expires_after_round=None,
-        is_fabricated=True,           # server-only; stripped before delivery
-    )
+elif framer_action == "hack_archives":
+    # false_hint_payload was constructed by the handler (server-side, not client-controlled)
+    if G.night_actions.false_hint_payload is not None:
+        G.night_actions.false_hint_queued = True
+    # else: payload missing (malformed state) — silent no-op
 ```
+
+**Intent fields (client → server):** The `SubmitNightActionIntent` carries `false_hint_category: str` and `false_hint_text: str`. The handler (`api/intents/handlers.py`) constructs a typed `FalseHintPayload` with a server-generated `hint_id=uuid4()` and `round=G.round` — the client never controls these fields.
 
 ### Hint delivery handler — check queue before generating real hint
 
@@ -116,16 +113,15 @@ record_hint_delivered(player_id, payload.hint_id, G)
 ### Stripping `is_fabricated`
 
 ```python
-def strip_fabricated_flag(false_hint: FalseHintPayload) -> HintPayload:
-    return HintPayload(
-        type=false_hint.type,
-        hint_id=false_hint.hint_id,
-        category=false_hint.category,
-        text=false_hint.text,
-        round=false_hint.round,
-        expires_after_round=false_hint.expires_after_round,
-        # is_fabricated intentionally excluded
-    )
+# engine/stripper.py: strip_fabricated_flag
+def strip_fabricated_flag(fp: dict[str, Any]) -> dict[str, Any]:
+    """Remove is_fabricated from a serialized FalseHintPayload before sending to clients."""
+    result = dict(fp)
+    result.pop("is_fabricated", None)
+    return result
+
+# Call site (handlers.py) — serialize the Pydantic model first:
+false_hint = strip_fabricated_flag(G.night_actions.false_hint_payload.model_dump(mode="json"))
 ```
 
 ---

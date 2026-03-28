@@ -71,6 +71,8 @@ export interface PlayerState {
   lovers_partner_id: string | null;
   /** own player only */
   puzzles_solved_count: number;
+  /** own player only; correct_index stripped before broadcast */
+  puzzle_state: PuzzleState | null;
   // Server-only fields (never sent to clients):
   // is_protected, last_protected_player_id, session_token,
   // hunter_fired, is_framed_tonight, hints_received, infect_used
@@ -101,9 +103,6 @@ export interface NightActions {
   /** Public — all clients see these for progress display */
   actions_submitted_count: number;
   actions_required_count: number;
-
-  /** wakeOrder==0 players (villager, doctor, etc.) — own puzzle only; correct_index stripped */
-  puzzle_state: PuzzleState | null;
 
   // Server-only fields (never sent to clients):
   // roleblock_target_id, doctor_target_id, roleblocked_player_id,
@@ -189,9 +188,17 @@ export interface MasterGameState {
 
 // ── WebSocket Messages ────────────────────────────────────────────────────────
 
-/** Sent by server on every state mutation */
-export interface StateUpdateMessage {
-  type: "state_update";
+/** Sent by server on initial connect — full state baseline */
+export interface SyncMessage {
+  type: "sync";
+  state_id: number;
+  schema_version: string;
+  state: MasterGameState;
+}
+
+/** Sent by server on every game-event broadcast */
+export interface UpdateMessage {
+  type: "update";
   state_id: number;
   schema_version: string;
   state: MasterGameState;
@@ -215,7 +222,7 @@ export interface HintRewardMessage {
 }
 
 /** Union of all server-to-client messages */
-export type ServerMessage = StateUpdateMessage | ErrorMessage | HintRewardMessage;
+export type ServerMessage = SyncMessage | UpdateMessage | ErrorMessage | HintRewardMessage;
 
 // ── Intent Payloads (client → server) ────────────────────────────────────────
 
@@ -244,7 +251,8 @@ export interface SubmitNightActionIntent {
   secondary_target_id?: string;
   wolf_vote_target_id?: string;
   framer_action?: "frame" | "hack_archives";
-  false_hint_payload?: Record<string, unknown>;
+  false_hint_category?: string;
+  false_hint_text?: string;
   arsonist_action?: "douse" | "ignite";
   link_target_a?: string;
   link_target_b?: string;

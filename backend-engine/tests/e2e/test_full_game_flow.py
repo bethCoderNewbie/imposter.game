@@ -70,7 +70,7 @@ class TestWebSocketLobbyBroadcast:
         with e2e_client.websocket_connect(f"/ws/{game_id}/display") as ws:
             msg = ws.receive_json()
 
-        assert msg["type"] == "state_update"
+        assert msg["type"] == "sync"
         assert msg["state"]["phase"] == "lobby"
         assert len(msg["state"]["players"]) == 3
 
@@ -99,7 +99,7 @@ class TestWebSocketLobbyBroadcast:
             ws.send_json({"type": "auth", "session_token": token})
             msg = ws.receive_json()
 
-        assert msg["type"] == "state_update"
+        assert msg["type"] == "sync"
         assert msg["state"]["phase"] == "lobby"
 
     def test_display_state_never_exposes_host_secret(self, e2e_client):
@@ -132,7 +132,7 @@ class TestGameStart:
 
             # Wait for the game queue to process start_game and broadcast ROLE_DEAL
             role_deal_msg = ws.receive_json()
-            assert role_deal_msg["type"] == "state_update"
+            assert role_deal_msg["type"] == "update"
             assert role_deal_msg["state"]["phase"] == "role_deal"
 
     def test_role_deal_state_has_all_players(self, e2e_client):

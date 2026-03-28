@@ -21,7 +21,7 @@ export function useGameState({ gameId, playerId, sessionToken }: Options) {
 
   const handleMessage = useCallback((data: unknown) => {
     const msg = data as ServerMessage
-    if (msg.type === 'state_update') {
+    if (msg.type === 'sync' || msg.type === 'update') {
       if (msg.state_id > lastStateIdRef.current) {
         lastStateIdRef.current = msg.state_id
         setGameState(msg.state)
