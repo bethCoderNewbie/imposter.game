@@ -1,9 +1,15 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import LobbyScreen from '../../components/LobbyScreen/LobbyScreen'
+import { useGameStore } from '../../store/gameStore'
 import { makeGameState, makePlayer } from '../fixtures'
 
 afterEach(() => vi.unstubAllGlobals())
+
+beforeEach(() => {
+  // Seed store with default 5 players before each test
+  useGameStore.setState({ roster: Object.values(makeGameState().players) })
+})
 
 function makeFivePlayers() {
   return {
@@ -30,7 +36,7 @@ describe('LobbyScreen', () => {
 
   it('shows joined count', () => {
     render(<LobbyScreen gameState={makeGameState()} />)
-    // 5 players, player_count = 8 in config
+    // 5 players in store, player_count = 8 in config
     expect(screen.getByText(/5 \/ 8 joined/i)).toBeInTheDocument()
   })
 
@@ -40,6 +46,13 @@ describe('LobbyScreen', () => {
   })
 
   it('disables Start button and shows needs-more text when fewer than 5 players', () => {
+    useGameStore.setState({
+      roster: [
+        makePlayer({ player_id: 'p1' }),
+        makePlayer({ player_id: 'p2' }),
+        makePlayer({ player_id: 'p3' }),
+      ],
+    })
     const threePlayerState = makeGameState({
       players: {
         p1: makePlayer({ player_id: 'p1' }),
@@ -54,6 +67,7 @@ describe('LobbyScreen', () => {
   })
 
   it('enables Start Game button at exactly 5 players', () => {
+    useGameStore.setState({ roster: Object.values(makeFivePlayers()) })
     render(
       <LobbyScreen
         gameState={makeGameState({ players: makeFivePlayers() })}
@@ -66,6 +80,7 @@ describe('LobbyScreen', () => {
   })
 
   it('shows Waiting for host text when no hostSecret is provided', () => {
+    useGameStore.setState({ roster: Object.values(makeFivePlayers()) })
     render(<LobbyScreen gameState={makeGameState({ players: makeFivePlayers() })} />)
     expect(screen.getByText(/waiting for host to start/i)).toBeInTheDocument()
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
@@ -84,6 +99,7 @@ describe('LobbyScreen', () => {
 
   it('calls POST /api/games/{id}/start on Start click', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({}) }))
+    useGameStore.setState({ roster: Object.values(makeFivePlayers()) })
     render(
       <LobbyScreen
         gameState={makeGameState({ players: makeFivePlayers(), game_id: 'GAMEX' })}
@@ -102,6 +118,7 @@ describe('LobbyScreen', () => {
 
   it('disables Start button while start request is in flight', async () => {
     vi.stubGlobal('fetch', vi.fn().mockReturnValue(new Promise(() => {})))
+    useGameStore.setState({ roster: Object.values(makeFivePlayers()) })
     render(
       <LobbyScreen
         gameState={makeGameState({ players: makeFivePlayers() })}
@@ -120,6 +137,7 @@ describe('LobbyScreen', () => {
       p3: makePlayer({ player_id: 'p3' }),
       p4: makePlayer({ player_id: 'p4' }),
     }
+    useGameStore.setState({ roster: Object.values(fourPlayers) })
     render(
       <LobbyScreen
         gameState={makeGameState({ players: fourPlayers })}

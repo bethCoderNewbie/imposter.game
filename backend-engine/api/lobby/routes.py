@@ -103,6 +103,7 @@ async def join_game(game_id: str, body: JoinGameRequest, redis=Depends(_get_redi
     # Broadcast updated lobby state to all connected sockets
     from api.connection_manager import manager
     await manager.broadcast(game_id, G)
+    await manager.broadcast_roster(game_id, list(G.players.values()))
 
     return {
         "game_id": game_id,
@@ -132,6 +133,9 @@ async def rejoin_game(game_id: str, body: RejoinGameRequest, redis=Depends(_get_
     G = G.model_copy(deep=True)
     G.players[player_id].is_connected = True
     await save_game(redis, game_id, G)
+
+    from api.connection_manager import manager
+    await manager.broadcast_roster(game_id, list(G.players.values()))
 
     return {
         "game_id": game_id,

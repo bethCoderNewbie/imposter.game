@@ -1,6 +1,7 @@
 import { renderHook, act } from '@testing-library/react'
 import type { WsStatus } from '../../hooks/useWebSocket'
 import { useGameState } from '../../hooks/useGameState'
+import { useGameStore } from '../../store/gameStore'
 import { makeGameState } from '../fixtures'
 
 // ── Mock useWebSocket ─────────────────────────────────────────────────────────
@@ -29,6 +30,7 @@ describe('useGameState', () => {
   beforeEach(() => {
     capturedOnMessage = () => {}
     capturedOnStatusChange = undefined
+    useGameStore.setState({ roster: [] })
   })
 
   it('has null gameState and "closed" status initially', () => {
@@ -54,44 +56,62 @@ describe('useGameState', () => {
     expect(callArg.url).toMatch(/\/ws\/game-1\/display$/)
   })
 
-  it('updates gameState on state_update message', () => {
+  it('updates gameState on sync message', () => {
     const { result } = renderHook(() =>
       useGameState({ gameId: 'g1', playerId: 'display' })
     )
     const state = makeGameState({ phase: 'lobby' })
     act(() => {
-      capturedOnMessage({ type: 'state_update', state_id: 1, state })
+      capturedOnMessage({ type: 'sync', state_id: 1, schema_version: '1', state })
     })
     expect(result.current.gameState?.phase).toBe('lobby')
   })
 
-  it('ignores state_update with stale state_id', () => {
+  it('ignores update with stale state_id', () => {
     const { result } = renderHook(() =>
       useGameState({ gameId: 'g1', playerId: 'display' })
     )
     const state5 = makeGameState({ phase: 'night' })
     const state3 = makeGameState({ phase: 'lobby' })
     act(() => {
-      capturedOnMessage({ type: 'state_update', state_id: 5, state: state5 })
+      capturedOnMessage({ type: 'update', state_id: 5, schema_version: '1', state: state5 })
     })
     act(() => {
-      capturedOnMessage({ type: 'state_update', state_id: 3, state: state3 })
+      capturedOnMessage({ type: 'update', state_id: 3, schema_version: '1', state: state3 })
     })
     // state3 is older — should keep state5's phase
     expect(result.current.gameState?.phase).toBe('night')
   })
 
-  it('applies sequential state_updates in order', () => {
+  it('applies sequential updates in order', () => {
     const { result } = renderHook(() =>
       useGameState({ gameId: 'g1', playerId: 'display' })
     )
     act(() => {
-      capturedOnMessage({ type: 'state_update', state_id: 1, state: makeGameState({ phase: 'lobby' }) })
+      capturedOnMessage({ type: 'sync', state_id: 1, schema_version: '1', state: makeGameState({ phase: 'lobby' }) })
     })
     act(() => {
-      capturedOnMessage({ type: 'state_update', state_id: 2, state: makeGameState({ phase: 'night' }) })
+      capturedOnMessage({ type: 'update', state_id: 2, schema_version: '1', state: makeGameState({ phase: 'night' }) })
     })
     expect(result.current.gameState?.phase).toBe('night')
+  })
+
+  it('match_data dispatches roster to Zustand store', () => {
+    renderHook(() => useGameState({ gameId: 'g1', playerId: 'display' }))
+    const roster = [{ player_id: 'p1', display_name: 'Alice', avatar_id: 'avatar_01', is_connected: true }]
+    act(() => {
+      capturedOnMessage({ type: 'match_data', players: roster })
+    })
+    expect(useGameStore.getState().roster).toEqual(roster)
+  })
+
+  it('sync seeds roster from state.players', () => {
+    const state = makeGameState({ phase: 'lobby' })
+    renderHook(() => useGameState({ gameId: 'g1', playerId: 'display' }))
+    act(() => {
+      capturedOnMessage({ type: 'sync', state_id: 1, schema_version: '1', state })
+    })
+    expect(useGameStore.getState().roster.length).toBe(Object.keys(state.players).length)
   })
 
   it('logs warning on error message and does not change gameState', () => {

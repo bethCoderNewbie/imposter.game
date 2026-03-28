@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react'
 import { useWebSocket, type WsStatus } from './useWebSocket'
 import type { StrippedGameState, ServerMessage } from '../types/game'
+import { useGameStore } from '../store/gameStore'
 
 interface Options {
   gameId: string | null
@@ -25,7 +26,13 @@ export function useGameState({ gameId, playerId, sessionToken }: Options) {
       if (msg.state_id > lastStateIdRef.current) {
         lastStateIdRef.current = msg.state_id
         setGameState(msg.state)
+        if (msg.type === 'sync') {
+          useGameStore.getState().setRoster(Object.values(msg.state.players))
+        }
       }
+    }
+    if (msg.type === 'match_data') {
+      useGameStore.getState().setRoster(msg.players)
     }
     // error messages are logged; surface to UI if needed
     if (msg.type === 'error') {

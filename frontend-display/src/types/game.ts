@@ -124,7 +124,19 @@ export interface ErrorMessage {
   message: string
 }
 
-export type ServerMessage = SyncMessage | UpdateMessage | ErrorMessage
+export interface PlayerRosterEntry {
+  player_id: string
+  display_name: string
+  avatar_id: string
+  is_connected: boolean
+}
+
+export interface MatchDataMessage {
+  type: 'match_data'
+  players: PlayerRosterEntry[]
+}
+
+export type ServerMessage = SyncMessage | UpdateMessage | MatchDataMessage | ErrorMessage
 
 // Avatar color palette — 8 preset colors for avatar_01…avatar_08
 export const AVATAR_COLORS: Record<string, string> = {

@@ -75,6 +75,31 @@ class ConnectionManager:
         except (WebSocketDisconnect, RuntimeError):
             self.disconnect(game_id, player_id)
 
+    async def broadcast_roster(self, game_id: str, players: list) -> None:
+        """Sends a match_data roster event to all sockets in the lobby room."""
+        room = self._rooms.get(game_id, {})
+        payload = {
+            "type": "match_data",
+            "players": [
+                {
+                    "player_id": p.player_id,
+                    "display_name": p.display_name,
+                    "avatar_id": p.avatar_id,
+                    "is_connected": p.is_connected,
+                }
+                for p in players
+            ],
+        }
+        text = json.dumps(payload)
+        dead_sockets: list[str | None] = []
+        for pid, ws in list(room.items()):
+            try:
+                await ws.send_text(text)
+            except (WebSocketDisconnect, RuntimeError):
+                dead_sockets.append(pid)
+        for pid in dead_sockets:
+            self._rooms[game_id].pop(pid, None)
+
     def is_connected(self, game_id: str, player_id: str | None) -> bool:
         return player_id in self._rooms.get(game_id, {})
 

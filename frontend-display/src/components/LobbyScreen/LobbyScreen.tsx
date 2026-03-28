@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import PlayerAvatar from '../PlayerAvatar/PlayerAvatar'
-import type { StrippedGameState, PlayerState } from '../../types/game'
+import type { StrippedGameState, PlayerRosterEntry } from '../../types/game'
+import { useGameStore } from '../../store/gameStore'
 import './LobbyScreen.css'
 
 interface Props {
@@ -16,7 +17,7 @@ const HOST_BASE: string = import.meta.env.VITE_HOST_IP || window.location.origin
 
 export default function LobbyScreen({ gameState, hostSecret, gameId }: Props) {
   const joinUrl = `${HOST_BASE}/?g=${gameState.game_id}`
-  const players = Object.values(gameState.players)
+  const players = useGameStore(state => state.roster)
   const playerCount = players.length
   const canStart = playerCount >= 5
   const [starting, setStarting] = useState(false)
@@ -86,7 +87,7 @@ export default function LobbyScreen({ gameState, hostSecret, gameId }: Props) {
       <div className="lobby-screen__parade">
         <div className="lobby-screen__campfire">🔥</div>
         <div className="lobby-screen__avatars">
-          {players.map((p: PlayerState) => (
+          {players.map((p: PlayerRosterEntry) => (
             <PlayerAvatar
               key={p.player_id}
               player={p}
@@ -100,7 +101,7 @@ export default function LobbyScreen({ gameState, hostSecret, gameId }: Props) {
       <div className="lobby-screen__status">
         {isDealing ? (
           'Dealing roles…'
-        ) : (
+        ) : hostSecret ? (
           <button
             className="lobby-screen__start-btn"
             disabled={!canStart || starting}
@@ -108,6 +109,8 @@ export default function LobbyScreen({ gameState, hostSecret, gameId }: Props) {
           >
             {starting ? 'Starting…' : canStart ? 'Start Game' : `Need ${5 - playerCount} more player${5 - playerCount !== 1 ? 's' : ''}`}
           </button>
+        ) : (
+          'Waiting for host to start'
         )}
       </div>
     </div>

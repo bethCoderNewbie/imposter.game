@@ -211,6 +211,19 @@ export interface ErrorMessage {
   message: string;
 }
 
+/** Sent by server on lobby player joins/rejoins — roster-only, no secret fields */
+export interface PlayerRosterEntry {
+  player_id: string;
+  display_name: string;
+  avatar_id: string;
+  is_connected: boolean;
+}
+
+export interface MatchDataMessage {
+  type: "match_data";
+  players: PlayerRosterEntry[];
+}
+
 /** Sent by server to deliver puzzle hints */
 export interface HintRewardMessage {
   type: "hint_reward";
@@ -222,7 +235,7 @@ export interface HintRewardMessage {
 }
 
 /** Union of all server-to-client messages */
-export type ServerMessage = SyncMessage | UpdateMessage | ErrorMessage | HintRewardMessage;
+export type ServerMessage = SyncMessage | UpdateMessage | MatchDataMessage | ErrorMessage | HintRewardMessage;
 
 // ── Intent Payloads (client → server) ────────────────────────────────────────
 

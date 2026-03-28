@@ -136,3 +136,24 @@ class TestJoinBroadcast:
             updated = ws.receive_json()
             assert updated["type"] == "update"
             assert len(updated["state"]["players"]) == 1
+
+    def test_display_receives_match_data_when_player_joins(self, client):
+        """Joining a player broadcasts a match_data roster event to the display."""
+        game_id = client.post("/api/games", json={}).json()["game_id"]
+
+        with client.websocket_connect(f"/ws/{game_id}/display") as ws:
+            ws.receive_json()  # consume sync
+
+            client.post(f"/api/games/{game_id}/join", json={"display_name": "Alice"})
+
+            # update arrives first (full state), then match_data (roster)
+            update_msg = ws.receive_json()
+            assert update_msg["type"] == "update"
+
+            roster_msg = ws.receive_json()
+            assert roster_msg["type"] == "match_data"
+            assert len(roster_msg["players"]) == 1
+            assert roster_msg["players"][0]["display_name"] == "Alice"
+            assert "player_id" in roster_msg["players"][0]
+            assert "avatar_id" in roster_msg["players"][0]
+            assert "is_connected" in roster_msg["players"][0]
