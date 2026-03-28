@@ -42,6 +42,14 @@ class StartGameRequest(BaseModel):
     host_secret: str
 
 
+class ConfigUpdateRequest(BaseModel):
+    host_secret: str
+    difficulty_level: str | None = None
+    night_timer_seconds: int | None = None
+    day_timer_seconds: int | None = None
+    vote_timer_seconds: int | None = None
+
+
 def _get_redis(request: Request):
     return request.app.state.redis
 
@@ -142,6 +150,49 @@ async def rejoin_game(game_id: str, body: RejoinGameRequest, redis=Depends(_get_
         "player_id": player_id,
         "session_token": body.session_token,
     }
+
+
+@router.patch("/{game_id}/config")
+async def update_game_config(game_id: str, body: ConfigUpdateRequest, redis=Depends(_get_redis)):
+    """Update difficulty level and/or phase timers while game is in lobby phase."""
+    G = await load_game(redis, game_id)
+    if G is None:
+        raise HTTPException(status_code=404, detail="Game not found.")
+    if G.host_secret != body.host_secret:
+        raise HTTPException(status_code=403, detail="Invalid host secret.")
+    if G.phase != Phase.LOBBY:
+        raise HTTPException(status_code=409, detail="Game already started.")
+
+    if body.difficulty_level is not None:
+        if body.difficulty_level not in ("easy", "standard", "hard"):
+            raise HTTPException(status_code=422, detail="difficulty_level must be easy, standard, or hard.")
+
+    TIMER_BOUNDS = {
+        "night_timer_seconds":  (30, 120),
+        "day_timer_seconds":    (60, 300),
+        "vote_timer_seconds":   (30, 120),
+    }
+    for field, (lo, hi) in TIMER_BOUNDS.items():
+        val = getattr(body, field)
+        if val is not None and not (lo <= val <= hi):
+            raise HTTPException(status_code=422, detail=f"{field} must be {lo}–{hi}.")
+
+    G = G.model_copy(deep=True)
+    updates: dict = {}
+    if body.difficulty_level is not None:
+        updates["difficulty_level"] = body.difficulty_level
+    for field in ("night_timer_seconds", "day_timer_seconds", "vote_timer_seconds"):
+        val = getattr(body, field)
+        if val is not None:
+            updates[field] = val
+
+    G.config = G.config.model_copy(update=updates)
+    await save_game(redis, game_id, G)
+
+    from api.connection_manager import manager
+    await manager.broadcast(game_id, G)
+
+    return {"ok": True}
 
 
 @router.post("/{game_id}/start")

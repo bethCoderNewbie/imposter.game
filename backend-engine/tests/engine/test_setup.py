@@ -57,6 +57,20 @@ class TestBuildComposition:
         for role_id in composition:
             assert role_id in ROLE_REGISTRY, f"Unknown role in composition: {role_id}"
 
+    def test_easy_difficulty_target_range_accepted(self):
+        """easy target_range [0,4] should be accepted without error."""
+        result = build_composition(8, "seed1", target_range=[0, 4])
+        assert sum(result.values()) == 8
+
+    def test_hard_difficulty_target_range_accepted(self):
+        result = build_composition(8, "seed1", target_range=[-4, 0])
+        assert sum(result.values()) == 8
+
+    def test_target_range_none_uses_default(self):
+        r1 = build_composition(8, "seed1", target_range=None)
+        r2 = build_composition(8, "seed1")
+        assert r1 == r2
+
 
 class TestAssignRoles:
     def test_assign_roles_covers_all_players(self):

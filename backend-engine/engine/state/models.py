@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from engine.state.enums import (
     ActionPhase,
     ActionType,
+    DifficultyLevel,
     EliminationCause,
     InvestigationResult,
     Phase,
@@ -47,6 +48,7 @@ class GameConfig(BaseModel):
     hunter_pending_timer_seconds: int = 30
     player_count: int
     roles: dict[str, int]  # role_id -> count
+    difficulty_level: DifficultyLevel = DifficultyLevel.STANDARD
 
 
 class PuzzleState(BaseModel):

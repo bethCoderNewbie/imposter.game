@@ -1,0 +1,7 @@
+.phase-timer {
+  font-size: clamp(2rem, 5.6vmin, 4rem);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.05em;
+}
+.phase-timer.timer--warning  { color: var(--timer-warning,  #f6c90e); }
+.phase-timer.timer--critical { color: var(--timer-critical, #e53e3e); }

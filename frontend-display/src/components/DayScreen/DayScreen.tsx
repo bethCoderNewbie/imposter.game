@@ -1,4 +1,4 @@
-import { useTimer } from '../../hooks/useTimer'
+import PhaseTimer from '../PhaseTimer/PhaseTimer'
 import PlayerCard from './PlayerCard'
 import VoteWeb from '../VoteWeb/VoteWeb'
 import type { StrippedGameState } from '../../types/game'
@@ -11,14 +11,8 @@ interface Props {
 }
 
 export default function DayScreen({ gameState, frozenVotes }: Props) {
-  const { secondsRemaining, isWarning, isCritical } = useTimer(gameState.timer_ends_at)
-
   const players = Object.values(gameState.players)
   const isVoting = gameState.phase === 'day_vote'
-
-  const mm = String(Math.floor(secondsRemaining / 60)).padStart(2, '0')
-  const ss = String(secondsRemaining % 60).padStart(2, '0')
-  const timerClass = isCritical ? 'timer--critical' : isWarning ? 'timer--warning' : ''
 
   // Vote tallies (live during day_vote; frozen after voting closes)
   const votes = isVoting ? gameState.day_votes : (frozenVotes ?? {})
@@ -34,7 +28,7 @@ export default function DayScreen({ gameState, frozenVotes }: Props) {
       {/* Top-center: round label + timer — PRD-003 §6 */}
       <div className="day-screen__header">
         <span className="day-screen__round">Day {gameState.round}</span>
-        <span className={`day-screen__timer ${timerClass}`}>{mm}:{ss}</span>
+        <PhaseTimer timerEndsAt={gameState.timer_ends_at} className="day-screen__timer" />
       </div>
 
       {/* Player grid — relative so VoteWeb SVG can overlay it */}

@@ -30,6 +30,7 @@ const DEFAULT_CONFIG: GameConfig = {
   hunter_pending_timer_seconds: 30,
   player_count: 8,
   roles: { werewolf: 2, villager: 4, seer: 1, doctor: 1 },
+  difficulty_level: 'standard',
 }
 
 const DEFAULT_NIGHT_ACTIONS: NightActions = {

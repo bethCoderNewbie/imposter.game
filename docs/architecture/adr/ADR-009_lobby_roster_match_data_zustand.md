@@ -1,7 +1,7 @@
 # ADR-009: Werewolf — Lobby Roster Broadcast via `match_data` and Zustand Store
 
 ## Status
-Proposed
+Accepted
 
 ## Date
 2026-03-27

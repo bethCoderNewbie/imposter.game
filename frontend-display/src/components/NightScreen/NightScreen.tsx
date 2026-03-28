@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useTimer } from '../../hooks/useTimer'
+import PhaseTimer from '../PhaseTimer/PhaseTimer'
 import type { StrippedGameState } from '../../types/game'
 import './NightScreen.css'
 
@@ -17,7 +17,6 @@ interface Props {
 }
 
 export default function NightScreen({ gameState, audioUnlocked }: Props) {
-  const { secondsRemaining, isWarning, isCritical } = useTimer(gameState.timer_ends_at)
   const [narrativeIdx, setNarrativeIdx] = useState(0)
   const ambientRef = useRef<HTMLAudioElement>(null)
 
@@ -41,11 +40,6 @@ export default function NightScreen({ gameState, audioUnlocked }: Props) {
     }
   }, [audioUnlocked])
 
-  const mm = String(Math.floor(secondsRemaining / 60)).padStart(2, '0')
-  const ss = String(secondsRemaining % 60).padStart(2, '0')
-
-  const timerClass = isCritical ? 'timer--critical' : isWarning ? 'timer--warning' : ''
-
   const { actions_submitted_count, actions_required_count } = gameState.night_actions
 
   return (
@@ -57,9 +51,7 @@ export default function NightScreen({ gameState, audioUnlocked }: Props) {
       <div className="night-screen__moon" aria-hidden="true">🌕</div>
 
       {/* Countdown timer — PRD-003 §2.2 */}
-      <div className={`night-screen__timer ${timerClass}`}>
-        {mm}:{ss}
-      </div>
+      <PhaseTimer timerEndsAt={gameState.timer_ends_at} className="night-screen__timer" />
 
       {/* Atmospheric narrative carousel — PRD-002 §2.3 */}
       <p className="night-screen__narrative" key={narrativeIdx}>

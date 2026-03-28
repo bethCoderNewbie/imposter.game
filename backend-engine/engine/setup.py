@@ -21,6 +21,12 @@ from engine.roles_loader import (
 from engine.state.enums import Phase, Team
 from engine.state.models import GameConfig, MasterGameState, NightActions, PlayerState
 
+DIFFICULTY_BALANCE_RANGE: dict[str, list[int]] = {
+    "easy":     [0,  4],
+    "standard": [-2, 2],
+    "hard":     [-4, 0],
+}
+
 
 def _find_template(player_count: int) -> dict[str, Any]:
     """Return the dynamic template matching the given player count."""
@@ -41,7 +47,7 @@ def _balance_weight(composition: dict[str, int]) -> int:
     )
 
 
-def build_composition(player_count: int, seed: str | None = None) -> dict[str, int]:
+def build_composition(player_count: int, seed: str | None = None, target_range: list[int] | None = None) -> dict[str, int]:
     """
     Select roles for a game using the dynamic template system.
     Returns {role_id: count} summing to player_count.
@@ -60,7 +66,7 @@ def build_composition(player_count: int, seed: str | None = None) -> dict[str, i
         slots_filled += count
 
     # Step 2: fill flex pools
-    target_range: list[int] = BALANCE_WEIGHT_SYSTEM.get("targetRange", [-2, 2])
+    effective_range: list[int] = target_range or BALANCE_WEIGHT_SYSTEM.get("targetRange", [-2, 2])
 
     def _draw_from_pool(pool: dict[str, Any], rng: random.Random) -> list[str]:
         picks = pool["picks"]
@@ -105,7 +111,7 @@ def build_composition(player_count: int, seed: str | None = None) -> dict[str, i
 
     # One re-roll pass if balance outside target range
     weight = _balance_weight(result)
-    if not (target_range[0] <= weight <= target_range[1]):
+    if not (effective_range[0] <= weight <= effective_range[1]):
         reroll_rng = random.Random(seed + "_reroll" if seed else None)
         result2 = _fill_pools(reroll_rng)
         weight2 = _balance_weight(result2)

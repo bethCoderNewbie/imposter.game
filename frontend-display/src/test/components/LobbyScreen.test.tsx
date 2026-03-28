@@ -61,9 +61,8 @@ describe('LobbyScreen', () => {
       },
     })
     render(<LobbyScreen gameState={threePlayerState} hostSecret="secret" gameId="G1" />)
-    const btn = screen.getByRole('button')
+    const btn = screen.getByRole('button', { name: /need 2 more players/i })
     expect(btn).toBeDisabled()
-    expect(btn).toHaveTextContent(/need 2 more players/i)
   })
 
   it('enables Start Game button at exactly 5 players', () => {
@@ -127,7 +126,13 @@ describe('LobbyScreen', () => {
       />
     )
     await userEvent.click(screen.getByRole('button', { name: /start game/i }))
-    expect(screen.getByRole('button')).toBeDisabled()
+    expect(screen.getByRole('button', { name: /starting/i })).toBeDisabled()
+  })
+
+  it('renders LobbyConfigPanel with config', () => {
+    render(<LobbyScreen gameState={makeGameState()} />)
+    // Spectator view shows read-only difficulty badge
+    expect(screen.getByText('Balanced')).toBeInTheDocument()
   })
 
   it('shows "Need 1 more player" (singular) when 4 players present', () => {
@@ -145,6 +150,6 @@ describe('LobbyScreen', () => {
         gameId="G1"
       />
     )
-    expect(screen.getByRole('button')).toHaveTextContent('Need 1 more player')
+    expect(screen.getByRole('button', { name: 'Need 1 more player' })).toBeInTheDocument()
   })
 })

@@ -62,3 +62,9 @@ class WinCondition(StrEnum):
     JESTER_WINS = "jester_wins"
     SERIAL_KILLER_WINS = "serial_killer_wins"
     ARSONIST_WINS = "arsonist_wins"
+
+
+class DifficultyLevel(StrEnum):
+    EASY     = "easy"
+    STANDARD = "standard"
+    HARD     = "hard"

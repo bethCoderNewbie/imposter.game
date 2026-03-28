@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import PlayerAvatar from '../PlayerAvatar/PlayerAvatar'
+import LobbyConfigPanel from '../LobbyConfigPanel/LobbyConfigPanel'
 import type { StrippedGameState, PlayerRosterEntry } from '../../types/game'
 import { useGameStore } from '../../store/gameStore'
 import './LobbyScreen.css'
@@ -96,6 +97,13 @@ export default function LobbyScreen({ gameState, hostSecret, gameId }: Props) {
           ))}
         </div>
       </div>
+
+      {/* Config panel: difficulty + timers — PRD-005 */}
+      <LobbyConfigPanel
+        config={gameState.config}
+        hostSecret={hostSecret}
+        gameId={gameId}
+      />
 
       {/* Bottom: status + optional Start button */}
       <div className="lobby-screen__status">

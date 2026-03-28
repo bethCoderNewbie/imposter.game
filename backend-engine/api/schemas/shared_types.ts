@@ -37,6 +37,8 @@ export type WinCondition =
   | "arsonist_wins"
   | "lovers_win";
 
+export type DifficultyLevel = "easy" | "standard" | "hard";
+
 // ── Game Config ──────────────────────────────────────────────────────────────
 
 export interface GameConfig {
@@ -47,6 +49,7 @@ export interface GameConfig {
   hunter_pending_timer_seconds: number;
   player_count: number;
   roles: Record<string, number>; // role_id -> count
+  difficulty_level: DifficultyLevel;
 }
 
 // ── Player State ─────────────────────────────────────────────────────────────

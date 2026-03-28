@@ -18,7 +18,7 @@ from engine.resolver.hunter import HunterError, resolve_hunter_revenge, resolve_
 from engine.resolver.night import resolve_night
 from engine.resolver.puzzle import PuzzleError, resolve_puzzle_answer
 from engine.roles_loader import CLIENT_SAFE_ROLE_REGISTRY, ROLE_REGISTRY
-from engine.setup import assign_roles, build_composition
+from engine.setup import DIFFICULTY_BALANCE_RANGE, assign_roles, build_composition
 from engine.state.enums import Phase, Team
 from engine.state.models import FalseHintPayload, MasterGameState, PlayerState
 
@@ -67,7 +67,8 @@ async def handle_start_game(G, intent, redis_client, cm) -> MasterGameState:
 
     # Assign roles
     player_count = len(G.players)
-    composition = build_composition(player_count, G.seed)
+    target_range = DIFFICULTY_BALANCE_RANGE.get(G.config.difficulty_level, [-2, 2])
+    composition = build_composition(player_count, G.seed, target_range=target_range)
     role_map = assign_roles(list(G.players.keys()), composition, G.seed)
 
     G = G.model_copy(deep=True)

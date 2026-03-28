@@ -12,6 +12,7 @@ export type Phase =
 
 export type Team = 'village' | 'werewolf' | 'neutral'
 export type InvestigationResult = 'village' | 'wolf' | 'neutral'
+export type DifficultyLevel = 'easy' | 'standard' | 'hard'
 
 export interface GameConfig {
   night_timer_seconds: number
@@ -21,6 +22,7 @@ export interface GameConfig {
   hunter_pending_timer_seconds: number
   player_count: number
   roles: Record<string, number>
+  difficulty_level: DifficultyLevel
 }
 
 export interface PlayerState {
