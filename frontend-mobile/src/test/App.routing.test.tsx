@@ -24,11 +24,11 @@ vi.mock('../hooks/useHaptics', () => ({
 const SESSION = { game_id: 'g1', player_id: 'p1', session_token: 'tok' }
 
 function setSession() {
-  sessionStorage.setItem('ww_session', JSON.stringify(SESSION))
+  localStorage.setItem('ww_session', JSON.stringify(SESSION))
 }
 
 function clearSession() {
-  sessionStorage.clear()
+  localStorage.clear()
 }
 
 async function renderApp() {
