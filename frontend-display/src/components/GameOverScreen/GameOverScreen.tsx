@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import PlayerAvatar from '../PlayerAvatar/PlayerAvatar'
 import type { StrippedGameState } from '../../types/game'
 import './GameOverScreen.css'
@@ -6,9 +6,15 @@ import './GameOverScreen.css'
 interface Props {
   gameState: StrippedGameState
   audioUnlocked: boolean
+  gameId: string
+  hostSecret: string | null
+  onPlayAgain: (newGameId: string, newHostSecret: string) => void
+  onNewMatch: () => void
 }
 
-export default function GameOverScreen({ gameState, audioUnlocked }: Props) {
+export default function GameOverScreen({ gameState, audioUnlocked, gameId, hostSecret, onPlayAgain, onNewMatch }: Props) {
+  const [loading, setLoading] = useState<'play_again' | 'new_match' | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
   const isVillageWin = gameState.winner === 'village'
 
@@ -24,6 +30,45 @@ export default function GameOverScreen({ gameState, audioUnlocked }: Props) {
       audioRef.current.play().catch(() => {})
     }
   }, [audioUnlocked])
+
+  async function handlePlayAgain() {
+    if (!hostSecret || loading) return
+    setLoading('play_again')
+    setError(null)
+    try {
+      const res = await fetch(`/api/games/${gameId}/rematch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ host_secret: hostSecret }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        setError((body as { detail?: string }).detail ?? 'Could not start rematch.')
+        return
+      }
+      const data = await res.json() as { new_game_id: string; new_host_secret: string }
+      onPlayAgain(data.new_game_id, data.new_host_secret)
+    } catch {
+      setError('Network error.')
+    } finally {
+      setLoading(null)
+    }
+  }
+
+  async function handleNewMatch() {
+    if (!hostSecret || loading) return
+    setLoading('new_match')
+    try {
+      await fetch(`/api/games/${gameId}/abandon`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ host_secret: hostSecret }),
+      })
+    } catch { /* best-effort */ } finally {
+      setLoading(null)
+    }
+    onNewMatch()
+  }
 
   const players = Object.values(gameState.players)
   const timeline = gameState.post_match?.timeline ?? []
@@ -67,6 +112,27 @@ export default function GameOverScreen({ gameState, audioUnlocked }: Props) {
               {event.display_text}
             </p>
           ))}
+        </div>
+      )}
+
+      {/* Host-only action buttons */}
+      {hostSecret && (
+        <div className="game-over__actions">
+          {error && <p className="game-over__error">{error}</p>}
+          <button
+            className="game-over__btn game-over__btn--primary"
+            disabled={!!loading}
+            onClick={handlePlayAgain}
+          >
+            {loading === 'play_again' ? 'Starting…' : 'Play Again'}
+          </button>
+          <button
+            className="game-over__btn game-over__btn--secondary"
+            disabled={!!loading}
+            onClick={handleNewMatch}
+          >
+            {loading === 'new_match' ? 'Leaving…' : 'New Match'}
+          </button>
         </div>
       )}
     </div>

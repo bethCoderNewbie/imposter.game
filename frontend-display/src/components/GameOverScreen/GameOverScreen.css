@@ -73,3 +73,41 @@
   opacity: 0;
   animation: reveal-flicker 1.2s cubic-bezier(0.5, 1, 0.89, 1) forwards;
 }
+
+/* Host action buttons */
+.game-over__actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 2vmin;
+  margin-top: 1vmin;
+  justify-content: center;
+  width: 100%;
+}
+
+.game-over__btn {
+  font-size: clamp(16px, 2.2vmin, 28px);
+  padding: 0.7em 2em;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  transition: opacity 0.15s;
+}
+
+.game-over__btn:disabled { opacity: 0.5; cursor: default; }
+
+.game-over__btn--primary  { background: var(--village-primary); color: #000; }
+.game-over__btn--secondary {
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.4);
+}
+
+.game-over__error {
+  color: #fc8181;
+  font-size: clamp(14px, 1.8vmin, 22px);
+  text-align: center;
+  width: 100%;
+}

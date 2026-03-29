@@ -20,14 +20,18 @@ const PHASE_TO_CLASS: Record<string, string> = {
   game_over:       'phase-day',
 }
 
-const initParams = new URLSearchParams(window.location.search)
-
 export default function App() {
   const [audioUnlocked, setAudioUnlocked] = useState(false)
-  const [gameId, setGameId] = useState<string | null>(initParams.get('g'))
-  const [hostSecret, setHostSecret] = useState<string | null>(
-    initParams.get('g') ? initParams.get('host_secret') : null
-  )
+  const [gameId, setGameId] = useState<string | null>(() => {
+    const p = new URLSearchParams(window.location.search)
+    return p.get('g')
+  })
+  const [hostSecret, setHostSecret] = useState<string | null>(() => {
+    const p = new URLSearchParams(window.location.search)
+    const gId = p.get('g')
+    if (!gId) return null
+    return p.get('host_secret') ?? localStorage.getItem(`ww_host_${gId}`)
+  })
   // Show NightResolution interstitial on night→day transition
   const [showResolution, setShowResolution] = useState(false)
   // Snapshot of game state at resolution moment (so component has stable data)
@@ -36,7 +40,16 @@ export default function App() {
   const [frozenVotes, setFrozenVotes] = useState<Record<string, string> | null>(null)
   const prevPhaseRef = useRef<string | null>(null)
 
+  // Sync hostSecret from URL (or localStorage fallback) whenever gameId changes
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search)
+    const gId = p.get('g')
+    if (!gId) { setHostSecret(null); return }
+    setHostSecret(p.get('host_secret') ?? localStorage.getItem(`ww_host_${gId}`))
+  }, [gameId])
+
   function handleCreated(newGameId: string, newHostSecret: string) {
+    localStorage.setItem(`ww_host_${newGameId}`, newHostSecret)
     history.pushState({}, '', `?g=${newGameId}&host_secret=${newHostSecret}`)
     setGameId(newGameId)
     setHostSecret(newHostSecret)
@@ -148,7 +161,25 @@ export default function App() {
   }
 
   if (phase === 'game_over') {
-    return <GameOverScreen gameState={gameState} audioUnlocked={audioUnlocked} />
+    return (
+      <GameOverScreen
+        gameState={gameState}
+        audioUnlocked={audioUnlocked}
+        gameId={gameId}
+        hostSecret={hostSecret}
+        onPlayAgain={(newGameId, newHostSecret) => {
+          localStorage.setItem(`ww_host_${newGameId}`, newHostSecret)
+          history.pushState({}, '', `?g=${newGameId}&host_secret=${newHostSecret}`)
+          setGameId(newGameId)
+          setHostSecret(newHostSecret)
+        }}
+        onNewMatch={() => {
+          history.pushState({}, '', '/')
+          setGameId(null)
+          setHostSecret(null)
+        }}
+      />
+    )
   }
 
   return null

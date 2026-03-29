@@ -21,6 +21,7 @@ export interface GameConfig {
   hunter_pending_timer_seconds: number
   player_count: number
   roles: Record<string, number>
+  difficulty_level: 'easy' | 'standard' | 'hard'
 }
 
 export interface PlayerState {
@@ -35,6 +36,7 @@ export interface PlayerState {
   role_confirmed: boolean
   vote_target_id: string | null
   puzzles_solved_count?: number
+  doused_player_ids?: string[]  // Arsonist only — own player strip
 }
 
 export interface PuzzleState {
@@ -102,8 +104,15 @@ export interface StrippedGameState {
   role_registry?: Record<string, Record<string, unknown>>
 }
 
-export interface StateUpdateMessage {
-  type: 'state_update'
+export interface SyncMessage {
+  type: 'sync'
+  state_id: number
+  schema_version: string
+  state: StrippedGameState
+}
+
+export interface UpdateMessage {
+  type: 'update'
   state_id: number
   schema_version: string
   state: StrippedGameState
@@ -124,7 +133,13 @@ export interface HintPayload {
   expires_after_round: number | null
 }
 
-export type ServerMessage = StateUpdateMessage | ErrorMessage | HintPayload
+export interface RedirectMessage {
+  type: 'redirect'
+  new_game_id: string | null
+  players: Record<string, { new_player_id: string; new_session_token: string }>
+}
+
+export type ServerMessage = SyncMessage | UpdateMessage | ErrorMessage | HintPayload | RedirectMessage
 
 export const AVATAR_COLORS: Record<string, string> = {
   avatar_01: '#e57373',

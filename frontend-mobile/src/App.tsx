@@ -1,14 +1,16 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useGameState } from './hooks/useGameState'
 import { useHaptics } from './hooks/useHaptics'
-import type { HintPayload } from './types/game'
+import type { HintPayload, RedirectMessage } from './types/game'
 import OnboardingForm from './components/OnboardingForm/OnboardingForm'
 import LobbyWaitingScreen from './components/LobbyWaitingScreen/LobbyWaitingScreen'
 import RoleRevealScreen from './components/RoleRevealScreen/RoleRevealScreen'
 import NightActionShell from './components/NightActionShell/NightActionShell'
 import DayDiscussionScreen from './components/DayDiscussionScreen/DayDiscussionScreen'
 import DayVoteScreen from './components/DayVoteScreen/DayVoteScreen'
+import HunterPendingScreen from './components/HunterPendingScreen/HunterPendingScreen'
 import DeadSpectatorScreen from './components/DeadSpectatorScreen/DeadSpectatorScreen'
+import GameOverScreen from './components/GameOverScreen/GameOverScreen'
 import './App.css'
 
 interface Session {
@@ -47,6 +49,26 @@ export default function App() {
     setLatestHint(hint)
   }, [])
 
+  const handleRedirect = useCallback((msg: RedirectMessage) => {
+    if (!msg.new_game_id) {
+      clearSession()
+      setSession(null)
+      return
+    }
+    setSession(prev => {
+      if (!prev) return null
+      const entry = msg.players[prev.player_id]
+      if (!entry) { clearSession(); return null }
+      const newSession: Session = {
+        game_id: msg.new_game_id!,
+        player_id: entry.new_player_id,
+        session_token: entry.new_session_token,
+      }
+      saveSession(newSession)
+      return newSession
+    })
+  }, [])
+
   // Attempt session rejoin on mount
   useEffect(() => {
     const stored = loadSession()
@@ -73,6 +95,7 @@ export default function App() {
     playerId: session?.player_id ?? '',
     sessionToken: session?.session_token,
     onHint: handleHint,
+    onRedirect: handleRedirect,
   })
 
   // Clear hint when night phase ends
@@ -110,19 +133,29 @@ export default function App() {
   if (!gameState) {
     return (
       <div className="app-status">
-        <p>{status === 'connecting' ? 'Connecting…' : 'Reconnecting…'}</p>
+        <p>{status === 'closed' ? 'Reconnecting…' : 'Connecting…'}</p>
       </div>
     )
   }
 
   const myPlayer = gameState.players[session.player_id]
+  const { phase } = gameState
 
-  // ── Player eliminated → Dead spectator view (overrides all phases) ───────────
+  // ── Game over → final reveal for all players (alive and dead) ─────────────────
+  if (phase === 'game_over') {
+    return (
+      <GameOverScreen
+        gameState={gameState}
+        myPlayerId={session.player_id}
+        onPlayAgain={() => { clearSession(); setSession(null) }}
+      />
+    )
+  }
+
+  // ── Player eliminated → Dead spectator view (overrides all live phases) ──────
   if (myPlayer && !myPlayer.is_alive) {
     return <DeadSpectatorScreen gameState={gameState} myPlayerId={session.player_id} />
   }
-
-  const { phase } = gameState
 
   if (phase === 'lobby') {
     return (
@@ -164,7 +197,7 @@ export default function App() {
     )
   }
 
-  if (phase === 'day_vote' || phase === 'hunter_pending') {
+  if (phase === 'day_vote') {
     return (
       <DayVoteScreen
         gameState={gameState}
@@ -174,15 +207,13 @@ export default function App() {
     )
   }
 
-  if (phase === 'game_over') {
+  if (phase === 'hunter_pending') {
     return (
-      <div className="game-over-mobile">
-        <h1>{gameState.winner === 'village' ? 'Village Wins!' : 'Wolves Win!'}</h1>
-        {myPlayer?.role && <p>Your role: <strong>{myPlayer.role}</strong></p>}
-        <button onClick={() => { clearSession(); setSession(null) }}>
-          Play Again
-        </button>
-      </div>
+      <HunterPendingScreen
+        gameState={gameState}
+        myPlayer={myPlayer!}
+        sendIntent={sendIntent}
+      />
     )
   }
 

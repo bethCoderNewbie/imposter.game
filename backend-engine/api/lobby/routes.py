@@ -195,6 +195,80 @@ async def update_game_config(game_id: str, body: ConfigUpdateRequest, redis=Depe
     return {"ok": True}
 
 
+class RematchRequest(BaseModel):
+    host_secret: str
+
+
+@router.post("/{game_id}/rematch")
+async def rematch_game(game_id: str, body: RematchRequest, redis=Depends(_get_redis)):
+    """Create a new game with the same players. Broadcasts a redirect to all connected sockets."""
+    G = await load_game(redis, game_id)
+    if G is None:
+        raise HTTPException(status_code=404, detail="Game not found.")
+    if G.host_secret != body.host_secret:
+        raise HTTPException(status_code=403, detail="Invalid host secret.")
+    if G.phase != Phase.GAME_OVER:
+        raise HTTPException(status_code=409, detail="Game has not ended yet.")
+
+    new_game_id = secrets.token_urlsafe(6).upper()
+    new_host_secret = secrets.token_urlsafe(32)
+
+    # Inherit all timer/difficulty settings from the old game
+    new_cfg = G.config.model_copy(update={"player_count": 0, "roles": {}})
+    new_G = setup_game(new_game_id, host_player_id=None, config=new_cfg, host_secret=new_host_secret)
+
+    migration_map: dict[str, tuple[str, str]] = {}
+    for old_pid, ps in G.players.items():
+        new_pid = str(uuid.uuid4())
+        new_token = await issue_session_token(redis, new_game_id, new_pid)
+        new_G.players[new_pid] = PlayerState(
+            player_id=new_pid,
+            display_name=ps.display_name,
+            avatar_id=ps.avatar_id,
+        )
+        new_G.players[new_pid].session_token = new_token
+        migration_map[old_pid] = (new_pid, new_token)
+
+    # Preserve host role across rematch
+    if G.host_player_id and G.host_player_id in migration_map:
+        new_G.host_player_id = migration_map[G.host_player_id][0]
+
+    await save_game(redis, new_game_id, new_G)
+
+    from api.connection_manager import manager
+    redirect_payload = {
+        "type": "redirect",
+        "new_game_id": new_game_id,
+        "players": {
+            old_pid: {
+                "new_player_id": new_pid,
+                "new_session_token": new_token,
+            }
+            for old_pid, (new_pid, new_token) in migration_map.items()
+        },
+    }
+    await manager.broadcast_raw(game_id, redirect_payload)
+
+    return {"new_game_id": new_game_id, "new_host_secret": new_host_secret}
+
+
+@router.post("/{game_id}/abandon")
+async def abandon_game(game_id: str, body: RematchRequest, redis=Depends(_get_redis)):
+    """Notify all connected players to return to onboarding (New Match flow)."""
+    G = await load_game(redis, game_id)
+    if G is None:
+        raise HTTPException(status_code=404, detail="Game not found.")
+    if G.host_secret != body.host_secret:
+        raise HTTPException(status_code=403, detail="Invalid host secret.")
+    if G.phase != Phase.GAME_OVER:
+        raise HTTPException(status_code=409, detail="Game has not ended yet.")
+
+    from api.connection_manager import manager
+    await manager.broadcast_raw(game_id, {"type": "redirect", "new_game_id": None, "players": {}})
+
+    return {"ok": True}
+
+
 @router.post("/{game_id}/start")
 async def start_game_via_display(game_id: str, body: StartGameRequest, redis=Depends(_get_redis)):
     """Allow the Display client to start the game using its host_secret."""
