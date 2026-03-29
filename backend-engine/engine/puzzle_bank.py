@@ -3,7 +3,9 @@ Archive puzzle bank: parses puzzles.md and generates night puzzles + hint payloa
 All generation is deterministic given the game seed — no I/O after module load.
 
 puzzles.md format:  **Q:** <question> **A:** <answer>
-BANK holds 400 (question, answer) tuples loaded at import time.
+BANK holds 400 (question, answer, category) tuples loaded at import time.
+BANK_BY_CATEGORY maps category name → list of indices into BANK.
+Logic puzzles draw 3 same-category distractors → 4-option format (ADR-012).
 """
 from __future__ import annotations
 
@@ -19,10 +21,34 @@ if TYPE_CHECKING:
 # ── Static bank ──────────────────────────────────────────────────────────────
 
 _PUZZLES_MD = pathlib.Path(__file__).parent.parent.parent / "puzzles.md"
-BANK: list[tuple[str, str]] = re.findall(
-    r"\*\*Q:\*\* (.+?) \*\*A:\*\* (.+)",
-    _PUZZLES_MD.read_text(encoding="utf-8"),
-)
+
+# Each entry: (question, answer, category)
+_BankEntry = tuple[str, str, str]
+
+_HEADER_RE = re.compile(r"^\s*(?:#{1,3}\s+)?\*\*([^*\d][^*]*)\*\*\s*$")
+_QA_RE = re.compile(r"\*\*Q:\*\*\s+(.+?)\s+\*\*A:\*\*\s+(.+)")
+
+
+def _parse_bank(text: str) -> tuple[list[_BankEntry], dict[str, list[int]]]:
+    bank: list[_BankEntry] = []
+    by_category: dict[str, list[int]] = {}
+    current_category = "Uncategorized"
+    for line in text.splitlines():
+        header_match = _HEADER_RE.match(line)
+        if header_match:
+            current_category = header_match.group(1).strip()
+            continue
+        qa_match = _QA_RE.search(line)
+        if qa_match:
+            idx = len(bank)
+            bank.append((qa_match.group(1), qa_match.group(2), current_category))
+            by_category.setdefault(current_category, []).append(idx)
+    return bank, by_category
+
+
+BANK: list[_BankEntry]
+BANK_BY_CATEGORY: dict[str, list[int]]
+BANK, BANK_BY_CATEGORY = _parse_bank(_PUZZLES_MD.read_text(encoding="utf-8"))
 
 _SEQUENCE_COLORS = ["red", "blue", "green", "yellow"]
 
@@ -57,16 +83,24 @@ def generate_night_puzzle(G: "MasterGameState", player_id: str) -> "PuzzleState"
 def _make_logic_puzzle(rng: random.Random) -> "PuzzleState":
     from engine.state.models import PuzzleState
 
-    # Pick question and a distractor from a different entry
+    # Pick question; collect 3 same-category distractors (ADR-012)
     q_idx = rng.randrange(len(BANK))
-    d_idx = rng.randrange(len(BANK))
-    while d_idx == q_idx:
+    question, correct_answer, category = BANK[q_idx]
+
+    peers = [i for i in BANK_BY_CATEGORY.get(category, []) if i != q_idx]
+    distractor_indices = rng.sample(peers, min(3, len(peers)))
+    distractors = [BANK[i][1] for i in distractor_indices]
+
+    # Fallback: pad with cross-category answers if the category had < 3 peers
+    seen = {correct_answer} | set(distractors)
+    while len(distractors) < 3:
         d_idx = rng.randrange(len(BANK))
+        candidate = BANK[d_idx][1]
+        if candidate not in seen:
+            distractors.append(candidate)
+            seen.add(candidate)
 
-    question, correct_answer = BANK[q_idx]
-    _, distractor = BANK[d_idx]
-
-    options = [correct_answer, distractor]
+    options = [correct_answer] + distractors
     rng.shuffle(options)
     correct_index = options.index(correct_answer)
 

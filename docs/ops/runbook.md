@@ -98,8 +98,54 @@ npm run test:coverage
 ### Full suite (all tiers)
 
 ```bash
-# Single command — runs all 203 backend + 116 frontend tests
+# Single command — runs all backend + frontend tests
 REDIS_URL=redis://localhost:6379/15 pytest && cd frontend-display && npm run test -- --run
+```
+
+### Running only the full game flow tests
+
+The phase-integration and win-condition tests drive the game through complete phase loops. Run them in isolation when debugging game logic:
+
+```bash
+# Phase integration: ROLE_DEAL → NIGHT → DAY → DAY_VOTE → GAME_OVER (fakeredis, fast)
+pytest backend-engine/tests/api/test_game_phases_integration.py -v
+
+# Win conditions: full village-wins and werewolf-wins round-trips (real Redis required)
+REDIS_URL=redis://localhost:6379/15 pytest backend-engine/tests/e2e/test_game_win_conditions.py -v
+
+# Both together with verbose output
+REDIS_URL=redis://localhost:6379/15 pytest \
+  backend-engine/tests/api/test_game_phases_integration.py \
+  backend-engine/tests/e2e/test_game_win_conditions.py \
+  -v --tb=short
+```
+
+### When E2E tests are skipped
+
+E2E tests auto-skip when Redis is unreachable. This is safe — it is the intended behavior for developer machines without local Redis.
+
+```
+SKIPPED [1] tests/e2e/conftest.py:XX - Redis not available at redis://localhost:6379/15 — skipping E2E tests
+```
+
+To run them, start Redis first:
+
+```bash
+# Option A: use a local Redis server
+redis-server &
+
+# Option B: throwaway Docker container
+docker run -d --rm -p 6379:6379 redis:7-alpine
+
+# Then run with explicit URL
+REDIS_URL=redis://localhost:6379/15 pytest -m "e2e" -v
+```
+
+If you want to confirm E2E tests skip cleanly (no failures, no hanging):
+
+```bash
+# No REDIS_URL set → all e2e tests should show SKIPPED, not FAILED
+pytest -m "e2e" -v
 ```
 
 ### Full suite via Docker (no local Python/Node required)
@@ -112,19 +158,95 @@ docker compose -f docker-compose.test.yml run --rm backend-test
 docker compose -f docker-compose.test.yml run --rm frontend-test
 ```
 
-### Test counts (as of 2026-03-27)
+### Test counts (as of 2026-03-29)
 
 | Suite | Marker | Tests |
 |-------|--------|-------|
-| Backend — engine (pure unit) | *(none)* | 114 |
+| Backend — engine (pure unit) | *(none)* | 118 |
 | Backend — storage/Redis (fakeredis) | *(none)* | 35 |
 | Backend — intent handlers (unit) | *(none)* | 13 |
-| Backend — lobby REST API (integration) | `integration` | 25 |
-| Backend — WebSocket (integration) | `integration` | 13 |
-| Backend — full game flow (E2E) | `e2e` | 11 |
-| Frontend — hooks | — | 35 |
-| Frontend — components | — | 81 |
-| **Total** | | **327** |
+| Backend — lobby REST API (integration) | `integration` | 35 |
+| Backend — WebSocket auth (integration) | `integration` | 14 |
+| Backend — full phase flow (integration) | `integration` | 29 |
+| Backend — game win conditions (E2E) | `e2e` | 18 |
+| Frontend — hooks | — | 37 |
+| Frontend — components | — | 99 |
+| **Total** | | **~398** |
+
+The 29 phase-integration tests cover ROLE_DEAL→NIGHT→DAY→DAY_VOTE→HUNTER_PENDING→GAME_OVER, security stripping, and the state_id fence (1 skipped when doctor is not in the seeded composition). The 18 E2E tests cover full village-wins and werewolf-wins round-trips via real Redis (auto-skipped without Redis).
+
+### Using the `tests/helpers/` package for debugging
+
+The three helper modules in `backend-engine/tests/helpers/` are reusable from the Python REPL or a scratch test when you need to reproduce a specific game scenario:
+
+**`game_driver.py`** — drive a game through phases via the real HTTP+WS stack:
+
+```python
+from tests.helpers.game_driver import create_and_fill, drive_role_deal, drive_night, drive_to_day_vote, drive_votes
+
+game_id, host_secret, players = create_and_fill(client, n=5)
+client.post(f"/api/games/{game_id}/start", json={"host_secret": host_secret})
+
+with client.websocket_connect(f"/ws/{game_id}/display") as display_ws:
+    display_ws.receive_json()          # consume initial sync
+    drive_role_deal(client, game_id, players, display_ws)
+    # game is now in NIGHT — inspect display_ws state here
+```
+
+**`role_utils.py`** — discover which player has which role (must call BEFORE opening display WS):
+
+```python
+from tests.helpers.role_utils import collect_role_map, first_with_role, players_with_role
+
+# Call BEFORE opening display WebSocket to avoid disconnect-broadcast buffer pollution
+role_map = collect_role_map(client, game_id, players)
+# role_map = {"pid-1": "werewolf", "pid-2": "seer", ...}
+
+wolf = first_with_role(role_map, "werewolf", players)
+villagers = players_with_role(role_map, "villager", players)
+```
+
+**`ws_patterns.py`** — drain WS messages until a condition is met:
+
+```python
+from tests.helpers.ws_patterns import consume_until, until_phase
+
+# Tolerates disconnect-noise broadcasts; raises AssertionError after max_messages
+night_msg = consume_until(display_ws, until_phase("night"), max_messages=20)
+```
+
+---
+
+### Game test failure modes
+
+**`drive_night` / `consume_until` hangs indefinitely (timeout)**
+- Cause: Not all `actions_required_count` night actions were submitted. Auto-advance never fires, so no DAY broadcast is sent, and `consume_until` blocks waiting.
+- Most common cause: Doctor is present in the composition but no doctor action was included in `night_acts`. Doctor has `wakeOrder > 0` so it counts toward `actions_required_count`.
+- Fix: Always include doctor in `night_acts` when doctor is in the composition. Use `_build_night_acts()` from the integration tests — it auto-fills doctor protecting seer.
+
+**`AssertionError: predicate not matched after N messages` (consume_until)**
+- Cause: Disconnect-broadcast noise from a closed player WS was consumed instead of the expected phase broadcast.
+- After `drive_role_deal` returns (consuming NIGHT), the last `send_player_intent` disconnect broadcast may still be buffered. The next `receive_json()` reads that noise message instead of the expected update.
+- Fix: Always use `consume_until(ws, predicate)` rather than a bare `ws.receive_json()` to drain WS; the helper tolerates noise broadcasts automatically.
+
+**Role discovery returns wrong role / `None` role**
+- Cause: `collect_role_map()` was called AFTER a display WS was already open. When player WS connections close during role collection, each closure generates a `player_disconnected` broadcast. These accumulate in the display WS buffer, and a subsequent `consume_until` may read them first.
+- Fix: Always call `collect_role_map()` before `client.websocket_connect(".../display")`.
+
+**`STALE_STATE` error in tests**
+- Cause: Test sent an intent with an explicit `state_id` that is no longer current (e.g., state advanced between the read and the submit).
+- Fix for tests: Omit `state_id` from all test intents unless the test is specifically validating the fence. Missing `state_id` = fence bypassed. The fence only activates when `state_id` is explicitly present and doesn't match.
+
+**Self-vote error (`SELF_VOTE_NOT_ALLOWED`) in voting tests**
+- Cause: A naive loop like `for pid in alive_pids: vote(pid, target=target_pid)` fails when `pid == target_pid` (player voting for themselves).
+- Fix: Use `_vote_everyone_for(target)` from the integration tests: target votes for any other alive player; everyone else votes for target. Guarantees strict majority for N≥2 without self-votes.
+
+**Win-condition test fails: `winner == None` after game should be over**
+- Cause: Game hasn't reached a win condition yet. Wolf count and village count math may differ from expectations if the composition varies (doctor can save, hunter can kill after elimination).
+- Fix: Verify `alive_pids` before driving votes; after eliminating the wolf, check `phase == "game_over"` via `consume_until` with `lambda m: m.get("state",{}).get("phase") == "game_over"`.
+
+**Doctor save test skipped (1 skipped in phase-integration suite)**
+- This is expected. `test_doctor_save_prevents_wolf_kill` is skipped when the seeded game composition doesn't include a doctor. The skip message is: `no doctor in this game composition — skipping doctor save test`. This is correct behavior; do not convert to a failure.
 
 ---
 
@@ -199,6 +321,31 @@ redis-cli --scan --pattern "wolf:*" | xargs redis-cli DEL
 
 ## Diagnosing WebSocket Issues
 
+### Symptom: Mobile client shows "Reconnecting…" immediately after joining via QR code
+
+**Cause (display logic):** `App.tsx` uses `status === 'connecting'` to decide whether to show "Connecting…" or "Reconnecting…". After the WebSocket handshake completes, `status` becomes `'open'` while the client waits for the first `sync` message from the server. Since `'open' !== 'connecting'`, the screen incorrectly shows "Reconnecting…" during this window.
+
+**Cause (backend silent failure):** If `load_game` returns `None` after a successful auth (rare edge case: game TTL expired between join and WS connect), the server never sends the initial `sync` and never sends an error. The client stays at `status='open'`, `gameState=null`, and "Reconnecting…" persists indefinitely.
+
+**Fix applied (frontend `App.tsx:115`):**
+```tsx
+// Before — wrongly shows "Reconnecting…" when status is 'open'
+<p>{status === 'connecting' ? 'Connecting…' : 'Reconnecting…'}</p>
+
+// After — "Reconnecting…" only when connection is actually down
+<p>{status === 'closed' ? 'Reconnecting…' : 'Connecting…'}</p>
+```
+
+**Fix applied (backend `endpoint.py:101`):**
+Added `else` branch: if game state not found after auth, send `GAME_NOT_FOUND` error and close with code 1011, so the client can surface an error instead of hanging.
+
+**Diagnosis steps (if still occurring after the fix):**
+1. Open browser DevTools → Network → WS tab → confirm the WebSocket upgrades to 101 Switching Protocols
+2. Inspect WS frames: look for `{"type":"error","code":"AUTH_FAILED"}` — if present, the session token is invalid; clear `sessionStorage` and rejoin
+3. Inspect WS frames: if only the auth frame is sent and the socket closes silently, check backend logs for Redis errors
+
+---
+
 ### Symptom: Mobile client stuck on "Connecting..."
 
 **Possible causes:**
@@ -250,6 +397,32 @@ redis-cli --scan --pattern "wolf:*" | xargs redis-cli DEL
 - Check `start.sh` auto-detected LAN IP is correct: `hostname -I | awk '{print $1}'`
 - Manually export: `export MOBILE_BASE_URL=http://<correct-ip>:3000`
 - Run `./start.sh <correct-ip>` to override
+
+### Symptom: Villager mobile screen stuck on "The Archives await…" — puzzle never renders
+
+**Cause:** Frontend type mismatch introduced by ADR-008. The backend stores `puzzle_state` on each `PlayerState` (at `players[pid].puzzle_state`), but the old frontend was reading `gameState.night_actions.puzzle_state` which is never populated by the stripper. The puzzle UI renders `null` forever and no hint can be earned.
+
+**Fix applied (`VillagerDecoyUI.tsx:17`):**
+```tsx
+// Before — reads from wrong location (NightActions never has puzzle_state)
+const puzzle = gameState.night_actions.puzzle_state ?? null
+
+// After — reads from own PlayerState (correct per ADR-008)
+const puzzle = myPlayer.puzzle_state ?? null
+```
+**Also fixed:** Added `puzzle_state?: PuzzleState | null` to `PlayerState` in `types/game.ts` and removed the stale `puzzle_state` field from `NightActions`.
+
+---
+
+### Symptom: Framer's night action rejected with `INVALID_ACTION`
+
+**Cause:** `NightActionShell` routed the `framer` role to `WolfVoteUI`, which sends `{ type: "submit_night_action", target_id: "..." }`. The backend handler (`handlers.py:170`) requires `framer_action: "frame" | "hack_archives"` — without it the intent is rejected immediately.
+
+**Fix applied:**
+- Created `FramerUI.tsx` — two-step flow: mode selection → frame (pick target) or hack archives (preset/custom false hint builder). Submits proper `framer_action` field.
+- Updated `NightActionShell.tsx` to route `role === 'framer'` to `FramerUI` before the `WOLF_ROLES.has(role)` fallback.
+
+---
 
 ### Symptom: Audio does not play on Display TV
 

@@ -266,3 +266,110 @@
   color: rgba(255,255,255,0.3);
   font-style: italic;
 }
+
+/* ── Framer UI ──────────────────────────────────────────────────────────────── */
+
+.action-ui__back {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.35);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+
+.action-ui__mode-row {
+  display: flex;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.action-ui__mode-btn {
+  flex: 1;
+  padding: 1rem 0.75rem;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.75);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.action-ui__mode-btn--frame {
+  border: 1px solid rgba(229, 62, 62, 0.35);
+}
+
+.action-ui__mode-btn--hack {
+  border: 1px solid rgba(246, 173, 85, 0.35);
+}
+
+.action-ui__sub-header {
+  font-size: 0.7rem;
+  color: rgba(255,255,255,0.25);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.action-ui__chip-row {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.action-ui__chip {
+  flex-shrink: 0;
+  padding: 0.4rem 0.75rem;
+  border-radius: 20px;
+  border: 1px solid rgba(246,173,85,0.2);
+  background: rgba(246,173,85,0.06);
+  color: rgba(246,173,85,0.7);
+  font-size: 0.8rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.action-ui__chip--selected,
+.action-ui__chip:active {
+  background: rgba(246,173,85,0.15);
+  border-color: rgba(246,173,85,0.5);
+}
+
+.action-ui__field-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.action-ui__label {
+  font-size: 0.78rem;
+  color: rgba(255,255,255,0.35);
+  min-width: 5rem;
+}
+
+.action-ui__select {
+  flex: 1;
+  padding: 0.5rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.75);
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.action-ui__hint-preview {
+  font-size: 0.85rem;
+  color: rgba(246,173,85,0.7);
+  font-style: italic;
+  line-height: 1.4;
+}
+
+.action-ui__confirm--hack {
+  border-color: rgba(246,173,85,0.35);
+  color: rgba(246,173,85,0.85);
+}

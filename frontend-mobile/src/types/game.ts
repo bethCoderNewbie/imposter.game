@@ -37,6 +37,7 @@ export interface PlayerState {
   vote_target_id: string | null
   puzzles_solved_count?: number
   doused_player_ids?: string[]  // Arsonist only — own player strip
+  puzzle_state?: PuzzleState | null
 }
 
 export interface PuzzleState {
@@ -56,7 +57,6 @@ export interface NightActions {
   wolf_votes?: Record<string, string>
   tracker_target_id?: string | null
   tracker_result?: string[]
-  puzzle_state?: PuzzleState | null
   decoy_reveal_delay_ms?: number
 }
 

@@ -13,8 +13,8 @@ interface Props {
 /** Archive puzzle UI for wakeOrder==0 players (Villager, Mayor, Jester).
  *  Anti-cheat: same dark panel silhouette as wolf-vote screen (PRD-002 §3.4, archivePuzzleSystem.antiCheatConstraint).
  *  Puzzle data comes from gameState.night_actions.puzzle_state — correct_index stripped server-side. */
-export default function VillagerDecoyUI({ gameState, sendIntent, latestHint }: Props) {
-  const puzzle = gameState.night_actions.puzzle_state ?? null
+export default function VillagerDecoyUI({ myPlayer, sendIntent, latestHint }: Props) {
+  const puzzle = myPlayer.puzzle_state ?? null
   const { vibrate } = useHaptics()
 
   if (!puzzle) {
