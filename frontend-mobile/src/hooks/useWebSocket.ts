@@ -9,8 +9,8 @@ interface Options {
   onStatusChange?: (status: WsStatus) => void
 }
 
-const MAX_RETRIES = 5
-const RETRY_DELAY_MS = 2000
+const BASE_RETRY_MS = 1000
+const MAX_RETRY_MS = 30_000
 
 export function useWebSocket({ url, sessionToken, onMessage, onStatusChange }: Options) {
   const wsRef = useRef<WebSocket | null>(null)
@@ -56,9 +56,10 @@ export function useWebSocket({ url, sessionToken, onMessage, onStatusChange }: O
 
       ws.onclose = () => {
         onStatusRef.current?.('closed')
-        if (!closed && retriesRef.current < MAX_RETRIES) {
+        if (!closed) {
+          const delay = Math.min(BASE_RETRY_MS * 2 ** retriesRef.current, MAX_RETRY_MS)
           retriesRef.current++
-          retryTimeout = setTimeout(connect, RETRY_DELAY_MS)
+          retryTimeout = setTimeout(connect, delay)
         }
       }
 

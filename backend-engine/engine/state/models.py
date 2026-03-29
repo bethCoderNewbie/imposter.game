@@ -198,3 +198,5 @@ class MasterGameState(BaseModel):
 
     # Server-only — stripped before every broadcast, never sent to any client
     host_secret: str | None = None
+    # Server-only: populated by /rematch so disconnected players receive redirect on WS reconnect
+    rematch_redirect: dict[str, Any] | None = None

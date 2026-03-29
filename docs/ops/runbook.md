@@ -341,7 +341,7 @@ Added `else` branch: if game state not found after auth, send `GAME_NOT_FOUND` e
 
 **Diagnosis steps (if still occurring after the fix):**
 1. Open browser DevTools → Network → WS tab → confirm the WebSocket upgrades to 101 Switching Protocols
-2. Inspect WS frames: look for `{"type":"error","code":"AUTH_FAILED"}` — if present, the session token is invalid; clear `sessionStorage` and rejoin
+2. Inspect WS frames: look for `{"type":"error","code":"AUTH_FAILED"}` — if present, the session token is invalid; clear `localStorage` (`ww_session` key) and rejoin
 3. Inspect WS frames: if only the auth frame is sent and the socket closes silently, check backend logs for Redis errors
 
 ---
@@ -365,8 +365,35 @@ Added `else` branch: if game state not found after auth, send `GAME_NOT_FOUND` e
 - Stale token from a previous game session
 
 **Fix:**
-- Clear `sessionStorage` in browser DevTools
+- Clear `localStorage` in browser DevTools (Application → Local Storage → `ww_session`)
 - Rejoin the game via the join URL
+
+---
+
+### Symptom: Mobile player lands on onboarding form after the game has already started
+
+**Cause:** The player's `localStorage` entry for `ww_session` is missing (browser cleared storage, or the player is on a new device). Without a stored session token, `App.tsx loadSession()` returns `null` and shows onboarding. `POST /api/games/{id}/join` then rejects with 409 "Game already started" because the game is past the `lobby` phase.
+
+**Fix:**
+- The session token is stored in `localStorage` (not `sessionStorage`) since ADR-013 — mobile browsers killing background tabs should no longer cause this.
+- If it still occurs (new device, browser cache cleared), the player has genuinely lost their credentials. They cannot re-enter an active game from onboarding. The host should wait for the round to complete or, in dev, delete and recreate the game via Redis.
+- To confirm the root cause: open DevTools → Application → Local Storage. Check for key `ww_session`. If absent, credentials were lost.
+
+---
+
+### Symptom: Mobile player sees old game-over screen after "Play Again" — cannot reach new game
+
+**Cause:** The Display host clicked "Play Again" (triggering `POST /api/games/{id}/rematch`) while the mobile player's WebSocket was closed. The `redirect` message was broadcast only to live sockets; the disconnected player never received it. On reconnecting to the old game, they see `phase: game_over` with no path forward.
+
+**Root fix (ADR-013):** `MasterGameState.rematch_redirect` stores the full redirect payload on the old game. `endpoint.py` replays it to any reconnecting player whose `player_id` is in the migration map. This should auto-forward them to the new game lobby.
+
+**Diagnosis if the fix does not trigger:**
+1. Check Redis: `redis-cli GET wolf:game:<OLD_GAME_ID> | python -m json.tool | grep rematch_redirect`
+   If `null`, the rematch was called before ADR-013 was deployed — old game has no forwarding pointer.
+2. Check WS frames in DevTools: after the initial `sync`, a second `redirect` frame should arrive within milliseconds.
+3. If `rematch_redirect` is present but player is not in the `players` map: the player joined with a different `player_id` than the one in the migration map (should not happen in production — player IDs are stable per join).
+
+**Workaround (if needed):** Player uses the new game QR code directly. The new game is in `lobby` phase until the host starts it, so `POST /api/games/{new_id}/join` accepts new entries.
 
 ### Symptom: Player gets `STALE_STATE` error
 

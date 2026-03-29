@@ -114,7 +114,18 @@ ADR-001 §4 already decided React DOM (no PixiJS) for both clients. This ADR rec
 - If the client generates the delay locally with `Math.random()`, the timer is silent (no network event). However, a sophisticated physical observer watching for any network traffic from a Villager's device could infer that the Villager's timer fired because no `night_action` confirm message was ever sent — contrasting with the single confirm message sent by active-role players. The timing of the client-side timer is thus inferrable from the absence of network activity.
 - Server-seeding embeds the delay value in the state broadcast, making the client-side timer duration opaque to network observers. The Villager's behavior pattern (dark screen, tapping activity for 15–30s, then idle) is indistinguishable from an active role that submitted early and entered a wait state.
 
-### 9. Seer Peek History: `sessionStorage`
+### 9. Session Reconnect Token: `localStorage`
+
+**Chosen:** The mobile client's reconnect session (game_id, player_id, session_token) is stored in `localStorage` under the key `ww_session` as a JSON object. It is read on every app mount, used to call `POST /api/games/{id}/rejoin`, and cleared on rejoin failure (401/404) or explicit "leave" actions.
+
+**Rejected:** `sessionStorage` (original implementation — reverted in ADR-013).
+
+**Rationale:**
+- Mobile browsers (iOS Safari, Android Chrome) kill background tabs under memory pressure, clearing `sessionStorage`. For a party game where players switch apps on their phone during play, this is an expected OS behavior — not an edge case. A player who switches to a messaging app mid-night phase would return to the onboarding form instead of their game.
+- `localStorage` persists until the origin is cleared or the item is explicitly removed. The backend's 4-hour Redis TTL on session tokens is the expiry guard. Stale entries trigger a 401 from `/rejoin`, which calls `clearSession()` — no permanent accumulation.
+- **This is distinct from the Seer peek history** (§10 below), which explicitly uses `sessionStorage` because its data should not outlast the tab session.
+
+### 10. Seer Peek History: `sessionStorage`
 
 **Chosen:** Seer peek results are stored in `sessionStorage` keyed by `ww_seer_{room_code}_{player_id}`. Each entry is an ordered array of `{ round, target_name, result }` objects. The component reads from `sessionStorage` on mount and appends each new result after the server confirms a peek. Data is cleared automatically on tab close.
 
@@ -134,7 +145,7 @@ ADR-001 §4 already decided React DOM (no PixiJS) for both clients. This ADR rec
 - Zero new UI dependencies beyond React — no animation library, no audio library, no haptics library. Bundle size stays minimal.
 - CSS animations are GPU-composited; SVG vote-web is rendered in a single pass on vote-close. No bespoke render loops to maintain.
 - DOM injection for Role Reveal closes the client-side inspect-element cheat vector completely when combined with server-side State Stripping.
-- `localStorage` notepad persistence and `sessionStorage` Seer history are concrete resolutions to PRD-002 Open Questions #4 and #6.
+- `localStorage` for the reconnect session token (§9) and notepad (§7), and `sessionStorage` for Seer peek history (§10) give each storage concern the correct scope: session tokens and notepad data survive tab kills; Seer history is intentionally ephemeral within a tab.
 - Server-seeded Villager decoy delay closes PRD-002 §3.4's timing-analysis requirement.
 - `clamp()`/`vmin` typography ensures Display readability across all TV resolutions without media queries or scale wrappers.
 - "Click to Begin" overlay on Display TV resolves PRD-002 Open Question #3 with no perceived friction (doubles as fullscreen entry).

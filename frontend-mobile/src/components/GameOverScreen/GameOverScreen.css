@@ -1,0 +1,108 @@
+.game-over {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.5rem 1rem 2rem;
+  gap: 1.25rem;
+  background: var(--bg-day, #f3e7e9);
+  min-height: 100%;
+  overflow-y: auto;
+}
+
+.game-over__heading {
+  font-size: 2rem;
+  font-weight: 800;
+  text-align: center;
+  color: #2d3748;
+  margin: 0;
+}
+
+.game-over__players {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.game-over__player-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.game-over__player-row--dead {
+  opacity: 0.6;
+}
+
+.game-over__player-row--me {
+  outline: 2px solid #805ad5;
+}
+
+.game-over__player-name {
+  flex: 1;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #2d3748;
+}
+
+.game-over__role-badge {
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.1);
+  color: #4a5568;
+  text-transform: capitalize;
+}
+
+.game-over__log {
+  width: 100%;
+}
+
+.game-over__log-heading {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #718096;
+  margin: 0 0 0.5rem;
+}
+
+.game-over__log-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  font-size: 0.85rem;
+}
+
+.game-over__log-round {
+  color: #718096;
+  min-width: 2rem;
+  font-weight: 600;
+}
+
+.game-over__log-name {
+  flex: 1;
+  color: #2d3748;
+}
+
+.game-over__log-cause {
+  color: #e53e3e;
+  font-size: 0.8rem;
+}
+
+.game-over__play-again {
+  margin-top: 0.5rem;
+  padding: 0.75rem 2rem;
+  border-radius: 8px;
+  background: #2d3748;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+}

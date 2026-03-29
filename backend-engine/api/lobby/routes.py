@@ -247,6 +247,12 @@ async def rematch_game(game_id: str, body: RematchRequest, redis=Depends(_get_re
             for old_pid, (new_pid, new_token) in migration_map.items()
         },
     }
+
+    # Persist redirect in old game so disconnected players receive it on WS reconnect
+    G = G.model_copy(deep=True)
+    G.rematch_redirect = redirect_payload
+    await save_game(redis, game_id, G)
+
     await manager.broadcast_raw(game_id, redirect_payload)
 
     return {"new_game_id": new_game_id, "new_host_secret": new_host_secret}

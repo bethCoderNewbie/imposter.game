@@ -257,6 +257,10 @@ async def handle_submit_night_action(G, intent, redis_client, cm) -> MasterGameS
     if should_auto_advance(G):
         cancel_phase_timer(G.game_id)
         G = resolve_night(G)
+        # Broadcast results while still in NIGHT phase so role-specific UIs
+        # (Seer, Tracker) can display their outcome before the phase transitions.
+        G.state_id += 1
+        await cm.broadcast(G.game_id, G)
         if G.phase not in (Phase.GAME_OVER, Phase.HUNTER_PENDING):
             G = transition_phase(G, Phase.DAY)
         from api.game_queue import get_or_create_queue
@@ -379,6 +383,9 @@ async def handle_phase_timeout(G, intent, redis_client, cm) -> MasterGameState:
 
     elif G.phase == Phase.NIGHT:
         G = resolve_night(G)
+        # Same intermediate broadcast as in auto-advance path.
+        G.state_id += 1
+        await cm.broadcast(G.game_id, G)
         if G.phase not in (Phase.GAME_OVER, Phase.HUNTER_PENDING):
             G = transition_phase(G, Phase.DAY)
 

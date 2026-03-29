@@ -29,18 +29,20 @@ export default function NightActionShell({ gameState, myPlayer, sendIntent, late
       </div>
 
       <div className="night-shell__content">
-        {submitted ? (
+        {/* Seer and Tracker stay mounted after submission so they can display
+            their result when the server broadcasts it (still in NIGHT phase). */}
+        {role === 'seer' ? (
+          <SeerPeekUI gameState={gameState} myPlayer={myPlayer} sendIntent={sendIntent} />
+        ) : role === 'tracker' ? (
+          <TrackerUI gameState={gameState} myPlayer={myPlayer} sendIntent={sendIntent} />
+        ) : submitted ? (
           <p className="night-shell__waiting">Waiting for others…</p>
         ) : role === 'framer' ? (
           <FramerUI gameState={gameState} myPlayer={myPlayer} sendIntent={sendIntent} />
         ) : WOLF_ROLES.has(role) ? (
           <WolfVoteUI gameState={gameState} myPlayer={myPlayer} sendIntent={sendIntent} />
-        ) : role === 'seer' ? (
-          <SeerPeekUI gameState={gameState} myPlayer={myPlayer} sendIntent={sendIntent} />
         ) : role === 'doctor' ? (
           <DoctorProtectUI gameState={gameState} myPlayer={myPlayer} sendIntent={sendIntent} />
-        ) : role === 'tracker' ? (
-          <TrackerUI gameState={gameState} myPlayer={myPlayer} sendIntent={sendIntent} />
         ) : role === 'serial_killer' ? (
           <SerialKillerUI gameState={gameState} myPlayer={myPlayer} sendIntent={sendIntent} />
         ) : role === 'cupid' && gameState.round === 1 ? (

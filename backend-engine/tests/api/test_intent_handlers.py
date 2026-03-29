@@ -227,3 +227,159 @@ class TestUnknownIntent:
         with pytest.raises(IntentError) as exc:
             await _dispatch(G, {"type": "do_something_weird", "player_id": "p1"})
         assert exc.value.code == "UNKNOWN_INTENT"
+
+
+# ── ADR-011: new role intents and hunter_revenge ───────────────────────────────
+
+class TestADR011NightIntents:
+    """Covers the four new role UIs and hunter_revenge added in ADR-011."""
+
+    @pytest.mark.asyncio
+    async def test_tracker_submit_night_action(self):
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.phase = Phase.NIGHT
+        G.night_actions.actions_required_count = 5  # prevent auto-advance
+        # p5 is already the tracker in _eight_player_game
+        G_new = await _dispatch(G, {
+            "type": "submit_night_action",
+            "player_id": "p5",  # tracker
+            "target_id": "p1",
+        })
+        assert G_new.players["p5"].night_action_submitted is True
+        assert G_new.night_actions.tracker_target_id == "p1"
+
+    @pytest.mark.asyncio
+    async def test_tracker_cannot_track_self(self):
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.phase = Phase.NIGHT
+        with pytest.raises(IntentError) as exc:
+            await _dispatch(G, {
+                "type": "submit_night_action",
+                "player_id": "p5",  # tracker
+                "target_id": "p5",
+            })
+        assert exc.value.code == "SELF_TARGET"
+
+    @pytest.mark.asyncio
+    async def test_serial_killer_submit_night_action(self):
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.phase = Phase.NIGHT
+        G.night_actions.actions_required_count = 5
+        G.players["p5"] = _make_player("p5", "SK", "serial_killer", Team.NEUTRAL)
+        G_new = await _dispatch(G, {
+            "type": "submit_night_action",
+            "player_id": "p5",  # serial_killer
+            "target_id": "p3",
+        })
+        assert G_new.players["p5"].night_action_submitted is True
+
+    @pytest.mark.asyncio
+    async def test_cupid_submit_night_action_round_1(self):
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.phase = Phase.NIGHT
+        G.round = 1
+        G.night_actions.actions_required_count = 5
+        G.players["p5"] = _make_player("p5", "Cupid", "cupid", Team.VILLAGE)
+        G_new = await _dispatch(G, {
+            "type": "submit_night_action",
+            "player_id": "p5",  # cupid
+            "link_target_a": "p3",
+            "link_target_b": "p4",
+        })
+        assert G_new.players["p5"].night_action_submitted is True
+        assert G_new.night_actions.cupid_link == ["p3", "p4"]
+
+    @pytest.mark.asyncio
+    async def test_cupid_link_targets_must_differ(self):
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.phase = Phase.NIGHT
+        G.round = 1
+        G.players["p5"] = _make_player("p5", "Cupid", "cupid", Team.VILLAGE)
+        with pytest.raises(IntentError) as exc:
+            await _dispatch(G, {
+                "type": "submit_night_action",
+                "player_id": "p5",
+                "link_target_a": "p3",
+                "link_target_b": "p3",  # same as A
+            })
+        assert exc.value.code == "INVALID_TARGET"
+
+    @pytest.mark.asyncio
+    async def test_arsonist_douse_action(self):
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.phase = Phase.NIGHT
+        G.night_actions.actions_required_count = 5
+        G.players["p5"] = _make_player("p5", "Arsonist", "arsonist", Team.NEUTRAL)
+        G_new = await _dispatch(G, {
+            "type": "submit_night_action",
+            "player_id": "p5",  # arsonist
+            "arsonist_action": "douse",
+            "target_id": "p3",
+        })
+        assert G_new.players["p5"].night_action_submitted is True
+        assert G_new.night_actions.arsonist_douse_target_id == "p3"
+
+    @pytest.mark.asyncio
+    async def test_arsonist_ignite_action(self):
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.phase = Phase.NIGHT
+        G.night_actions.actions_required_count = 5
+        G.players["p5"] = _make_player("p5", "Arsonist", "arsonist", Team.NEUTRAL)
+        G.players["p5"].doused_player_ids = ["p3"]  # p3 already doused
+        G_new = await _dispatch(G, {
+            "type": "submit_night_action",
+            "player_id": "p5",
+            "arsonist_action": "ignite",
+        })
+        assert G_new.players["p5"].night_action_submitted is True
+
+    @pytest.mark.asyncio
+    async def test_arsonist_ignite_requires_doused_players(self):
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.phase = Phase.NIGHT
+        G.players["p5"] = _make_player("p5", "Arsonist", "arsonist", Team.NEUTRAL)
+        # doused_player_ids is empty (default)
+        with pytest.raises(IntentError) as exc:
+            await _dispatch(G, {
+                "type": "submit_night_action",
+                "player_id": "p5",
+                "arsonist_action": "ignite",
+            })
+        assert exc.value.code == "NO_DOUSED_PLAYERS"
+
+    @pytest.mark.asyncio
+    async def test_hunter_revenge_eliminates_target(self):
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.phase = Phase.HUNTER_PENDING
+        # Promote p5 to hunter (dead, pending revenge)
+        G.players["p5"] = _make_player("p5", "Hunter", "hunter", Team.VILLAGE, alive=False)
+        G.hunter_queue = ["p5"]
+        G_new = await _dispatch(G, {
+            "type": "hunter_revenge",
+            "player_id": "p5",
+            "target_id": "p3",
+        })
+        assert G_new.players["p3"].is_alive is False
+        assert "p5" not in G_new.hunter_queue
+
+    @pytest.mark.asyncio
+    async def test_hunter_revenge_wrong_phase_rejected(self):
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.phase = Phase.NIGHT  # Not HUNTER_PENDING
+        with pytest.raises(IntentError) as exc:
+            await _dispatch(G, {
+                "type": "hunter_revenge",
+                "player_id": "p5",
+                "target_id": "p3",
+            })
+        assert exc.value.code == "WRONG_PHASE"

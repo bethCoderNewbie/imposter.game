@@ -1,6 +1,6 @@
 # Data Dictionary: Werewolf — Game State Schemas
 
-**Last updated:** 2026-03-29 (schema v0.7: Logic puzzles expanded to 4 options with same-category distractors — ADR-012; `puzzle_data.answer_options` length changed from 2 to 4 for `logic` type)
+**Last updated:** 2026-03-29 (schema v0.7: Added `MasterGameState.rematch_redirect` server-only field for WS redirect replay — ADR-013; `session_token` storage changed from `sessionStorage` to `localStorage` — ADR-013. Previously: Logic puzzles expanded to 4 options with same-category distractors — ADR-012)
 **Schema version:** 0.7
 **Source of truth:** `backend-engine/engine/state/` (models, enums); `backend-engine/api/intents/` (handlers, dispatch)
 **Static board data:** `docs/architecture/roles.json` (role definitions, dynamic composition templates, balance weights, win conditions, archive puzzle system)
@@ -69,6 +69,16 @@ Top-level object sent server → all connected sockets on every state mutation, 
 | `players` | `PlayerRosterEntry[]` | Current lobby player list. See `PlayerRosterEntry` schema. Sent to all connected sockets — no per-socket stripping because roster contains no secret fields. |
 
 > **Broadcast sites:** `POST /api/games/{id}/join` and `POST /api/games/{id}/rejoin` (both call `manager.broadcast_roster()` in `api/connection_manager.py`). Not sent during active game phases — roster changes mid-game are carried by the next full-state `update` message. Introduced in ADR-009.
+
+**`redirect` payload** (server → all sockets on old game, or unicast replay to reconnecting player):
+
+| Field | Type | Description |
+|:------|:-----|:------------|
+| `type` | `str` | `"redirect"` |
+| `new_game_id` | `str \| null` | New game ID. `null` means "abandon" — mobile clients clear their session and show onboarding. Non-null means a rematch was created. |
+| `players` | `map[old_player_id → entry]` | Per-player migration map. Each entry has `new_player_id` and `new_session_token` for the new game. Empty when `new_game_id` is `null`. |
+
+> **Broadcast sites:** `POST /api/games/{id}/rematch` broadcasts to all live sockets on the old game via `manager.broadcast_raw()`. Players who were disconnected at broadcast time receive it via WS replay from `endpoint.py` on their next reconnect to the old game (enabled by `MasterGameState.rematch_redirect` — see ADR-013). `POST /api/games/{id}/abandon` sends `{ type: "redirect", new_game_id: null, players: {} }` to tell all clients to return to onboarding. **Client handling (`App.tsx handleRedirect`):** updates session in `localStorage` with new credentials, triggering WS reconnect to the new game.
 
 ---
 
@@ -162,6 +172,7 @@ Static, loaded at startup from `docs/architecture/roles.json`. Never mutated at 
 | `tracker_knowledge` | `map[str → array[str]]` | Maps round number (as string key) → list of player IDs the Tracker's chosen target visited that round. Accumulates across rounds. `{}` until Tracker acts. Example: `{"1": ["p3"], "2": []}` | Populated by `resolve_night()` step 11 (Tracker result) | No (empty map) | **Yes — sent only to the Tracker; removed for all others** |
 | `config` | `GameConfig` | Host-configured game settings (timers, role set). Frozen at game start. | Set by host on `POST /games` | No | No |
 | `role_registry` | `map[str → RoleDefinition]` | Read-only copy of `roles.json` filtered to roles active in this game. Sent to clients on initial `state_update`. Never changes after game start. | Loaded from `roles.json` at `setup_game()` | No | No |
+| `rematch_redirect` | `dict \| null` | **Server-only. Never sent to any client.** Populated by `POST /api/games/{id}/rematch` with the full `redirect` payload (`new_game_id` + per-player `new_player_id`/`new_session_token` map). When a mobile player reconnects to this game via WS after missing the live broadcast, `endpoint.py` reads this field and replays the redirect message immediately after the initial `sync`. Excluded from `player_view()` via the stripper's `exclude` set. Lives until the old game's Redis key expires (4-hour TTL). | Set by `rematch_game()` in `api/lobby/routes.py` | Yes | **Yes — server-only; excluded from state stripper** |
 
 ---
 
@@ -217,7 +228,7 @@ Minimal player descriptor sent in `match_data` payloads (ADR-009). Intentionally
 | `last_protected_player_id` | `str` \| `null` | Player ID the Doctor protected last round. Enforces the consecutive-protect ban. Server-only field. | Set by `resolve_night()` when the Doctor acts. Only present on the Doctor's own PlayerState entry. | Yes | **Yes — server-only; never sent to any client** |
 | `night_action_submitted` | `bool` | Whether this player has submitted their night action this round. Reset to `false` at night phase start. | Set to `true` by `submit_night_action()` | No | **Yes — visible to own player and wolf teammates only. Display client receives aggregate count via `actions_submitted_count`, not individual booleans** |
 | `role_confirmed` | `bool` | Whether this player has held the "Hold to Reveal" button long enough to confirm they've seen their role. Used to gate the `role_deal` → `night` auto-advance. | Set by `confirm_role_reveal` intent | No | No |
-| `session_token` | `str` \| `null` | Opaque reconnect token. Set on join; re-issued on `/rejoin`. Stored in browser `sessionStorage` key `wolf_token`. Allows seamless reconnect on page refresh. | Server-generated UUID on join | Yes | **Yes — sent only to own player on join/rejoin; never in state broadcasts** |
+| `session_token` | `str` \| `null` | Opaque reconnect token. Set on join; re-issued on `/rejoin`. Stored in browser `localStorage` under key `ww_session` (as JSON with `game_id`, `player_id`, `session_token`). Persists across tab kills — mobile browsers that kill background tabs would lose `sessionStorage`, permanently locking players out (see ADR-013 §1). Token expires server-side after 4 hours (Redis TTL). | Server-generated UUID on join | Yes | **Yes — sent only to own player on join/rejoin; never in state broadcasts** |
 | `puzzles_solved_count` | `int` | Total puzzles the player has solved correctly across all rounds. Used by the Archives system to track engagement; not surfaced to other players. Only present on players with `wakeOrder == 0`. | Incremented by `resolve_puzzle()` on correct answer | No | **Yes — sent only to own player** |
 | `hints_received` | `array[str]` | List of `hint_id` strings for hints delivered to this player. Used as a deduplication registry — server checks this before delivering a new hint to prevent re-send on reconnect. Only present on players with `wakeOrder == 0`. | Appended by hint delivery handler | No (empty array) | **Yes — server-only; never sent in state broadcasts** |
 | `puzzle_state` | `PuzzleState` \| `null` | Active Archive puzzle for this player during the night phase. `null` for `wakeOrder != 0` players, dead players, and outside the night phase. Each eligible player receives a **distinct** puzzle seeded by `f"{G.seed}:{G.round}:{player_id}:puzzle"`. | Set by `transition_phase("night")` loop per eligible player; cleared to `null` on phase transition | Yes | **Yes — sent only to own player; `correct_index` stripped before broadcast; `null` in all other players' views** |

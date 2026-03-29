@@ -106,6 +106,11 @@ Running `pytest` without `REDIS_URL` is always safe — E2E tests self-skip rath
 - `POST /api/games/{id}/start` triggers game queue processing and results in a `ROLE_DEAL` state update broadcast to the display WS
 - Display view never exposes `host_secret` or player roles during `ROLE_DEAL`
 - Player's own WS view exposes their own role during `ROLE_DEAL`
+- **Full village-wins flow** (ROLE_DEAL → NIGHT → DAY → DAY_VOTE → `game_over winner=village`)
+- **Full werewolf-wins flow** (2-round engineered WW majority)
+- `elimination_log[*].role` populated at `game_over` (roles revealed via log, not `players` dict)
+- Both display and player WS receive the `game_over` broadcast
+- No post-game-over broadcasts sent (game queue stopped)
 
 ### 4. GitHub Actions CI/CD Pipeline
 
@@ -123,12 +128,15 @@ backend-unit:
 backend-integration:
   # pytest -m "integration" --timeout=30
   # No services required (fakeredis is in-process).
+  # Covers: HTTP lobby, WS auth, ROLE_DEAL→NIGHT→DAY→DAY_VOTE→HUNTER_PENDING→GAME_OVER,
+  #         security stripping, state_id fence, multi-round loop (~66 tests total).
 
 backend-e2e:
   services:
     redis: {image: redis:7-alpine, health-cmd: "redis-cli ping"}
   # pytest -m "e2e" --timeout=60
   # REDIS_URL=redis://localhost:6379/15
+  # Covers: full village-wins, full werewolf-wins, game_over broadcast, elimination_log roles.
 
 frontend-display:
   # npm ci && npm run test -- --run --reporter=verbose
@@ -146,7 +154,7 @@ frontend-mobile:
 ## Consequences
 
 **Positive:**
-- 203 backend tests (154 unit + 38 integration + 11 e2e) run in < 15s on developer hardware.
+- ~315 backend tests (154 unit + 38 prior integration + **28 new phase-integration** + 11 prior e2e + **7 new win-condition e2e**) run in < 15s on developer hardware (e2e auto-skip without Redis).
 - Every pull request is gated by all five CI jobs before merge.
 - Integration tests verify the HTTP/WS layer including auth, error codes, broadcast ordering, and state stripping — without requiring a running server or browser.
 - E2E tests verify the full Redis round-trip and the `game_queue` processing pipeline, catching bugs that only appear when fakeredis semantics diverge from production Redis.

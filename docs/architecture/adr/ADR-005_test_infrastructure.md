@@ -72,10 +72,33 @@ The project also had no containerized test runner, so tests could not be run rep
 ## Consequences
 
 **Positive:**
-- 265 total tests (114 backend engine + 35 Redis store + 35 frontend hooks + 81 frontend components) can be run locally or in Docker without any running services.
+- ~420 total tests (114 backend engine + 35 Redis store + 35 frontend hooks + 81 frontend components + 28 integration + 7 e2e + helpers) can be run locally or in Docker without any running services (e2e auto-skip without Redis).
 - `storage/redis_store.py` now has 100% line coverage via the fakeredis suite.
 - Frontend hook and component tests catch regressions in rendering logic, state transitions, and audio behavior that would otherwise require a full browser + running backend to discover.
 - `docker-compose.test.yml` provides a reproducible test environment for CI/CD integration.
+
+---
+
+## Addendum — `tests/helpers/` Package (2026-03-29)
+
+A shared helper package was added at `backend-engine/tests/helpers/` to support the phase-integration and win-condition test suites.
+
+### Modules
+
+| Module | Purpose |
+|--------|---------|
+| `ws_patterns.py` | `consume_until(ws, predicate)` — drain WS until a predicate matches, tolerating disconnect-noise broadcasts. Assertion helpers: `assert_phase`, `assert_player_dead`, `assert_game_over`, `assert_no_sensitive_role_data`. |
+| `role_utils.py` | `collect_role_map(client, game_id, players)` — open each player WS, read their sync, extract role. **Must be called before opening the display WS** to avoid disconnect broadcasts polluting the display buffer. `first_with_role`, `players_with_role`, `get_alive_pids`. |
+| `game_driver.py` | `create_and_fill`, `send_player_intent`, `drive_role_deal`, `drive_night`, `drive_to_day_vote`, `drive_votes` — stateless phase-driving helpers used by both integration and e2e test tiers. |
+
+### Key contracts
+
+- **Role discovery**: No REST endpoint exposes assigned roles. Each player's sync message after `start_game` transitions to `ROLE_DEAL` is the only authoritative source. `collect_role_map()` encapsulates this.
+- **`state_id` in test intents**: Omit `state_id` from all test intents unless the test specifically validates the fence. Missing field = fence bypassed.
+- **Auto-advance is synchronous**: The last required night action triggers `resolve_night()` inline and transitions to `DAY` before broadcasting. There is no intermediate "all submitted but still NIGHT" broadcast.
+- **Disconnect-broadcast noise**: Closing a player WS enqueues `player_disconnected`, which causes a broadcast. `consume_until` tolerates this; tests that read exactly one message must account for leftover broadcasts from previous phases.
+- **Doctor always in night_acts**: `_build_night_acts()` in both test files auto-fills doctor target (protect seer) when doctor is present, ensuring `actions_required_count` is met and auto-advance fires reliably.
+- **Voting pattern**: `_vote_everyone_for(target)` — all alive players vote for target (target votes for someone else). Guarantees strict majority for any `N ≥ 2` alive, avoids self-vote errors.
 
 **Negative:**
 - `fakeredis` may not implement every Redis command or edge case identically to the production Redis 7 server. If `redis_store.py` ever uses an obscure command (e.g., scripting, streams), a fakeredis test could pass while the production Redis call fails. Mitigated by keeping `redis_store.py` to basic `GET`/`SET`/`DEL`/`EXPIRE` operations.

@@ -23,17 +23,17 @@ const SESSION_KEY = 'ww_session'
 
 function loadSession(): Session | null {
   try {
-    const raw = sessionStorage.getItem(SESSION_KEY)
+    const raw = localStorage.getItem(SESSION_KEY)
     return raw ? (JSON.parse(raw) as Session) : null
   } catch { return null }
 }
 
 function saveSession(s: Session) {
-  sessionStorage.setItem(SESSION_KEY, JSON.stringify(s))
+  localStorage.setItem(SESSION_KEY, JSON.stringify(s))
 }
 
 function clearSession() {
-  sessionStorage.removeItem(SESSION_KEY)
+  localStorage.removeItem(SESSION_KEY)
 }
 
 const urlParams = new URLSearchParams(window.location.search)

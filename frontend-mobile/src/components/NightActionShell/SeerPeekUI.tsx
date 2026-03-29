@@ -26,6 +26,7 @@ export default function SeerPeekUI({ gameState, myPlayer, sendIntent }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [history, setHistory] = useState<PeekRecord[]>([])
   const { vibrate } = useHaptics()
+  const submitted = myPlayer.night_action_submitted
 
   // Load history from sessionStorage on mount
   useEffect(() => {
@@ -69,30 +70,36 @@ export default function SeerPeekUI({ gameState, myPlayer, sendIntent }: Props) {
 
   return (
     <div className="action-ui">
-      <p className="action-ui__header">Choose who to investigate</p>
+      <p className="action-ui__header">
+        {submitted ? 'Waiting for others…' : 'Choose who to investigate'}
+      </p>
 
-      <div className="action-ui__list">
-        {targets.map(p => (
-          <button
-            key={p.player_id}
-            className={`action-ui__row ${selectedId === p.player_id ? 'action-ui__row--selected' : ''}`}
-            onClick={() => setSelectedId(p.player_id)}
-          >
-            <PlayerAvatar player={p} />
-            <span>{p.display_name}</span>
-          </button>
-        ))}
-      </div>
+      {!submitted && (
+        <div className="action-ui__list">
+          {targets.map(p => (
+            <button
+              key={p.player_id}
+              className={`action-ui__row ${selectedId === p.player_id ? 'action-ui__row--selected' : ''}`}
+              onClick={() => setSelectedId(p.player_id)}
+            >
+              <PlayerAvatar player={p} />
+              <span>{p.display_name}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
-      <button
-        className="action-ui__confirm"
-        disabled={!selectedId}
-        onClick={handleConfirm}
-      >
-        Confirm
-      </button>
+      {!submitted && (
+        <button
+          className="action-ui__confirm"
+          disabled={!selectedId}
+          onClick={handleConfirm}
+        >
+          Confirm
+        </button>
+      )}
 
-      {/* Current round result */}
+      {/* Current round result — rendered once server broadcasts resolve */}
       {gameState.night_actions.seer_result && (
         <p className={`action-ui__result action-ui__result--${gameState.night_actions.seer_result}`}>
           {gameState.players[gameState.night_actions.seer_target_id ?? '']?.display_name} is…{' '}

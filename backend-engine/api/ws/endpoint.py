@@ -109,6 +109,23 @@ async def websocket_endpoint(websocket: WebSocket, game_id: str, player_id: str)
             "state": stripped,
         }))
 
+        # If a rematch occurred while this player was disconnected, replay the
+        # redirect immediately so they are forwarded to the new game.
+        if (
+            not is_display
+            and G_init.rematch_redirect
+            and authenticated_player_id in G_init.rematch_redirect.get("players", {})
+        ):
+            await websocket.send_json(G_init.rematch_redirect)
+    else:
+        await websocket.send_json({
+            "type": "error",
+            "code": "GAME_NOT_FOUND",
+            "message": "Game state not found.",
+        })
+        await websocket.close(code=1011, reason="Game not found.")
+        return
+
     logger.info("WS connected: game=%s player=%s", game_id, authenticated_player_id or "display")
 
     try:
