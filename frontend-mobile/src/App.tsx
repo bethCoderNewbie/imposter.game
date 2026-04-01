@@ -152,6 +152,24 @@ export default function App() {
     )
   }
 
+  // ── Hunter pending → only the eliminated hunter acts; everyone else waits ─────
+  if (phase === 'hunter_pending') {
+    if (myPlayer && !myPlayer.is_alive && myPlayer.role === 'hunter') {
+      return (
+        <HunterPendingScreen
+          gameState={gameState}
+          myPlayer={myPlayer}
+          sendIntent={sendIntent}
+        />
+      )
+    }
+    return (
+      <div className="app-status">
+        <p>Waiting…</p>
+      </div>
+    )
+  }
+
   // ── Player eliminated → Dead spectator view (overrides all live phases) ──────
   if (myPlayer && !myPlayer.is_alive) {
     return <DeadSpectatorScreen gameState={gameState} myPlayerId={session.player_id} />
@@ -200,16 +218,6 @@ export default function App() {
   if (phase === 'day_vote') {
     return (
       <DayVoteScreen
-        gameState={gameState}
-        myPlayer={myPlayer!}
-        sendIntent={sendIntent}
-      />
-    )
-  }
-
-  if (phase === 'hunter_pending') {
-    return (
-      <HunterPendingScreen
         gameState={gameState}
         myPlayer={myPlayer!}
         sendIntent={sendIntent}

@@ -100,7 +100,7 @@ describe('App phase routing — ADR-011 Decision 4a', () => {
     mockGameState = makeGameState({
       phase: 'hunter_pending',
       players: {
-        p1: makePlayer({ player_id: 'p1', display_name: 'Alice', is_alive: true, role: 'hunter' }),
+        p1: makePlayer({ player_id: 'p1', display_name: 'Alice', is_alive: false, role: 'hunter' }),
         p2: makePlayer({ player_id: 'p2', display_name: 'Bob',   is_alive: true }),
       },
     })
