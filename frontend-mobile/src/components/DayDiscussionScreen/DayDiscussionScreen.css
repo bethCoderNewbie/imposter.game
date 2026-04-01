@@ -91,3 +91,34 @@
 .day-discussion__tag--sus     { background: #fc8181; color: #fff; }
 .day-discussion__tag--safe    { background: #81c784; color: #fff; }
 .day-discussion__tag--unknown { background: rgba(0,0,0,0.1); color: rgba(70,50,80,0.6); }
+
+/* Seer intel panel */
+.day-discussion__seer-panel {
+  border-radius: 12px;
+  background: rgba(255,255,255,0.5);
+  padding: 0.75rem 1rem;
+}
+
+.day-discussion__seer-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #4a3560;
+  margin-bottom: 0.5rem;
+}
+
+.day-discussion__seer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.day-discussion__seer-row {
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+}
+
+.day-discussion__seer-row--wolf    { color: #c53030; background: rgba(252,129,129,0.15); }
+.day-discussion__seer-row--village { color: #276749; background: rgba(129,199,132,0.15); }
+.day-discussion__seer-row--neutral { color: #744210; background: rgba(246,173,85,0.15); }

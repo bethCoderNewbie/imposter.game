@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useTimer } from '../../hooks/useTimer'
 import PlayerAvatar from '../PlayerAvatar/PlayerAvatar'
-import type { StrippedGameState } from '../../types/game'
+import type { InvestigationResult, StrippedGameState } from '../../types/game'
 import './DayDiscussionScreen.css'
 
 type NoteTag = 'Sus' | 'Safe' | '?'
@@ -32,6 +32,9 @@ export default function DayDiscussionScreen({ gameState, myPlayerId }: Props) {
   const { secondsRemaining, isWarning, isCritical } = useTimer(gameState.timer_ends_at)
   const [notepadOpen, setNotepadOpen] = useState(false)
   const [tags, setTags] = useState<Record<string, NoteTag>>({})
+
+  const myPlayer = gameState.players[myPlayerId]
+  const isSeer = myPlayer?.role === 'seer'
 
   const players = Object.values(gameState.players).filter(p => p.player_id !== myPlayerId)
 
@@ -75,6 +78,11 @@ export default function DayDiscussionScreen({ gameState, myPlayerId }: Props) {
       {/* Phase label */}
       <p className="day-discussion__phase">Discussion — Speak up!</p>
 
+      {/* Seer intel panel — only visible to the seer */}
+      {isSeer && (
+        <SeerIntelPanel gameState={gameState} />
+      )}
+
       {/* Private notepad */}
       <div className="day-discussion__notepad">
         <button
@@ -100,6 +108,37 @@ export default function DayDiscussionScreen({ gameState, myPlayerId }: Props) {
             ))}
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+
+// ── Seer Intel Panel ──────────────────────────────────────────────────────────
+
+function SeerIntelPanel({ gameState }: { gameState: StrippedGameState }) {
+  const knowledge = gameState.seer_knowledge ?? {}
+  const entries = Object.entries(knowledge) as [string, InvestigationResult][]
+
+  if (entries.length === 0 && !gameState.night_actions.seer_result) {
+    return null
+  }
+
+  return (
+    <div className="day-discussion__seer-panel">
+      <p className="day-discussion__seer-label">🔮 Your Intel</p>
+      <div className="day-discussion__seer-list">
+        {entries.map(([targetId, result]) => {
+          const name = gameState.players[targetId]?.display_name ?? targetId
+          return (
+            <p
+              key={targetId}
+              className={`day-discussion__seer-row day-discussion__seer-row--${result}`}
+            >
+              {name} — {result === 'wolf' ? 'WOLF' : result === 'neutral' ? 'Neutral' : 'Not Wolf'}
+            </p>
+          )
+        })}
       </div>
     </div>
   )

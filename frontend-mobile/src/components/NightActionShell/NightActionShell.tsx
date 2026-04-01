@@ -51,7 +51,6 @@ export default function NightActionShell({ gameState, myPlayer, sendIntent, late
           <ArsonistUI gameState={gameState} myPlayer={myPlayer} sendIntent={sendIntent} />
         ) : (
           <VillagerDecoyUI
-            gameState={gameState}
             myPlayer={myPlayer}
             sendIntent={sendIntent}
             latestHint={latestHint}

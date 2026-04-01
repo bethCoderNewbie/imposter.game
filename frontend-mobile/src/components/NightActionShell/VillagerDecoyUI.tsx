@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { useHaptics } from '../../hooks/useHaptics'
-import type { HintPayload, PlayerState, PuzzleState, StrippedGameState } from '../../types/game'
+import type { HintPayload, PlayerState, PuzzleState } from '../../types/game'
 import './ActionUI.css'
 
+// How long to keep buttons locked after a click before re-enabling (safety valve
+// for WRONG_PHASE / network error when no state update arrives).
+const LOCK_TIMEOUT_MS = 4000
+
 interface Props {
-  gameState: StrippedGameState
   myPlayer: PlayerState
   sendIntent: (payload: Record<string, unknown>) => void
   latestHint?: HintPayload | null
@@ -90,6 +93,20 @@ function ChoicePuzzle({ puzzle, sendIntent, pct, isWarning }: ChoiceProps) {
   const data = puzzle.puzzle_data as { question?: string; expression?: string; answer_options: string[] }
   const prompt = data.question ?? data.expression ?? ''
   const options = data.answer_options ?? []
+  const [locked, setLocked] = useState(false)
+  const unlockTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function handleAnswer(i: number) {
+    if (locked) return
+    setLocked(true)
+    sendIntent({ type: 'submit_puzzle_answer', answer_index: i })
+    // Re-enable after timeout in case the server rejects (e.g. WRONG_PHASE)
+    unlockTimer.current = setTimeout(() => setLocked(false), LOCK_TIMEOUT_MS)
+  }
+
+  useEffect(() => () => {
+    if (unlockTimer.current) clearTimeout(unlockTimer.current)
+  }, [])
 
   return (
     <div className="action-ui">
@@ -107,7 +124,8 @@ function ChoicePuzzle({ puzzle, sendIntent, pct, isWarning }: ChoiceProps) {
             <button
               key={i}
               className="action-ui__answer-btn"
-              onClick={() => sendIntent({ type: 'submit_puzzle_answer', answer_index: i })}
+              disabled={locked}
+              onClick={() => handleAnswer(i)}
             >
               {opt}
             </button>
@@ -140,6 +158,12 @@ function SequencePuzzle({ puzzle, sendIntent, pct, isWarning }: SequenceProps) {
   const [flashIdx, setFlashIdx] = useState<number | null>(null)
   const [showing, setShowing] = useState(true)  // true = flashing sequence; false = player input
   const [playerInput, setPlayerInput] = useState<string[]>([])
+  const [locked, setLocked] = useState(false)
+  const unlockTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => () => {
+    if (unlockTimer.current) clearTimeout(unlockTimer.current)
+  }, [])
 
   // Flash the sequence on mount
   useEffect(() => {
@@ -157,10 +181,13 @@ function SequencePuzzle({ puzzle, sendIntent, pct, isWarning }: SequenceProps) {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleTileTap(color: string) {
+    if (locked) return
     const next = [...playerInput, color]
     setPlayerInput(next)
     if (next.length === sequence.length) {
+      setLocked(true)
       sendIntent({ type: 'submit_puzzle_answer', answer_sequence: next })
+      unlockTimer.current = setTimeout(() => setLocked(false), LOCK_TIMEOUT_MS)
     }
   }
 
@@ -184,7 +211,7 @@ function SequencePuzzle({ puzzle, sendIntent, pct, isWarning }: SequenceProps) {
                 key={color}
                 className={`action-ui__seq-tile${isFlashing ? ' action-ui__seq-tile--flash' : ''}`}
                 style={{ background: isFlashing ? TILE_COLORS[color] : `${TILE_COLORS[color]}33` }}
-                disabled={showing}
+                disabled={showing || locked}
                 onClick={() => handleTileTap(color)}
                 aria-label={color}
               />

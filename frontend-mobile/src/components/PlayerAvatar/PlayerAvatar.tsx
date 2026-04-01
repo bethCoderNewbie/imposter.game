@@ -16,6 +16,8 @@ export default function PlayerAvatar({ player, size, className = '', style }: Pr
 
   return (
     <div
+      role="img"
+      aria-label={player.display_name}
       className={`player-avatar ${className}`}
       style={{ backgroundColor: bg, ...sizeStyle, ...style }}
     >
