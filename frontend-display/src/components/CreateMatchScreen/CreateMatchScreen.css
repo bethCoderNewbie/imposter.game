@@ -12,7 +12,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.5rem;
+  gap: 1.25rem;
 }
 
 .create-match__title {
@@ -29,6 +29,8 @@
 }
 
 .create-match__btn {
+  width: 100%;
+  max-width: 24rem;
   padding: 1rem 3rem;
   font-size: 1.5rem;
   font-weight: 600;
@@ -49,4 +51,135 @@
   color: #f87171;
   font-size: 1rem;
   margin: 0;
+}
+
+/* ── Settings card ─────────────────────────────────────────── */
+.create-match__settings {
+  width: 100%;
+  max-width: 24rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.75rem;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.create-match__settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.create-match__settings-label {
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+/* ── Difficulty toggle ─────────────────────────────────────── */
+.create-match__difficulty-group {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.create-match__difficulty-btn {
+  flex: 1;
+  padding: 0.45rem 0;
+  font-size: 0.9rem;
+  font-weight: 500;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 0.4rem;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.create-match__difficulty-btn--active {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.6);
+  color: #fff;
+}
+
+.create-match__difficulty-btn:hover:not(.create-match__difficulty-btn--active) {
+  border-color: rgba(255, 255, 255, 0.35);
+  color: rgba(255, 255, 255, 0.75);
+}
+
+/* ── Phase timer rows ──────────────────────────────────────── */
+.create-match__timer-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.create-match__timer-label {
+  width: 3.5rem;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.create-match__timer-value {
+  min-width: 3rem;
+  text-align: center;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+
+.create-match__stepper {
+  width: 1.9rem;
+  height: 1.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.35rem;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.create-match__stepper:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.create-match__stepper:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+/* ── Resume section ────────────────────────────────────────── */
+.create-match__resume {
+  width: 100%;
+  max-width: 24rem;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.75rem;
+}
+
+.create-match__resume-input {
+  padding: 0.75rem 1rem;
+  font-size: 1.1rem;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.5rem;
+  color: #fff;
+  text-align: center;
+  letter-spacing: 0.1em;
+  outline: none;
+}
+
+.create-match__resume-input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.create-match__resume-input:focus {
+  border-color: rgba(255, 255, 255, 0.5);
 }
