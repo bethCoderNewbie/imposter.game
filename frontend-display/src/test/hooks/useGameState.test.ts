@@ -137,6 +137,44 @@ describe('useGameState', () => {
     expect(mockSend).toHaveBeenCalledWith({ type: 'vote', targetId: 'p3' })
   })
 
+  // ── gameId-change reset (rematch / new-match bug) ───────────────────────────
+
+  it('resets gameState to null when gameId changes', async () => {
+    const { result, rerender } = renderHook(
+      ({ gameId }: { gameId: string | null }) =>
+        useGameState({ gameId, playerId: 'display' }),
+      { initialProps: { gameId: 'game-1' } },
+    )
+    act(() => {
+      capturedOnMessage({ type: 'sync', state_id: 50, schema_version: '1', state: makeGameState({ phase: 'game_over' }) })
+    })
+    expect(result.current.gameState?.phase).toBe('game_over')
+
+    rerender({ gameId: 'game-2' })
+    expect(result.current.gameState).toBeNull()
+  })
+
+  it('accepts low state_id from new game after gameId change', async () => {
+    const { result, rerender } = renderHook(
+      ({ gameId }: { gameId: string | null }) =>
+        useGameState({ gameId, playerId: 'display' }),
+      { initialProps: { gameId: 'game-1' } },
+    )
+    // Old game ends at state_id=100
+    act(() => {
+      capturedOnMessage({ type: 'sync', state_id: 100, schema_version: '1', state: makeGameState({ phase: 'game_over' }) })
+    })
+
+    // Switch to new game
+    rerender({ gameId: 'game-2' })
+
+    // New game sends state_id=1 — must NOT be dropped by the stale fence
+    act(() => {
+      capturedOnMessage({ type: 'sync', state_id: 1, schema_version: '1', state: makeGameState({ phase: 'lobby' }) })
+    })
+    expect(result.current.gameState?.phase).toBe('lobby')
+  })
+
   it('uses wss: protocol when window.location.protocol is https:', async () => {
     const { useWebSocket } = await import('../../hooks/useWebSocket')
     Object.defineProperty(window, 'location', {

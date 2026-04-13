@@ -135,4 +135,42 @@ describe('useGameState (mobile)', () => {
     act(() => { capturedOnStatusChange?.('open') })
     expect(result.current.status).toBe('open')
   })
+
+  // ── Rematch redirect: state-id fence must reset on game switch ───────────────
+
+  it('resets gameState to null when gameId changes (redirect fence reset)', async () => {
+    const { result, rerender } = renderHook(
+      ({ gameId, playerId }: { gameId: string; playerId: string }) =>
+        useGameState({ gameId, playerId }),
+      { initialProps: { gameId: 'old-game', playerId: 'old-pid' } },
+    )
+    act(() => {
+      capturedOnMessage({ type: 'sync', state_id: 80, schema_version: '0.4', state: makeGameState({ phase: 'game_over' }) })
+    })
+    expect(result.current.gameState?.phase).toBe('game_over')
+
+    rerender({ gameId: 'new-game', playerId: 'new-pid' })
+    expect(result.current.gameState).toBeNull()
+  })
+
+  it('accepts low state_id from new game after redirect (rematch scenario)', async () => {
+    const { result, rerender } = renderHook(
+      ({ gameId, playerId }: { gameId: string; playerId: string }) =>
+        useGameState({ gameId, playerId }),
+      { initialProps: { gameId: 'old-game', playerId: 'old-pid' } },
+    )
+    // Old game ends at a high state_id
+    act(() => {
+      capturedOnMessage({ type: 'sync', state_id: 80, schema_version: '0.4', state: makeGameState({ phase: 'game_over' }) })
+    })
+
+    // Redirect fires — new game/player IDs from handleRedirect in App.tsx
+    rerender({ gameId: 'new-game', playerId: 'new-pid' })
+
+    // New game sends state_id=1 — must NOT be blocked by the stale fence
+    act(() => {
+      capturedOnMessage({ type: 'sync', state_id: 1, schema_version: '0.4', state: makeGameState({ phase: 'lobby' }) })
+    })
+    expect(result.current.gameState?.phase).toBe('lobby')
+  })
 })

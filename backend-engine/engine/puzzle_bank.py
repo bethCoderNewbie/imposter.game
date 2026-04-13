@@ -56,6 +56,10 @@ _SEQUENCE_COLORS = ["red", "blue", "green", "yellow"]
 _HIGH_IMPACT_ABSENT_ROLES = ["alpha_wolf", "framer", "infector", "serial_killer", "arsonist"]
 # Guaranteed baseline roles — not worth hinting about presence
 _BASELINE_ROLES = {"villager", "werewolf", "seer"}
+# Elimination causes that indicate a non-wolf kill (for non_wolf_kill hint category)
+_NON_WOLF_CAUSES = {"arsonist_ignite", "serial_killer_kill", "broken_heart", "hunter_revenge"}
+# Round threshold: rounds < this are vague, rounds >= this are specific
+_VAGUE_ROUND_THRESHOLD = 3
 
 
 # ── Puzzle generation ─────────────────────────────────────────────────────────
@@ -198,12 +202,18 @@ def generate_hint(G: "MasterGameState", player_id: str) -> dict:
     Generate a real HintPayload for a player who solved their Archive puzzle.
     Seeded by (game seed : round : player_id) so simultaneous solvers can get
     different hints even in the same round.
-    Hint categories: wolf_count (always), no_role_present (if applicable),
-    role_present (if applicable), neutral_exists (if applicable).
+
+    Rounds 1–2 (< _VAGUE_ROUND_THRESHOLD): composition hints are vague — direction
+    without naming specifics (role names, exact counts).
+    Round 3+: hints are specific (exact counts, role names).
+
+    Categories: wolf_count (always), no_role_present, role_present, neutral_exists,
+    non_wolf_kill (round 2+), lovers_exist (if Cupid linked a pair).
     seer_blocked_last_night is omitted — roleblocked_player_id is not set until
     night resolution runs, which happens after puzzle delivery.
     """
     rng = random.Random(f"{G.seed}:{G.round}:{player_id}:hint")
+    is_vague = G.round < _VAGUE_ROUND_THRESHOLD
 
     composition: dict[str, int] = {}
     for player in G.players.values():
@@ -214,35 +224,39 @@ def generate_hint(G: "MasterGameState", player_id: str) -> dict:
 
     # wolf_count — always available
     wolf_count = sum(1 for p in G.players.values() if p.team == "werewolf")
-    plural = wolf_count != 1
-    pool.append({
-        "category": "wolf_count",
-        "text": (
+    if is_vague:
+        low = max(1, wolf_count - 1)
+        high = wolf_count + 1
+        wolf_text = f"The Archives suggest between {low} and {high} Wolves are present in this game."
+    else:
+        plural = wolf_count != 1
+        wolf_text = (
             f"There {'are' if plural else 'is'} {wolf_count} "
             f"{'Wolves' if plural else 'Wolf'} total in this game."
-        ),
-        "expires_after_round": None,
-    })
+        )
+    pool.append({"category": "wolf_count", "text": wolf_text, "expires_after_round": None})
 
     # no_role_present — pick one absent high-impact role
+    # rng.choice always called to preserve RNG sequence even when vague
     absent = [r for r in _HIGH_IMPACT_ABSENT_ROLES if r not in composition]
     if absent:
         role_name = rng.choice(absent)
-        pool.append({
-            "category": "no_role_present",
-            "text": f"There is NO {role_name.replace('_', ' ').title()} in this game.",
-            "expires_after_round": None,
-        })
+        if is_vague:
+            no_role_text = "The Archives hint that a certain powerful role is absent from this game."
+        else:
+            no_role_text = f"There is NO {role_name.replace('_', ' ').title()} in this game."
+        pool.append({"category": "no_role_present", "text": no_role_text, "expires_after_round": None})
 
     # role_present — pick one present non-baseline role
+    # rng.choice always called to preserve RNG sequence even when vague
     present_special = [r for r in composition if r not in _BASELINE_ROLES]
     if present_special:
         role_name = rng.choice(present_special)
-        pool.append({
-            "category": "role_present",
-            "text": f"There IS a {role_name.replace('_', ' ').title()} in this game.",
-            "expires_after_round": None,
-        })
+        if is_vague:
+            role_text = "The Archives suggest at least one special role is in play beyond the basics."
+        else:
+            role_text = f"There IS a {role_name.replace('_', ' ').title()} in this game."
+        pool.append({"category": "role_present", "text": role_text, "expires_after_round": None})
 
     # neutral_exists — only if a living neutral player exists
     if any(p.is_alive and p.team == "neutral" for p in G.players.values()):
@@ -251,6 +265,30 @@ def generate_hint(G: "MasterGameState", player_id: str) -> dict:
             "text": "At least one Neutral player is alive in this game.",
             "expires_after_round": G.round + 1,
         })
+
+    # non_wolf_kill — behavioral, round 2+
+    # Fires when last night had at least one kill not caused by wolves
+    if G.round >= 2:
+        last_night_non_wolf = [
+            e for e in G.elimination_log
+            if e.round == G.round - 1
+            and e.phase == "night"
+            and e.cause in _NON_WOLF_CAUSES
+        ]
+        if last_night_non_wolf:
+            pool.append({
+                "category": "non_wolf_kill",
+                "text": "The last night's death was not the wolves' doing.",
+                "expires_after_round": G.round + 1,
+            })
+
+    # lovers_exist — if Cupid linked a pair this game
+    if G.lovers_pair:
+        if is_vague:
+            lovers_text = "Two souls in this village share an unbreakable bond."
+        else:
+            lovers_text = "Two players are bound together — if one falls, the other follows."
+        pool.append({"category": "lovers_exist", "text": lovers_text, "expires_after_round": None})
 
     chosen = rng.choice(pool)
     return {

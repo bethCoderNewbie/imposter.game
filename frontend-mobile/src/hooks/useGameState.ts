@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { useWebSocket, type WsStatus } from './useWebSocket'
 import type { HintPayload, RedirectMessage, StrippedGameState, ServerMessage } from '../types/game'
 
@@ -18,6 +18,14 @@ export function useGameState({ gameId, playerId, sessionToken, onHint, onRedirec
   onHintRef.current = onHint
   const onRedirectRef = useRef(onRedirect)
   onRedirectRef.current = onRedirect
+
+  // Reset state fence and stale game state when switching to a new game.
+  // Without this, a rematch (new game starting at state_id=1) is silently
+  // dropped when lastStateIdRef is still at the old game's final state_id.
+  useEffect(() => {
+    lastStateIdRef.current = -1
+    setGameState(null)
+  }, [gameId])
 
   const proto = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   const url = gameId && playerId

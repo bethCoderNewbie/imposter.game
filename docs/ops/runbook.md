@@ -158,7 +158,7 @@ docker compose -f docker-compose.test.yml run --rm backend-test
 docker compose -f docker-compose.test.yml run --rm frontend-test
 ```
 
-### Test counts (as of 2026-03-29)
+### Test counts (as of 2026-04-13)
 
 | Suite | Marker | Tests |
 |-------|--------|-------|
@@ -169,9 +169,15 @@ docker compose -f docker-compose.test.yml run --rm frontend-test
 | Backend — WebSocket auth (integration) | `integration` | 14 |
 | Backend — full phase flow (integration) | `integration` | 29 |
 | Backend — game win conditions (E2E) | `e2e` | 18 |
-| Frontend — hooks | — | 37 |
-| Frontend — components | — | 99 |
-| **Total** | | **~398** |
+| Frontend display — hooks | — | 39 |
+| Frontend display — components | — | 105 |
+| Frontend mobile — hooks | — | 10 |
+| Frontend mobile — components + routing | — | 82 |
+| **Total** | | **~431** |
+
+*+2 display `useGameState` regression tests for state-id fence reset (ADR-019)*
+*+6 `CreateMatchScreen` tests for pre-game settings UI and PATCH flow (PRD-011)*
+*+2 mobile `useGameState` regression tests for rematch redirect fence reset (ADR-019)*
 
 The 29 phase-integration tests cover ROLE_DEAL→NIGHT→DAY→DAY_VOTE→HUNTER_PENDING→GAME_OVER, security stripping, and the state_id fence (1 skipped when doctor is not in the seeded composition). The 18 E2E tests cover full village-wins and werewolf-wins round-trips via real Redis (auto-skipped without Redis).
 
@@ -374,10 +380,27 @@ Added `else` branch: if game state not found after auth, send `GAME_NOT_FOUND` e
 
 **Cause:** The player's `localStorage` entry for `ww_session` is missing (browser cleared storage, or the player is on a new device). Without a stored session token, `App.tsx loadSession()` returns `null` and shows onboarding. `POST /api/games/{id}/join` then rejects with 409 "Game already started" because the game is past the `lobby` phase.
 
-**Fix:**
-- The session token is stored in `localStorage` (not `sessionStorage`) since ADR-013 — mobile browsers killing background tabs should no longer cause this.
-- If it still occurs (new device, browser cache cleared), the player has genuinely lost their credentials. They cannot re-enter an active game from onboarding. The host should wait for the round to complete or, in dev, delete and recreate the game via Redis.
-- To confirm the root cause: open DevTools → Application → Local Storage. Check for key `ww_session`. If absent, credentials were lost.
+**Resolution (current behavior):**
+
+1. **Bootstrap auto-rejoin**: On mount, `App.tsx` calls `POST /api/games/{stored.game_id}/rejoin` with the stored token. If successful, the player is returned to the game directly without seeing the form. The bootstrap now only clears the session on 401/404 (definitively invalid) — transient 5xx/network errors preserve the token so the next app open retries automatically.
+
+2. **OnboardingForm 409 → auto-rejoin**: If the player enters a game code and JOIN returns 409 (game already started), `OnboardingForm` silently tries `POST /rejoin` using any matching session stored in `localStorage`. If this succeeds, the player is returned to the game without manual action.
+
+3. **Manual rejoin via token**: If both auto-paths fail (session genuinely lost), the form switches to "Rejoin" mode showing a session token input + game code. The player pastes their token and clicks "Rejoin Game" → calls `POST /rejoin`.
+
+4. **"Returning player?" link**: Visible on the join form at all times — lets a player skip directly to rejoin mode without hitting the 409 first.
+
+**Finding the session token for manual rejoin (host / dev):**
+```bash
+# Get the token for a specific player in a game
+docker compose exec redis redis-cli GET wolf:game:<GAME_ID> | \
+  python -m json.tool | grep -A2 '"display_name": "<PLAYER_NAME>"'
+# Look for "session_token" field in that player's object
+```
+
+**When the player genuinely cannot rejoin** (new device, no token, game in progress):
+- The host can extract the token from Redis as above and share it out-of-band
+- Or the host waits for game-over, then triggers a rematch which migrates all players
 
 ---
 
@@ -394,6 +417,26 @@ Added `else` branch: if game state not found after auth, send `GAME_NOT_FOUND` e
 3. If `rematch_redirect` is present but player is not in the `players` map: the player joined with a different `player_id` than the one in the migration map (should not happen in production — player IDs are stable per join).
 
 **Workaround (if needed):** Player uses the new game QR code directly. The new game is in `lobby` phase until the host starts it, so `POST /api/games/{new_id}/join` accepts new entries.
+
+### Symptom: Display stuck on game-over screen after "Play Again" or "New Match → Create New Match"
+
+**Cause (ADR-019):** `useGameState.ts` maintains a `lastStateIdRef` fence to discard replayed messages. This fence was not reset when `gameId` changed. The new game starts at `state_id = 1`, but the fence from the completed game may be at `state_id = 100+`. Every message from the new game fails the `msg.state_id > fence` check and is silently dropped. `gameState` stays frozen at the old `phase: "game_over"`.
+
+**Fix applied (both `frontend-display/src/hooks/useGameState.ts` and `frontend-mobile/src/hooks/useGameState.ts`):**
+```ts
+// Resets fence (-1 accepts any state_id ≥ 0) and clears stale state
+useEffect(() => {
+  lastStateIdRef.current = -1
+  setGameState(null)
+}, [gameId])
+```
+
+**Diagnosis (if regression):**
+1. Open DevTools → Network → WS tab. After "Play Again", confirm the display opens a new WebSocket to `/ws/<new_game_id>/display`.
+2. In the new WS frame list, verify a `sync` frame is received with `state_id: 1` and `phase: "lobby"`.
+3. If the `sync` frame is present but the screen does not update: `lastStateIdRef` is above 1. The `useEffect` reset is not running — check that `gameId` state is actually changing (confirm `setGameId(newGameId)` fires in the `onPlayAgain` callback).
+
+---
 
 ### Symptom: Player gets `STALE_STATE` error
 
@@ -448,6 +491,34 @@ const puzzle = myPlayer.puzzle_state ?? null
 **Fix applied:**
 - Created `FramerUI.tsx` — two-step flow: mode selection → frame (pick target) or hack archives (preset/custom false hint builder). Submits proper `framer_action` field.
 - Updated `NightActionShell.tsx` to route `role === 'framer'` to `FramerUI` before the `WOLF_ROLES.has(role)` fallback.
+
+---
+
+### Symptom: Hints are specific in round 1 (vague text not showing)
+
+**Cause:** `G.round` starts at 1 for the first night. The vague threshold is `_VAGUE_ROUND_THRESHOLD = 3` (`puzzle_bank.py`), so rounds 1 and 2 (`G.round < 3`) should produce vague text. If specific text appears in round 1, the most likely cause is `G.round` being incorrectly incremented before the night phase starts.
+
+**Diagnosis:** Check `MasterGameState.round` in the Redis state dump for the affected game. If `round >= 3` in what should be the first night, the phase machine is double-incrementing round. See `engine/phases/machine.py` — round is incremented at the top of `_enter_night()`.
+
+---
+
+### Symptom: `non_wolf_kill` hint never appears even when SK/Arsonist is active
+
+**Causes to check (in order):**
+
+1. **Round guard.** `non_wolf_kill` requires `G.round >= 2`. It is impossible in round 1 (no previous night's data exists). Confirm the hint is being sought in round 2+.
+
+2. **Phase mismatch in elimination_log.** The filter requires `e.phase == "night"`. Hunter revenge kills that occur during the day (`e.phase == "day"`) will not trigger this hint even though their cause (`hunter_revenge`) is in `_NON_WOLF_CAUSES`. Check the `elimination_log` entries for the relevant round.
+
+3. **Cause value mismatch.** Verify the `EliminationCause` enum value is the string `"serial_killer_kill"` (not `"serial_killer"`). See `engine/state/enums.py:54`.
+
+4. **Pool selection.** Even if `non_wolf_kill` enters the pool, `rng.choice(pool)` may select a different category. With 4–6 pool entries, the probability of selecting any specific one is ~17–25% per puzzle solve. Run `pytest tests/engine/test_puzzle_bank.py -k non_wolf_kill` to confirm the category enters the pool correctly.
+
+---
+
+### Symptom: `lovers_exist` hint never appears in a Cupid game
+
+**Cause:** `G.lovers_pair` is `None`. Confirm Cupid's round-1 action was submitted and processed. Check `G.night_actions.cupid_link` in the round-1 state dump — if it is non-null but `G.lovers_pair` is still null, the night resolver failed to persist the link at step N (Cupid linking step). See `engine/resolver/night.py`.
 
 ---
 

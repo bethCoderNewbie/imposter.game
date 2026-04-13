@@ -174,7 +174,7 @@ export default function App() {
           setHostSecret(newHostSecret)
         }}
         onNewMatch={() => {
-          history.pushState({}, '', '/')
+          history.pushState({}, '', import.meta.env.BASE_URL)
           setGameId(null)
           setHostSecret(null)
         }}

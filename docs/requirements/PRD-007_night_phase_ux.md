@@ -181,7 +181,7 @@ Feature: Seer result visible in day discussion
     And the seer submits an investigation targeting the wolf
     And all required roles (wolf, doctor) submit their night actions
     When the night auto-advances to day
-    Then DayDiscussionScreen shows a panel labeled "Your Intel"
+    Then DayDiscussionScreen shows a panel labeled "Your Intel"docker
     And the panel contains "[Wolf player name] — WOLF" in red
     And the panel is not visible to any non-seer player
 

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { useWebSocket, type WsStatus } from './useWebSocket'
 import type { StrippedGameState, ServerMessage } from '../types/game'
 import { useGameStore } from '../store/gameStore'
@@ -14,6 +14,14 @@ export function useGameState({ gameId, playerId, sessionToken }: Options) {
   const [gameState, setGameState] = useState<StrippedGameState | null>(null)
   const [status, setStatus] = useState<WsStatus>('closed')
   const lastStateIdRef = useRef(-1)
+
+  // Reset state fence and stale game state when switching to a new game.
+  // Without this, a new game starting at state_id=1 would be silently dropped
+  // because the fence is still at the old game's final state_id (e.g. 100).
+  useEffect(() => {
+    lastStateIdRef.current = -1
+    setGameState(null)
+  }, [gameId])
 
   const proto = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   const url = gameId

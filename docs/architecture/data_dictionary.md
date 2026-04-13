@@ -352,7 +352,7 @@ Unicast message sent server → solving player only, immediately after a correct
 |:------|:-----|:------------|:---------|
 | `type` | `str` | Always `"hint_reward"`. Discriminates this message from `"state_update"` and `"error"`. | No |
 | `hint_id` | `str` (UUID) | Unique identifier for this hint delivery. Stored in `PlayerState.hints_received` to prevent re-delivery on reconnect. | No |
-| `category` | `str` enum | One of the `archivePuzzleSystem.hintCategories[].id` values: `"wolf_count"` \| `"no_role_present"` \| `"role_present"` \| `"neutral_exists"` \| `"seer_blocked_last_night"`. | No |
+| `category` | `str` enum | One of the `archivePuzzleSystem.hintCategories[].id` values: `"wolf_count"` \| `"no_role_present"` \| `"role_present"` \| `"neutral_exists"` \| `"seer_blocked_last_night"` \| `"non_wolf_kill"` \| `"lovers_exist"`. | No |
 | `text` | `str` | Pre-formatted hint string ready for display. E.g., `"There are 3 Wolves total in this game."`. Generated server-side from the category template. | No |
 | `round` | `int` | Round number when the hint was earned. | No |
 | `expires_after_round` | `int` \| `null` | Round number after which this hint is stale. `null` = permanent (composition-derived hints). Set to `(round + 1)` for behavioral hints that reference the previous night's events. | Yes |

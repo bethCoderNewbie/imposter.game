@@ -1,39 +1,18 @@
 import { useState } from 'react'
 import type { GameConfig, DifficultyLevel } from '../../types/game'
+import {
+  formatSeconds,
+  DIFFICULTY_LABELS,
+  TIMER_STEPS,
+  TIMER_BOUNDS,
+  TIMER_LABELS,
+} from './config'
 import './LobbyConfigPanel.css'
 
 interface Props {
   config: GameConfig
   hostSecret?: string
   gameId?: string
-}
-
-function formatSeconds(s: number): string {
-  const m = Math.floor(s / 60)
-  const rem = s % 60
-  return m > 0 ? `${m}:${String(rem).padStart(2, '0')}` : `${s}s`
-}
-
-const DIFFICULTY_LABELS: Record<DifficultyLevel, string> = {
-  easy: 'Easy', standard: 'Balanced', hard: 'Hard',
-}
-
-const TIMER_STEPS: Record<string, number> = {
-  night_timer_seconds: 15,
-  day_timer_seconds: 30,
-  vote_timer_seconds: 15,
-}
-
-const TIMER_BOUNDS: Record<string, [number, number]> = {
-  night_timer_seconds:  [30,  120],
-  day_timer_seconds:    [60,  300],
-  vote_timer_seconds:   [30,  120],
-}
-
-const TIMER_LABELS: Record<string, string> = {
-  night_timer_seconds: 'Night',
-  day_timer_seconds:   'Day',
-  vote_timer_seconds:  'Vote',
 }
 
 export default function LobbyConfigPanel({ config, hostSecret, gameId }: Props) {

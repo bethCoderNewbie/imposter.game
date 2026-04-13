@@ -82,11 +82,15 @@ export default function App() {
       .then(r => {
         if (r.ok) {
           setSession(stored)
-        } else {
+        } else if (r.status === 401 || r.status === 404) {
+          // Definitively invalid token or game gone — safe to discard
           clearSession()
         }
+        // Any other status (5xx, network hiccup): keep session in localStorage
+        // so the player can manually rejoin via OnboardingForm without re-entering
+        // their token. Next app open will retry the bootstrap automatically.
       })
-      .catch(() => clearSession())
+      .catch(() => { /* network error — preserve session for retry */ })
       .finally(() => setBootstrapping(false))
   }, [])
 

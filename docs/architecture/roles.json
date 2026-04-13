@@ -1108,6 +1108,22 @@
         "expiry": "expires_after_1_round",
         "sensitivity": "medium",
         "note": "Only delivered if a Seer is in the game and was roleblocked last round."
+      },
+      {
+        "id": "non_wolf_kill",
+        "template": "The last night's death was not the wolves' doing.",
+        "derivedFrom": "elimination_log: any entry with round == G.round-1, phase == 'night', cause in {arsonist_ignite, serial_killer_kill, broken_heart, hunter_revenge}",
+        "expiry": "expires_after_1_round",
+        "sensitivity": "medium",
+        "note": "Only available from round 2 onward. Signals that a non-wolf threat (SK, Arsonist, broken-heart lovers, Hunter revenge) was active last night."
+      },
+      {
+        "id": "lovers_exist",
+        "template": "Two players are bound together — if one falls, the other follows.",
+        "derivedFrom": "G.lovers_pair is not None (Cupid linked two players in round 1)",
+        "expiry": "null",
+        "sensitivity": "medium",
+        "note": "Permanent composition hint. Vague in rounds 1–2: 'Two souls in this village share an unbreakable bond.' Specific in round 3+."
       }
     ],
     "hintPayload": {
