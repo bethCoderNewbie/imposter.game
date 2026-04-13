@@ -20,6 +20,13 @@ class Settings(BaseSettings):
     redis_game_ttl_seconds: int = 14400  # 4 hours
     max_active_games: int = 100
 
+    # Narrator settings (PRD-008)
+    narrator_enabled: bool = False
+    ollama_url: str = "http://host.docker.internal:11434"
+    ollama_model: str = "llama3.2:3b"
+    kokoro_url: str = "http://tts:8880"
+    narrator_voice: str = "af_bella"
+
 
 @lru_cache
 def get_settings() -> Settings:

@@ -1,0 +1,28 @@
+.narrator-subtitle {
+  position: fixed;
+  bottom: 8%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.78);
+  color: #f5f0e8;
+  padding: 0.55em 1.3em;
+  border-radius: 6px;
+  font-size: 1.45rem;
+  font-style: italic;
+  text-align: center;
+  max-width: 80%;
+  z-index: 100;
+  pointer-events: none;
+  animation: narrator-fade-in 0.35s ease-in;
+}
+
+@keyframes narrator-fade-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}

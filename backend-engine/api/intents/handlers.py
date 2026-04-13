@@ -6,17 +6,20 @@ All raise IntentError on invalid intents.
 
 from __future__ import annotations
 
+import asyncio
 import secrets
 from typing import Any
 from uuid import uuid4
 
 from api.intents.errors import IntentError
+from api.narrator.triggers import narrate
 from api.timer_tasks import cancel_phase_timer, start_phase_timer
 from engine.phases.machine import should_auto_advance, transition_phase
 from engine.resolver.day import resolve_day_vote
 from engine.resolver.hunter import HunterError, resolve_hunter_revenge, resolve_hunter_timeout
 from engine.resolver.night import resolve_night
 from engine.resolver.puzzle import PuzzleError, resolve_puzzle_answer
+from engine.config import get_settings
 from engine.roles_loader import CLIENT_SAFE_ROLE_REGISTRY, ROLE_REGISTRY
 from engine.setup import DIFFICULTY_BALANCE_RANGE, assign_roles, build_composition
 from engine.state.enums import Phase, Team
@@ -83,6 +86,10 @@ async def handle_start_game(G, intent, redis_client, cm) -> MasterGameState:
     from api.game_queue import get_or_create_queue
     queue = get_or_create_queue(G.game_id)
     await _maybe_start_timer(G, G.game_id, queue)
+
+    if get_settings().narrator_enabled:
+        asyncio.create_task(narrate("game_start", G, cm, G.game_id))
+
     return G
 
 
@@ -102,6 +109,9 @@ async def handle_confirm_role_reveal(G, intent, redis_client, cm) -> MasterGameS
         from api.game_queue import get_or_create_queue
         queue = get_or_create_queue(G.game_id)
         await _maybe_start_timer(G, G.game_id, queue)
+
+        if get_settings().narrator_enabled:
+            asyncio.create_task(narrate("night_open", G, cm, G.game_id))
 
     return G
 
@@ -256,6 +266,7 @@ async def handle_submit_night_action(G, intent, redis_client, cm) -> MasterGameS
     # Auto-advance check
     if should_auto_advance(G):
         cancel_phase_timer(G.game_id)
+        elim_count_before = len(G.elimination_log)
         G = resolve_night(G)
         # Broadcast results while still in NIGHT phase so role-specific UIs
         # (Seer, Tracker) can display their outcome before the phase transitions.
@@ -263,6 +274,15 @@ async def handle_submit_night_action(G, intent, redis_client, cm) -> MasterGameS
         await cm.broadcast(G.game_id, G)
         if G.phase not in (Phase.GAME_OVER, Phase.HUNTER_PENDING):
             G = transition_phase(G, Phase.DAY)
+            if get_settings().narrator_enabled:
+                asyncio.create_task(narrate("night_close", G, cm, G.game_id))
+                if len(G.elimination_log) > elim_count_before:
+                    last_elim = G.elimination_log[-1]
+                    elim_player = G.players.get(last_elim.player_id)
+                    asyncio.create_task(narrate(
+                        "player_eliminated", G, cm, G.game_id,
+                        eliminated_name=elim_player.display_name if elim_player else None,
+                    ))
         from api.game_queue import get_or_create_queue
         queue = get_or_create_queue(G.game_id)
         await _maybe_start_timer(G, G.game_id, queue)
@@ -289,7 +309,19 @@ async def handle_submit_day_vote(G, intent, redis_client, cm) -> MasterGameState
 
     if should_auto_advance(G):
         cancel_phase_timer(G.game_id)
+        elim_count_before = len(G.elimination_log)
         G = resolve_day_vote(G)
+        if get_settings().narrator_enabled:
+            if len(G.elimination_log) > elim_count_before:
+                last_elim = G.elimination_log[-1]
+                elim_player = G.players.get(last_elim.player_id)
+                asyncio.create_task(narrate(
+                    "vote_elimination", G, cm, G.game_id,
+                    eliminated_name=elim_player.display_name if elim_player else None,
+                ))
+            if G.phase == Phase.GAME_OVER and G.winner is not None:
+                trigger = "wolves_win" if G.winner == Team.WEREWOLF else "village_wins"
+                asyncio.create_task(narrate(trigger, G, cm, G.game_id))
         if G.phase not in (Phase.GAME_OVER, Phase.HUNTER_PENDING):
             G = transition_phase(G, Phase.NIGHT)
             from api.game_queue import get_or_create_queue
@@ -380,20 +412,46 @@ async def handle_phase_timeout(G, intent, redis_client, cm) -> MasterGameState:
         for player in G.players.values():
             player.role_confirmed = True
         G = transition_phase(G, Phase.NIGHT)
+        if get_settings().narrator_enabled:
+            asyncio.create_task(narrate("night_open", G, cm, G.game_id))
 
     elif G.phase == Phase.NIGHT:
+        elim_count_before = len(G.elimination_log)
         G = resolve_night(G)
         # Same intermediate broadcast as in auto-advance path.
         G.state_id += 1
         await cm.broadcast(G.game_id, G)
         if G.phase not in (Phase.GAME_OVER, Phase.HUNTER_PENDING):
             G = transition_phase(G, Phase.DAY)
+            if get_settings().narrator_enabled:
+                asyncio.create_task(narrate("night_close", G, cm, G.game_id))
+                if len(G.elimination_log) > elim_count_before:
+                    last_elim = G.elimination_log[-1]
+                    elim_player = G.players.get(last_elim.player_id)
+                    asyncio.create_task(narrate(
+                        "player_eliminated", G, cm, G.game_id,
+                        eliminated_name=elim_player.display_name if elim_player else None,
+                    ))
 
     elif G.phase == Phase.DAY:
         G = transition_phase(G, Phase.DAY_VOTE)
+        if get_settings().narrator_enabled:
+            asyncio.create_task(narrate("vote_open", G, cm, G.game_id))
 
     elif G.phase == Phase.DAY_VOTE:
+        elim_count_before = len(G.elimination_log)
         G = resolve_day_vote(G)
+        if get_settings().narrator_enabled:
+            if len(G.elimination_log) > elim_count_before:
+                last_elim = G.elimination_log[-1]
+                elim_player = G.players.get(last_elim.player_id)
+                asyncio.create_task(narrate(
+                    "vote_elimination", G, cm, G.game_id,
+                    eliminated_name=elim_player.display_name if elim_player else None,
+                ))
+            if G.phase == Phase.GAME_OVER and G.winner is not None:
+                trigger = "wolves_win" if G.winner == Team.WEREWOLF else "village_wins"
+                asyncio.create_task(narrate(trigger, G, cm, G.game_id))
         if G.phase not in (Phase.GAME_OVER, Phase.HUNTER_PENDING):
             G = transition_phase(G, Phase.NIGHT)
 
