@@ -95,14 +95,9 @@
   font-size: 0.8rem;
 }
 
-.game-over__play-again {
+.game-over__waiting {
   margin-top: 0.5rem;
-  padding: 0.75rem 2rem;
-  border-radius: 8px;
-  background: #2d3748;
-  color: #fff;
-  font-size: 1rem;
-  font-weight: 700;
-  border: none;
-  cursor: pointer;
+  font-size: 0.9rem;
+  color: #718096;
+  text-align: center;
 }

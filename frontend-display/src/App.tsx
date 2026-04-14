@@ -48,6 +48,17 @@ export default function App() {
     setHostSecret(p.get('host_secret') ?? localStorage.getItem(`ww_host_${gId}`))
   }, [gameId])
 
+  // Reset per-game display state when switching to a new game (rematch).
+  // Without this, frozenVotes from the ended game bleeds into the new game's
+  // DayScreen (wrong vote arrows), and a mid-animation NightResolution stays
+  // visible instead of the new game's lobby.
+  useEffect(() => {
+    setFrozenVotes(null)
+    setShowResolution(false)
+    setResolutionState(null)
+    prevPhaseRef.current = null
+  }, [gameId])
+
   function handleCreated(newGameId: string, newHostSecret: string) {
     localStorage.setItem(`ww_host_${newGameId}`, newHostSecret)
     history.pushState({}, '', `?g=${newGameId}&host_secret=${newHostSecret}`)

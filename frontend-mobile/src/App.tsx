@@ -169,7 +169,6 @@ export default function App() {
       <GameOverScreen
         gameState={gameState}
         myPlayerId={session.player_id}
-        onPlayAgain={() => { clearSession(); setSession(null) }}
       />
     )
   }

@@ -5,7 +5,6 @@ import './GameOverScreen.css'
 interface Props {
   gameState: StrippedGameState
   myPlayerId: string
-  onPlayAgain: () => void
 }
 
 const CAUSE_LABELS: Record<string, string> = {
@@ -27,7 +26,7 @@ function winnerHeading(gameState: StrippedGameState): string {
   return 'Game Over'
 }
 
-export default function GameOverScreen({ gameState, myPlayerId, onPlayAgain }: Props) {
+export default function GameOverScreen({ gameState, myPlayerId }: Props) {
   const allPlayers = Object.values(gameState.players)
 
   return (
@@ -65,9 +64,7 @@ export default function GameOverScreen({ gameState, myPlayerId, onPlayAgain }: P
         </div>
       )}
 
-      <button className="game-over__play-again" onClick={onPlayAgain}>
-        Play Again
-      </button>
+      <p className="game-over__waiting">Waiting for host to start a new game…</p>
     </div>
   )
 }
