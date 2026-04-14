@@ -82,7 +82,7 @@ async def narrate(
         })
         return duration_ms
     except Exception:
-        logger.debug("Narrator pipeline failed for trigger=%s game=%s", trigger_id, game_id)
+        logger.warning("Narrator pipeline failed for trigger=%s game=%s", trigger_id, game_id, exc_info=True)
         return 0
 
 
