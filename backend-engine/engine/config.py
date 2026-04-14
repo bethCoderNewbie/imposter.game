@@ -17,8 +17,9 @@ class Settings(BaseSettings):
     role_deal_timer_seconds: int = 30
     hunter_pending_timer_seconds: int = 30
 
-    redis_game_ttl_seconds: int = 14400  # 4 hours
+    redis_game_ttl_seconds: int = 172800  # 48 hours
     max_active_games: int = 100
+    database_url: str = "postgresql+asyncpg://werewolf:werewolf@postgres/werewolf"
 
 
 @lru_cache

@@ -58,12 +58,13 @@ def _load_game_sync(sync_redis, game_id: str) -> MasterGameState:
 @pytest.fixture
 def game_over_game(client, sync_redis):
     """Create a 5-player lobby, then fast-forward to GAME_OVER via sync Redis."""
+    from tests.helpers.game_driver import register_and_join
     data = client.post("/api/games", json={}).json()
     game_id: str = data["game_id"]
     host_secret: str = data["host_secret"]
 
     for i in range(5):
-        client.post(f"/api/games/{game_id}/join", json={"display_name": f"P{i}"})
+        register_and_join(client, game_id, f"P{i}")
 
     _set_game_over(sync_redis, game_id)
     return game_id, host_secret
@@ -95,13 +96,11 @@ class TestRematch:
         assert data["new_host_secret"] != host_secret
 
     def test_rematch_new_game_exists_and_is_joinable(self, client, game_over_game):
+        from tests.helpers.game_driver import register_and_join
         game_id, host_secret = game_over_game
         data = client.post(f"/api/games/{game_id}/rematch", json={"host_secret": host_secret}).json()
-        resp = client.post(
-            f"/api/games/{data['new_game_id']}/join",
-            json={"display_name": "NewPlayer"},
-        )
-        assert resp.status_code == 200
+        p = register_and_join(client, data["new_game_id"], "NewPlayer")
+        assert p["player_id"] is not None
 
     def test_rematch_migrates_all_players(self, client, sync_redis, game_over_game):
         game_id, host_secret = game_over_game

@@ -3,14 +3,24 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
 
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: werewolf
+      POSTGRES_USER: werewolf
+      POSTGRES_PASSWORD: werewolf
+    restart: unless-stopped
+
   backend:
     build:
       context: .
       dockerfile: ./backend-engine/Dockerfile
     environment:
       REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql+asyncpg://werewolf:werewolf@postgres/werewolf
     depends_on:
       - redis
+      - postgres
     restart: unless-stopped
 
   frontend-display:

@@ -17,9 +17,11 @@ interface Session {
   game_id: string
   player_id: string
   session_token: string
+  permanent_id: string
 }
 
 const SESSION_KEY = 'ww_session'
+const PERMANENT_ID_KEY = 'ww_permanent_id'
 
 function loadSession(): Session | null {
   try {
@@ -34,6 +36,14 @@ function saveSession(s: Session) {
 
 function clearSession() {
   localStorage.removeItem(SESSION_KEY)
+}
+
+function loadPermanentId(): string | null {
+  return localStorage.getItem(PERMANENT_ID_KEY)
+}
+
+function savePermanentId(id: string) {
+  localStorage.setItem(PERMANENT_ID_KEY, id)
 }
 
 const urlParams = new URLSearchParams(window.location.search)
@@ -63,6 +73,7 @@ export default function App() {
         game_id: msg.new_game_id!,
         player_id: entry.new_player_id,
         session_token: entry.new_session_token,
+        permanent_id: prev.permanent_id,
       }
       saveSession(newSession)
       return newSession
@@ -120,6 +131,7 @@ export default function App() {
   }, [gameState?.players[session?.player_id ?? '']?.is_alive]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleJoined(s: Session) {
+    savePermanentId(s.permanent_id)
     saveSession(s)
     setSession(s)
   }
@@ -130,7 +142,13 @@ export default function App() {
 
   // ── No session → Onboarding ──────────────────────────────────────────────────
   if (!session) {
-    return <OnboardingForm prefillCode={URL_GAME_CODE} onJoined={handleJoined} />
+    return (
+      <OnboardingForm
+        prefillCode={URL_GAME_CODE}
+        permanentId={loadPermanentId()}
+        onJoined={handleJoined}
+      />
+    )
   }
 
   // ── Connecting ───────────────────────────────────────────────────────────────

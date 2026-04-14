@@ -98,6 +98,9 @@ class GameQueue:
                 if G_new.phase == Phase.GAME_OVER:
                     logger.info("Game over — stopping queue: %s", game_id)
                     _queues.pop(game_id, None)
+                    # Fire-and-forget: persist outcome to Postgres history
+                    from storage.db_writes import record_game_over
+                    asyncio.ensure_future(record_game_over(G_new))
                     return
 
             except asyncio.CancelledError:

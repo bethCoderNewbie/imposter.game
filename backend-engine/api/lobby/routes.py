@@ -5,16 +5,20 @@ All game lifecycle initialization happens here before WebSocket connection.
 
 from __future__ import annotations
 
-import secrets
 import uuid
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from engine.config import get_settings
 from engine.setup import setup_game
 from engine.state.enums import Phase
 from engine.state.models import GameConfig, PlayerState
+from storage.db import get_db
+from storage.id_gen import new_game_id
+from storage.models_db import DBGame, DBGamePlayer, DBPlayer
 from storage.redis_store import (
     issue_session_token,
     load_game,
@@ -30,7 +34,7 @@ class CreateGameRequest(BaseModel):
 
 
 class JoinGameRequest(BaseModel):
-    display_name: str = Field(..., min_length=1, max_length=16)
+    permanent_id: str
     avatar_id: str = "default_01"
 
 
@@ -55,9 +59,10 @@ def _get_redis(request: Request):
 
 
 @router.post("")
-async def create_game(body: CreateGameRequest, redis=Depends(_get_redis)):
+async def create_game(body: CreateGameRequest, redis=Depends(_get_redis), db: AsyncSession = Depends(get_db)):
     """Create a new game lobby. Returns game_id and host_secret for the Display client."""
-    game_id = secrets.token_urlsafe(6).upper()
+    import secrets
+    game_id = new_game_id()
     host_secret = secrets.token_urlsafe(32)
 
     settings = get_settings()
@@ -73,6 +78,13 @@ async def create_game(body: CreateGameRequest, redis=Depends(_get_redis)):
     G = setup_game(game_id, host_player_id=None, config=cfg, host_secret=host_secret)
     await save_game(redis, game_id, G)
 
+    db.add(DBGame(
+        game_id=game_id,
+        started_at=datetime.now(UTC),
+        player_count=0,
+    ))
+    await db.commit()
+
     return {
         "game_id": game_id,
         "host_secret": host_secret,
@@ -81,8 +93,13 @@ async def create_game(body: CreateGameRequest, redis=Depends(_get_redis)):
 
 
 @router.post("/{game_id}/join")
-async def join_game(game_id: str, body: JoinGameRequest, redis=Depends(_get_redis)):
+async def join_game(game_id: str, body: JoinGameRequest, redis=Depends(_get_redis), db: AsyncSession = Depends(get_db)):
     """Join an existing lobby. Returns player_id and session token."""
+    # Look up the player's registered display name
+    player_rec = await db.get(DBPlayer, body.permanent_id)
+    if player_rec is None:
+        raise HTTPException(status_code=404, detail="Player not registered.")
+
     G = await load_game(redis, game_id)
     if G is None:
         raise HTTPException(status_code=404, detail="Game not found.")
@@ -95,8 +112,9 @@ async def join_game(game_id: str, body: JoinGameRequest, redis=Depends(_get_redi
     G = G.model_copy(deep=True)
     G.players[player_id] = PlayerState(
         player_id=player_id,
-        display_name=body.display_name,
+        display_name=player_rec.display_name,
         avatar_id=body.avatar_id,
+        permanent_id=body.permanent_id,
     )
 
     # First player to join becomes the host
@@ -107,6 +125,17 @@ async def join_game(game_id: str, body: JoinGameRequest, redis=Depends(_get_redi
     G.players[player_id].session_token = token
 
     await save_game(redis, game_id, G)
+
+    # Record in game history
+    db.add(DBGamePlayer(
+        game_id=game_id,
+        permanent_id=body.permanent_id,
+        per_game_player_id=player_id,
+    ))
+    game_rec = await db.get(DBGame, game_id)
+    if game_rec:
+        game_rec.player_count = len(G.players)
+    await db.commit()
 
     # Broadcast updated lobby state to all connected sockets
     from api.connection_manager import manager
@@ -200,7 +229,7 @@ class RematchRequest(BaseModel):
 
 
 @router.post("/{game_id}/rematch")
-async def rematch_game(game_id: str, body: RematchRequest, redis=Depends(_get_redis)):
+async def rematch_game(game_id: str, body: RematchRequest, redis=Depends(_get_redis), db: AsyncSession = Depends(get_db)):
     """Create a new game with the same players. Broadcasts a redirect to all connected sockets."""
     G = await load_game(redis, game_id)
     if G is None:
@@ -210,21 +239,23 @@ async def rematch_game(game_id: str, body: RematchRequest, redis=Depends(_get_re
     if G.phase != Phase.GAME_OVER:
         raise HTTPException(status_code=409, detail="Game has not ended yet.")
 
-    new_game_id = secrets.token_urlsafe(6).upper()
+    import secrets
+    new_game_id_val = new_game_id()
     new_host_secret = secrets.token_urlsafe(32)
 
     # Inherit all timer/difficulty settings from the old game
     new_cfg = G.config.model_copy(update={"player_count": 0, "roles": {}})
-    new_G = setup_game(new_game_id, host_player_id=None, config=new_cfg, host_secret=new_host_secret)
+    new_G = setup_game(new_game_id_val, host_player_id=None, config=new_cfg, host_secret=new_host_secret)
 
     migration_map: dict[str, tuple[str, str]] = {}
     for old_pid, ps in G.players.items():
         new_pid = str(uuid.uuid4())
-        new_token = await issue_session_token(redis, new_game_id, new_pid)
+        new_token = await issue_session_token(redis, new_game_id_val, new_pid)
         new_G.players[new_pid] = PlayerState(
             player_id=new_pid,
             display_name=ps.display_name,
             avatar_id=ps.avatar_id,
+            permanent_id=ps.permanent_id,
         )
         new_G.players[new_pid].session_token = new_token
         migration_map[old_pid] = (new_pid, new_token)
@@ -233,12 +264,27 @@ async def rematch_game(game_id: str, body: RematchRequest, redis=Depends(_get_re
     if G.host_player_id and G.host_player_id in migration_map:
         new_G.host_player_id = migration_map[G.host_player_id][0]
 
-    await save_game(redis, new_game_id, new_G)
+    await save_game(redis, new_game_id_val, new_G)
+
+    # Record new game + players in history DB
+    db.add(DBGame(
+        game_id=new_game_id_val,
+        started_at=datetime.now(UTC),
+        player_count=len(new_G.players),
+    ))
+    for new_pid, ps in new_G.players.items():
+        if ps.permanent_id:
+            db.add(DBGamePlayer(
+                game_id=new_game_id_val,
+                permanent_id=ps.permanent_id,
+                per_game_player_id=new_pid,
+            ))
+    await db.commit()
 
     from api.connection_manager import manager
     redirect_payload = {
         "type": "redirect",
-        "new_game_id": new_game_id,
+        "new_game_id": new_game_id_val,
         "players": {
             old_pid: {
                 "new_player_id": new_pid,
@@ -255,7 +301,7 @@ async def rematch_game(game_id: str, body: RematchRequest, redis=Depends(_get_re
 
     await manager.broadcast_raw(game_id, redirect_payload)
 
-    return {"new_game_id": new_game_id, "new_host_secret": new_host_secret}
+    return {"new_game_id": new_game_id_val, "new_host_secret": new_host_secret}
 
 
 @router.post("/{game_id}/abandon")

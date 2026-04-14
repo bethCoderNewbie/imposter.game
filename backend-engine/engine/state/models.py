@@ -86,6 +86,7 @@ class PlayerState(BaseModel):
     puzzles_solved_count: int = 0       # own player only
     hints_received: list[str] = Field(default_factory=list)  # server-only
     puzzle_state: PuzzleState | None = None  # own player only; correct_index stripped before broadcast
+    permanent_id: str | None = None    # server-only: cross-game registry key, never broadcast
 
 
 class FalseHintPayload(BaseModel):

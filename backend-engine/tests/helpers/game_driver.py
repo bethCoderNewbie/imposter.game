@@ -18,6 +18,21 @@ from tests.helpers.ws_patterns import consume_until, until_phase
 
 # ── Low-level helpers ─────────────────────────────────────────────────────────
 
+def register_and_join(client, game_id: str, display_name: str) -> dict[str, str]:
+    """Register a player then join a game. Returns {player_id, session_token}."""
+    reg = client.post("/api/players/register", json={"display_name": display_name})
+    assert reg.status_code == 200, reg.text
+    permanent_id = reg.json()["permanent_id"]
+
+    r = client.post(
+        f"/api/games/{game_id}/join",
+        json={"permanent_id": permanent_id},
+    )
+    assert r.status_code == 200, r.text
+    j = r.json()
+    return {"player_id": j["player_id"], "session_token": j["session_token"]}
+
+
 def create_and_fill(client, n: int = 5) -> tuple[str, str, list[dict[str, str]]]:
     """
     Create a game and join n players.
@@ -31,13 +46,8 @@ def create_and_fill(client, n: int = 5) -> tuple[str, str, list[dict[str, str]]]
 
     players: list[dict[str, str]] = []
     for i in range(n):
-        r = client.post(
-            f"/api/games/{game_id}/join",
-            json={"display_name": f"Player{i + 1}"},
-        )
-        assert r.status_code == 200, r.text
-        j = r.json()
-        players.append({"player_id": j["player_id"], "session_token": j["session_token"]})
+        p = register_and_join(client, game_id, f"Player{i + 1}")
+        players.append(p)
 
     return game_id, host_secret, players
 

@@ -33,6 +33,7 @@ _ALWAYS_STRIP_PLAYER_FIELDS = frozenset({
     "is_framed_tonight",
     "hints_received",
     "infect_used",
+    "permanent_id",
 })
 
 _ALWAYS_STRIP_NIGHT_ACTION_FIELDS = frozenset({
