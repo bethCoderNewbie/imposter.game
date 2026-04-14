@@ -138,7 +138,25 @@ export interface MatchDataMessage {
   players: PlayerRosterEntry[]
 }
 
-export type ServerMessage = SyncMessage | UpdateMessage | MatchDataMessage | ErrorMessage
+// ── Narrator Messages (PRD-008) ───────────────────────────────────────────────
+
+export type NarratorTrigger =
+  | 'game_start' | 'night_open' | 'night_close'
+  | 'day_open'   | 'player_eliminated' | 'vote_open'
+  | 'vote_elimination' | 'wolves_win' | 'village_wins'
+  | 'hunter_revenge' | 'no_elimination'
+
+export interface NarrateMessage {
+  type: 'narrate'
+  trigger: NarratorTrigger
+  text: string
+  audio_url: string
+  duration_ms: number
+  phase: Phase
+  round: number
+}
+
+export type ServerMessage = SyncMessage | UpdateMessage | MatchDataMessage | ErrorMessage | NarrateMessage
 
 // Avatar color palette — 8 preset colors for avatar_01…avatar_08
 export const AVATAR_COLORS: Record<string, string> = {

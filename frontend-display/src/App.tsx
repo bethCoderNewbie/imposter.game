@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { useGameState } from './hooks/useGameState'
+import { useNarrator } from './hooks/useNarrator'
 import CreateMatchScreen from './components/CreateMatchScreen/CreateMatchScreen'
 import LobbyScreen from './components/LobbyScreen/LobbyScreen'
 import NightScreen from './components/NightScreen/NightScreen'
 import NightResolution from './components/NightResolution/NightResolution'
 import DayScreen from './components/DayScreen/DayScreen'
 import GameOverScreen from './components/GameOverScreen/GameOverScreen'
+import NarratorSubtitle from './components/NarratorSubtitle/NarratorSubtitle'
 import type { StrippedGameState } from './types/game'
 import './App.css'
 
@@ -39,6 +41,8 @@ export default function App() {
   // Freeze votes at the moment day_vote closes (for VoteWeb reveal-all-at-once)
   const [frozenVotes, setFrozenVotes] = useState<Record<string, string> | null>(null)
   const prevPhaseRef = useRef<string | null>(null)
+
+  const { narratorText, handleNarrate } = useNarrator()
 
   // Sync hostSecret from URL (or localStorage fallback) whenever gameId changes
   useEffect(() => {
@@ -75,6 +79,7 @@ export default function App() {
   const { gameState, status } = useGameState({
     gameId,
     playerId: 'display',
+    onNarrate: handleNarrate,
   })
 
   // PRD-003 §4 rule: substrate class set here, not inside components
@@ -109,89 +114,99 @@ export default function App() {
     setAudioUnlocked(true)
   }
 
-  // ── "Click to Begin" overlay (audio unlock + fullscreen entry) ──────────────
-  if (!audioUnlocked) {
-    return (
-      <div className="click-to-begin" onClick={handleClickToBegin}>
-        <div className="click-to-begin__content">
-          <span className="click-to-begin__icon">▶</span>
-          <p>Click to begin</p>
+  // Extract render logic into a helper so NarratorSubtitle can be mounted alongside
+  function renderContent() {
+    // ── "Click to Begin" overlay (audio unlock + fullscreen entry) ──────────────
+    if (!audioUnlocked) {
+      return (
+        <div className="click-to-begin" onClick={handleClickToBegin}>
+          <div className="click-to-begin__content">
+            <span className="click-to-begin__icon">▶</span>
+            <p>Click to begin</p>
+          </div>
         </div>
-      </div>
-    )
+      )
+    }
+
+    // ── No game ID → Create match screen ────────────────────────────────────────
+    if (!gameId) {
+      return <CreateMatchScreen onCreated={handleCreated} onResumed={handleResumed} />
+    }
+
+    // ── Night Resolution interstitial (4 s, non-skippable) ──────────────────────
+    if (showResolution && resolutionState) {
+      return (
+        <NightResolution
+          gameState={resolutionState}
+          onComplete={() => {
+            setShowResolution(false)
+            setResolutionState(null)
+            if (gameState) {
+              document.documentElement.className = PHASE_TO_CLASS[gameState.phase] ?? ''
+            }
+          }}
+        />
+      )
+    }
+
+    // ── Waiting for connection / first state broadcast ───────────────────────────
+    if (!gameState) {
+      return (
+        <div className="status-screen">
+          <p>{status === 'connecting' ? 'Connecting…' : 'Waiting for game…'}</p>
+        </div>
+      )
+    }
+
+    const { phase } = gameState
+
+    if (phase === 'lobby' || phase === 'role_deal') {
+      return (
+        <LobbyScreen
+          gameState={gameState}
+          hostSecret={hostSecret ?? undefined}
+          gameId={gameId ?? undefined}
+        />
+      )
+    }
+
+    if (phase === 'night') {
+      return <NightScreen gameState={gameState} audioUnlocked={audioUnlocked} />
+    }
+
+    if (phase === 'day' || phase === 'day_vote' || phase === 'hunter_pending') {
+      return <DayScreen gameState={gameState} frozenVotes={frozenVotes} />
+    }
+
+    if (phase === 'game_over') {
+      return (
+        <GameOverScreen
+          gameState={gameState}
+          audioUnlocked={audioUnlocked}
+          gameId={gameId}
+          hostSecret={hostSecret}
+          onPlayAgain={(newGameId, newHostSecret) => {
+            localStorage.setItem(`ww_host_${newGameId}`, newHostSecret)
+            history.pushState({}, '', `?g=${newGameId}&host_secret=${newHostSecret}`)
+            setGameId(newGameId)
+            setHostSecret(newHostSecret)
+          }}
+          onNewMatch={() => {
+            history.pushState({}, '', import.meta.env.BASE_URL)
+            setGameId(null)
+            setHostSecret(null)
+          }}
+        />
+      )
+    }
+
+    return null
   }
 
-  // ── No game ID → Create match screen ────────────────────────────────────────
-  if (!gameId) {
-    return <CreateMatchScreen onCreated={handleCreated} onResumed={handleResumed} />
-  }
-
-  // ── Night Resolution interstitial (4 s, non-skippable) ──────────────────────
-  if (showResolution && resolutionState) {
-    return (
-      <NightResolution
-        gameState={resolutionState}
-        onComplete={() => {
-          setShowResolution(false)
-          setResolutionState(null)
-          if (gameState) {
-            document.documentElement.className = PHASE_TO_CLASS[gameState.phase] ?? ''
-          }
-        }}
-      />
-    )
-  }
-
-  // ── Waiting for connection / first state broadcast ───────────────────────────
-  if (!gameState) {
-    return (
-      <div className="status-screen">
-        <p>{status === 'connecting' ? 'Connecting…' : 'Waiting for game…'}</p>
-      </div>
-    )
-  }
-
-  const { phase } = gameState
-
-  if (phase === 'lobby' || phase === 'role_deal') {
-    return (
-      <LobbyScreen
-        gameState={gameState}
-        hostSecret={hostSecret ?? undefined}
-        gameId={gameId ?? undefined}
-      />
-    )
-  }
-
-  if (phase === 'night') {
-    return <NightScreen gameState={gameState} audioUnlocked={audioUnlocked} />
-  }
-
-  if (phase === 'day' || phase === 'day_vote' || phase === 'hunter_pending') {
-    return <DayScreen gameState={gameState} frozenVotes={frozenVotes} />
-  }
-
-  if (phase === 'game_over') {
-    return (
-      <GameOverScreen
-        gameState={gameState}
-        audioUnlocked={audioUnlocked}
-        gameId={gameId}
-        hostSecret={hostSecret}
-        onPlayAgain={(newGameId, newHostSecret) => {
-          localStorage.setItem(`ww_host_${newGameId}`, newHostSecret)
-          history.pushState({}, '', `?g=${newGameId}&host_secret=${newHostSecret}`)
-          setGameId(newGameId)
-          setHostSecret(newHostSecret)
-        }}
-        onNewMatch={() => {
-          history.pushState({}, '', import.meta.env.BASE_URL)
-          setGameId(null)
-          setHostSecret(null)
-        }}
-      />
-    )
-  }
-
-  return null
+  return (
+    <>
+      {renderContent()}
+      {audioUnlocked && <NarratorSubtitle text={narratorText} />}
+    </>
+  )
 }

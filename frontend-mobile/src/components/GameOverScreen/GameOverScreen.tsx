@@ -64,7 +64,6 @@ export default function GameOverScreen({ gameState, myPlayerId }: Props) {
         </div>
       )}
 
-      <p className="game-over__waiting">Waiting for host to start a new game…</p>
     </div>
   )
 }

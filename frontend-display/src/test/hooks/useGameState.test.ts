@@ -175,6 +175,49 @@ describe('useGameState', () => {
     expect(result.current.gameState?.phase).toBe('lobby')
   })
 
+  // ── narrate message dispatch ───────────────────────────────────────────────
+
+  it('narrate message invokes onNarrate callback with the full message', () => {
+    const onNarrate = vi.fn()
+    renderHook(() =>
+      useGameState({ gameId: 'g1', playerId: 'display', onNarrate })
+    )
+    const narrateMsg = {
+      type: 'narrate',
+      trigger: 'game_start',
+      text: 'Night falls.',
+      audio_url: '/tts/audio/test.wav',
+      duration_ms: 2000,
+      phase: 'role_deal',
+      round: 1,
+    }
+    act(() => {
+      capturedOnMessage(narrateMsg)
+    })
+    expect(onNarrate).toHaveBeenCalledOnce()
+    expect(onNarrate).toHaveBeenCalledWith(narrateMsg)
+  })
+
+  it('does not throw when onNarrate is not provided and a narrate message arrives', () => {
+    renderHook(() =>
+      useGameState({ gameId: 'g1', playerId: 'display' })
+    )
+    const narrateMsg = {
+      type: 'narrate',
+      trigger: 'night_open',
+      text: 'Night falls.',
+      audio_url: '/tts/audio/night.wav',
+      duration_ms: 1500,
+      phase: 'night',
+      round: 1,
+    }
+    expect(() => {
+      act(() => {
+        capturedOnMessage(narrateMsg)
+      })
+    }).not.toThrow()
+  })
+
   it('uses wss: protocol when window.location.protocol is https:', async () => {
     const { useWebSocket } = await import('../../hooks/useWebSocket')
     Object.defineProperty(window, 'location', {

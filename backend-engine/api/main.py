@@ -1,17 +1,21 @@
 """
 FastAPI application entry point.
 Lifespan: creates/closes Redis connection pool.
-Includes lobby REST routes and WebSocket endpoint.
+Includes lobby REST routes, WebSocket endpoint, and TTS audio serving (PRD-008).
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import redis.asyncio as aioredis
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from engine.config import get_settings
 
@@ -32,8 +36,17 @@ async def lifespan(app: FastAPI):
     get_engine()  # warm the async DB connection pool
     logger.info("Postgres pool created: %s", settings.database_url)
 
+    # Start narrator audio cleanup loop if narrator is enabled
+    cleanup_task = None
+    if settings.narrator_enabled:
+        from api.narrator.tts import run_cleanup_loop
+        cleanup_task = asyncio.create_task(run_cleanup_loop())
+        logger.info("Narrator audio cleanup loop started")
+
     yield
 
+    if cleanup_task is not None:
+        cleanup_task.cancel()
     await app.state.redis.aclose()
     logger.info("Redis pool closed.")
     await get_engine().dispose()
@@ -73,6 +86,23 @@ def create_app() -> FastAPI:
     @app.get("/health", tags=["ops"])
     async def health():
         return {"status": "ok", "schema_version": settings.schema_version}
+
+    # TTS audio serving (PRD-008) — serve generated WAV files to display client
+    @app.get("/tts/audio/{filename}", tags=["narrator"])
+    async def serve_tts_audio(filename: str):
+        from api.narrator.config import get_narrator_settings
+        cfg = get_narrator_settings()
+        audio_path = Path(cfg.narrator_audio_dir) / filename
+        if not audio_path.exists() or audio_path.suffix != ".wav":
+            raise HTTPException(status_code=404, detail="Audio file not found")
+        return FileResponse(str(audio_path), media_type="audio/wav")
+
+    # Prebaked TTS static files (ADR-021) — only mounted when audio dir is populated.
+    # Distinct from /tts/audio/ (ephemeral Kokoro files); nginx /tts/ proxy covers both.
+    from api.narrator.config import get_narrator_settings as _get_ns
+    _prebaked_dir = Path(_get_ns().narrator_prebaked_dir)
+    if _prebaked_dir.exists():
+        app.mount("/tts/static", StaticFiles(directory=str(_prebaked_dir)), name="prebaked_audio")
 
     return app
 

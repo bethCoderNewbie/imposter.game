@@ -1,6 +1,6 @@
 # PRD-008: LLM Text-to-Speech Host Narrator
 
-**Status:** Draft — Revalidated 2026-04-13
+**Status:** Draft — Revalidated 2026-04-14
 **Date:** 2026-03-30
 **Schema version context:** 0.7
 **Revalidation note:** 4 inaccuracies corrected against current codebase (see §2.2, §3.1, §3.3, §3.4). Architecture confirmed feasible.
@@ -38,10 +38,12 @@ The narrator fires on **phase transitions** and **elimination events**. It does 
 | `night_close` | phase → `night_resolution` | "The village stirs. Dawn breaks cold and grey." |
 | `day_open` | phase → `day_discussion` | "Someone did not survive the night." |
 | `player_eliminated` | `EliminationEvent` appended | "John has been found dead. They were a Villager." |
-| `vote_open` | phase → `day_vote` | "It is time to cast your vote." |
+| `vote_open` | phase → `day_vote` (timeout or host manual advance) | "It is time to cast your vote." |
 | `vote_elimination` | vote resolves, player eliminated | "The village has spoken. Sarah leaves the game." |
 | `wolves_win` | `winner == "werewolf"` | "The wolves have consumed the village. Darkness wins." |
 | `village_wins` | `winner == "village"` | "The last wolf has been unmasked. The village is saved." |
+| `hunter_revenge` | Hunter fires final shot after being eliminated | "Dying, the hunter takes one last aim -- and fires!" |
+| `no_elimination` | Day vote ends in tie or no majority | "The village could not agree. The darkness smiles." |
 
 ### LLM Prompt Template
 
@@ -101,7 +103,8 @@ interface NarrateMessage {
 type NarratorTrigger =
   | "game_start" | "night_open" | "night_close"
   | "day_open"   | "player_eliminated" | "vote_open"
-  | "vote_elimination" | "wolves_win" | "village_wins";
+  | "vote_elimination" | "wolves_win" | "village_wins"
+  | "hunter_revenge" | "no_elimination";
 ```
 
 `NarrateMessage` is unicast to **Display client only**. Mobile clients do not receive it. Confirm the display player_id registration key in `backend-engine/api/ws/endpoint.py` before implementing the unicast call.

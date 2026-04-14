@@ -9,6 +9,56 @@ services:
       POSTGRES_DB: werewolf
       POSTGRES_USER: werewolf
       POSTGRES_PASSWORD: werewolf
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U werewolf -d werewolf"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  # Ollama LLM service (PRD-008) — internal only, reached by backend at http://ollama:11434
+  # GPU acceleration: applied automatically by start.sh when nvidia-smi is detected (docker-compose.gpu.yml override).
+  ollama:
+    image: ollama/ollama
+    profiles: ["llm"]
+    volumes:
+      - ollama_models:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  # One-shot init container: pulls the configured model into the shared volume on first run.
+  # Re-run manually if pull fails: docker compose run --rm ollama-pull
+  ollama-pull:
+    image: ollama/ollama
+    profiles: ["llm"]
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["ollama pull ${OLLAMA_MODEL:-llama3.2:3b}"]
+    volumes:
+      - ollama_models:/root/.ollama
+    restart: "no"
+
+  # Kokoro TTS service (PRD-008) — internal only, reached by backend at http://tts:8880
+  # GPU acceleration: applied automatically by start.sh when nvidia-smi is detected (docker-compose.gpu.yml override).
+  # Opt-in via profile: docker compose --profile tts up
+  tts:
+    image: ghcr.io/remsky/kokoro-fastapi-cpu:latest
+    container_name: kokoro-tts
+    profiles: ["tts"]
+    expose:
+      - "8880"
+    ports:
+      - "8880:8880"    # host access for prebake script and local dev
     restart: unless-stopped
 
   backend:
@@ -18,9 +68,21 @@ services:
     environment:
       REDIS_URL: redis://redis:6379
       DATABASE_URL: postgresql+asyncpg://werewolf:werewolf@postgres/werewolf
+      # Narrator settings (PRD-008) — all default to disabled; set NARRATOR_ENABLED=true to activate
+      NARRATOR_ENABLED: ${NARRATOR_ENABLED:-false}
+      NARRATOR_MODE: ${NARRATOR_MODE:-prebaked}
+      OLLAMA_URL: "http://ollama:11434"
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:3b}
+      KOKORO_URL: "http://tts:8880"
+      NARRATOR_VOICE: ${NARRATOR_VOICE:-af_bella}
     depends_on:
-      - redis
-      - postgres
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+        required: false
     restart: unless-stopped
 
   frontend-display:
@@ -51,3 +113,6 @@ services:
       - frontend-display
       - frontend-mobile
     restart: unless-stopped
+
+volumes:
+  ollama_models:   # persists downloaded models across compose restarts

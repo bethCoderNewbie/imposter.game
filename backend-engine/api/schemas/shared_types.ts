@@ -237,8 +237,26 @@ export interface HintRewardMessage {
   expires_after_round: number | null;
 }
 
+// ── Narrator Messages (PRD-008) ───────────────────────────────────────────────
+
+export type NarratorTrigger =
+  | "game_start" | "night_open" | "night_close"
+  | "day_open"   | "player_eliminated" | "vote_open"
+  | "vote_elimination" | "wolves_win" | "village_wins";
+
+/** Sent by server to display client only — unicast on phase transitions */
+export interface NarrateMessage {
+  type: "narrate";
+  trigger: NarratorTrigger;
+  text: string;           // generated narration line (for subtitle)
+  audio_url: string;      // "/tts/audio/{uuid}.wav"
+  duration_ms: number;    // WAV duration for subtitle clear timing
+  phase: Phase;
+  round: number;
+}
+
 /** Union of all server-to-client messages */
-export type ServerMessage = SyncMessage | UpdateMessage | MatchDataMessage | ErrorMessage | HintRewardMessage;
+export type ServerMessage = SyncMessage | UpdateMessage | MatchDataMessage | ErrorMessage | HintRewardMessage | NarrateMessage;
 
 // ── Intent Payloads (client → server) ────────────────────────────────────────
 

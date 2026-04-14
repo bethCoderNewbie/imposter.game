@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useWebSocket, type WsStatus } from './useWebSocket'
-import type { StrippedGameState, ServerMessage } from '../types/game'
+import type { StrippedGameState, ServerMessage, NarrateMessage } from '../types/game'
 import { useGameStore } from '../store/gameStore'
 
 interface Options {
@@ -8,9 +8,10 @@ interface Options {
   /** "display" for the TV client — no auth required. */
   playerId: string
   sessionToken?: string
+  onNarrate?: (msg: NarrateMessage) => void
 }
 
-export function useGameState({ gameId, playerId, sessionToken }: Options) {
+export function useGameState({ gameId, playerId, sessionToken, onNarrate }: Options) {
   const [gameState, setGameState] = useState<StrippedGameState | null>(null)
   const [status, setStatus] = useState<WsStatus>('closed')
   const lastStateIdRef = useRef(-1)
@@ -46,7 +47,10 @@ export function useGameState({ gameId, playerId, sessionToken }: Options) {
     if (msg.type === 'error') {
       console.warn('[WS error]', msg.code, msg.message)
     }
-  }, [])
+    if (msg.type === 'narrate') {
+      onNarrate?.(msg as NarrateMessage)
+    }
+  }, [onNarrate]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const { send } = useWebSocket({
     url,

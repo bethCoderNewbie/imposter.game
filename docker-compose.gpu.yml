@@ -1,0 +1,21 @@
+# GPU override — applied automatically by start.sh when nvidia-smi is detected.
+# Manual GPU mode: docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build
+# Manual CPU mode: docker compose -f docker-compose.yml up --build
+services:
+  ollama:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+  tts:
+    image: ghcr.io/remsky/kokoro-fastapi-gpu:latest
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

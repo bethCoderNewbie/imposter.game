@@ -530,6 +530,110 @@ const puzzle = myPlayer.puzzle_state ?? null
 
 ---
 
+## Narrator (LLM + TTS) — PRD-008
+
+The narrator pipeline is: **game event → Ollama LLM** (generates text) **→ Kokoro TTS** (synthesises WAV) **→ WebSocket `narrate` message → display browser plays audio**.
+
+All steps are fire-and-forget — failure at any stage is silent and the game continues normally.
+
+### Enabling narrator
+
+Set `NARRATOR_ENABLED=true` in `.env`. Ollama and Kokoro run as Docker Compose services; no host install is required.
+
+### Checking service health
+
+```bash
+docker compose ps ollama          # should show "healthy"
+docker compose ps tts             # should show "Up"
+docker compose logs tts | tail -5 # Kokoro: "Uvicorn running on http://0.0.0.0:8880"
+```
+
+### Confirming narrator fires in-game
+
+```bash
+docker compose logs -f backend | grep -i narr
+# Expected lines per night resolution:
+#   Narrator: trigger=night_close ...
+#   Narrator: trigger=day_open ...
+```
+
+### Symptom: Narration never fires (no `narr` lines in backend logs)
+
+1. Check `NARRATOR_ENABLED` is set to `true` in the container:
+   ```bash
+   docker compose exec backend printenv NARRATOR_ENABLED
+   ```
+2. If `false`, update `.env` and restart: `docker compose up -d backend`
+
+### Symptom: Ollama connection refused / timeout in backend logs
+
+Ollama is not healthy. Check:
+
+```bash
+docker compose ps ollama
+docker compose logs ollama | tail -20
+```
+
+If the service is up but the model hasn't been pulled yet, `ollama-pull` is still running or failed:
+
+```bash
+docker compose logs ollama-pull
+```
+
+Re-pull manually if needed:
+
+```bash
+docker compose run --rm ollama-pull
+```
+
+### Symptom: Ollama responds but narration text is empty
+
+The model may not be loaded. Verify via the Ollama API from inside the backend container:
+
+```bash
+docker compose exec backend python -c "
+import urllib.request, json
+r = urllib.request.urlopen('http://ollama:11434/api/tags', timeout=3)
+print([m['name'] for m in json.loads(r.read()).get('models', [])])
+"
+```
+
+If `llama3.2:3b` is not listed, re-run the pull service.
+
+### Symptom: Subtitle appears but no audio plays
+
+The LLM and TTS steps succeeded (subtitle = text from LLM, cleared after `duration_ms`), but the browser couldn't play the audio. Check:
+
+1. **Autoplay lock** — host must have clicked "Click to Begin" on the display before any narration fires.
+2. **Audio URL reachable** — open `http://<LAN-IP>/tts/audio/<any>.wav` in the display browser; should return a WAV file (not 404).
+3. **Kokoro health** — `docker compose logs tts | grep -i error`
+
+### GPU vs CPU narrator services
+
+`start.sh` auto-detects GPU via `nvidia-smi` and applies `docker-compose.gpu.yml` when found. CPU is the default — no manual changes needed.
+
+To force GPU mode manually:
+```bash
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build
+```
+
+To force CPU mode on a GPU host:
+```bash
+docker compose -f docker-compose.yml up --build
+```
+
+CPU inference is slower (~10–30 s per narration vs ~2–5 s on GPU).
+
+### Clearing the model volume (forces re-download)
+
+```bash
+docker compose down
+docker volume rm imposter_ollama_models
+docker compose up -d
+```
+
+---
+
 ## Deployment (Docker Compose)
 
 ### Start all services
@@ -617,3 +721,63 @@ Environment variables (see `.env.example`):
 | `ROLE_DEAL_TIMER_SECONDS` | `30` | Role reveal timer |
 | `HUNTER_PENDING_TIMER_SECONDS` | `30` | Hunter revenge window |
 | `DEBUG` | `false` | Enable debug logging |
+| `NARRATOR_ENABLED` | `false` | Enable LLM+TTS narration (PRD-008) |
+| `NARRATOR_MODE` | `auto` | `auto` \| `live` \| `static` \| `prebaked` |
+| `NARRATOR_PREBAKED_DIR` | (package `audio/`) | Path to pre-baked WAV directory |
+| `OLLAMA_URL` | `http://ollama:11434` | Ollama service URL (Docker Compose internal) |
+| `OLLAMA_MODEL` | `llama3.2:3b` | Model used for narration text generation |
+| `KOKORO_URL` | `http://tts:8880` | Kokoro TTS service URL (Docker Compose internal) |
+| `NARRATOR_VOICE` | `af_bella` | Kokoro voice ID |
+
+---
+
+## Narrator — Prebaked Mode (CPU, no external services)
+
+Serves pre-generated WAV files from `backend-engine/api/narrator/audio/` instead of calling
+Ollama or Kokoro at runtime. See ADR-021 for design rationale.
+
+### Enabling
+
+```bash
+NARRATOR_ENABLED=true
+NARRATOR_MODE=prebaked
+docker compose up   # no --profile tts needed
+```
+
+### Generating audio (developer, one-time)
+
+Fish-Speech must be installed; GPU recommended for speed.
+
+```bash
+pip install fish-speech   # or: pip install -e /path/to/fish-speech
+python scripts/prebake_tts.py
+git add backend-engine/api/narrator/audio/
+git commit -m "feat(narrator): add pre-baked Rickman-voice audio files"
+```
+
+Naming convention: `{trigger_id}_{index:02d}.wav` → `game_start_00.wav` … `village_wins_19.wav`
+Total: 180 files (9 triggers × 20 lines). Estimated size: ~150–200 MB.
+
+### Symptom: audio silent, subtitle shows
+
+1. Check files are present:
+   ```bash
+   docker compose exec backend ls /app/api/narrator/audio/ | head
+   # → empty: WAVs not committed; run prebake script then recommit
+   ```
+2. Check static route responds:
+   ```bash
+   curl -I http://localhost:8000/tts/static/game_start_00.wav
+   # → 404: backend started before audio/ dir existed; restart backend
+   ```
+3. Confirm mode:
+   ```bash
+   docker compose exec backend printenv NARRATOR_MODE
+   # → should print "prebaked"
+   ```
+
+### Note: audio says "a player", subtitle shows real name
+
+Intentional — see ADR-021. Dynamic triggers (`vote_elimination`, `player_eliminated`) were baked
+with `"a player"` substituted for `{eliminated_name}`. The subtitle text uses the real player name
+drawn from the DB preset at runtime.
