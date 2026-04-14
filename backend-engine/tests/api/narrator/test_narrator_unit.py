@@ -258,6 +258,12 @@ class TestNarratorPipeline:
             "api.narrator.triggers.generate_narration",
             AsyncMock(return_value=""),
         )
+        # Also mock the DB fallback so the test doesn't need a real DB connection.
+        # With narrator_mode="auto" (default), an empty LLM result triggers the DB path.
+        monkeypatch.setattr(
+            "api.narrator.triggers.get_preset_script",
+            AsyncMock(return_value=""),
+        )
         monkeypatch.setattr("api.narrator.triggers.synthesize", synthesize_mock)
 
         await narrate("night_close", G, cm, "test-game-1")

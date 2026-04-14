@@ -5,6 +5,7 @@ WORKDIR /app
 # pyproject.toml is at the project root; backend-engine/ is the package source.
 # Build context must be the project root (set in docker-compose.yml).
 COPY pyproject.toml ./
+COPY alembic.ini ./
 COPY backend-engine/ ./backend-engine/
 COPY docs/architecture/roles.json ./docs/architecture/roles.json
 COPY puzzles.md ./puzzles.md

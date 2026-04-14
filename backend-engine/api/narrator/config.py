@@ -13,6 +13,7 @@ class NarratorSettings(BaseSettings):
     narrator_voice: str = "af_bella"
     narrator_audio_dir: str = "/tmp/narr_audio"
     narrator_audio_ttl_s: int = 300
+    narrator_mode: str = "auto"   # "auto" | "live" | "static"
 
 
 @lru_cache

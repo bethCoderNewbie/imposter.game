@@ -1,12 +1,19 @@
 """
-Tests that verify narrate() is triggered at the correct handler call sites.
+Tests that verify narrate() / narrate_sequence() is triggered at the correct
+handler call sites.
 
-Pattern:
-  1. Mock narrate as AsyncMock so create_task captures it synchronously.
+Pattern for single-narrate sites (game_start, night_open, vote_open):
+  1. Mock `narrate` as AsyncMock — create_task records the call synchronously.
   2. Enable narrator via monkeypatching get_settings.
   3. Dispatch the relevant intent.
-  4. await asyncio.sleep(0) so the event loop runs any scheduled tasks.
+  4. await asyncio.sleep(0) to let the event loop run scheduled tasks.
   5. Assert mock_narrate was called with the expected trigger_id.
+
+Pattern for narrate_sequence sites (night_close+day_open, vote_elimination, etc.):
+  1. Install a _SeqSpy coroutine that records the specs list explicitly.
+  2. Enable narrator via monkeypatching get_settings.
+  3. Dispatch and sleep.
+  4. Assert the expected trigger_ids appear in the captured specs.
 
 asyncio_mode = "auto" (see pyproject.toml) — no @pytest.mark.asyncio needed.
 """
@@ -51,9 +58,14 @@ async def _dispatch(G, intent):
     return await dispatch_intent(G, intent, _redis, _cm)
 
 
-def _narrator_settings():
+def _narrator_enabled():
     """SimpleNamespace that looks like Settings with narrator_enabled=True."""
     return SimpleNamespace(narrator_enabled=True)
+
+
+def _narrator_disabled():
+    """SimpleNamespace that looks like Settings with narrator_enabled=False."""
+    return SimpleNamespace(narrator_enabled=False)
 
 
 def _make_small_game(host_id: str, players_dict: dict, phase: Phase):
@@ -68,15 +80,49 @@ def _make_small_game(host_id: str, players_dict: dict, phase: Phase):
     return G
 
 
+class _SeqSpy:
+    """
+    Async spy for narrate_sequence that records the specs list on each call.
+    Used instead of AsyncMock because create_task + call_args has subtle
+    timing issues with the args-capture in this codebase's test harness.
+    """
+
+    def __init__(self):
+        self.calls: list[list] = []
+
+    async def __call__(self, specs, G, cm, game_id):
+        # Take a snapshot of the list so late mutations don't affect assertion
+        self.calls.append(list(specs))
+
+    @property
+    def called(self) -> bool:
+        return bool(self.calls)
+
+    @property
+    def call_count(self) -> int:
+        return len(self.calls)
+
+    def all_trigger_ids(self) -> list[str]:
+        """Flatten all trigger_ids across all calls."""
+        return [t for call in self.calls for t, _, _ in call]
+
+    def specs_for_call(self, call_index: int = 0) -> list:
+        return self.calls[call_index]
+
+
 # ── narrator disabled ─────────────────────────────────────────────────────────
 
 
 class TestNarratorDisabled:
     async def test_narrator_disabled_no_task_created(self, monkeypatch):
-        """With narrator_enabled=False (default), no narrate task is ever created."""
+        """With narrator_enabled=False, no narrate task is ever created."""
         mock_narrate = AsyncMock()
+        mock_seq = _SeqSpy()
         monkeypatch.setattr("api.intents.handlers.narrate", mock_narrate)
-        # Do NOT override get_settings → narrator_enabled=False by default
+        monkeypatch.setattr("api.intents.handlers.narrate_sequence", mock_seq)
+        # Explicitly set narrator_enabled=False — do NOT rely on the environment
+        # default because the container may have NARRATOR_ENABLED=true exported.
+        monkeypatch.setattr("api.intents.handlers.get_settings", _narrator_disabled)
 
         G, _ = _eight_player_game()
         G = G.model_copy(deep=True)
@@ -89,6 +135,7 @@ class TestNarratorDisabled:
         await asyncio.sleep(0)
 
         mock_narrate.assert_not_called()
+        assert not mock_seq.called
 
 
 # ── narrator trigger sites ────────────────────────────────────────────────────
@@ -99,7 +146,7 @@ class TestNarratorTriggers:
         """handle_start_game fires narrate('game_start') when narrator is enabled."""
         mock_narrate = AsyncMock()
         monkeypatch.setattr("api.intents.handlers.narrate", mock_narrate)
-        monkeypatch.setattr("api.intents.handlers.get_settings", _narrator_settings)
+        monkeypatch.setattr("api.intents.handlers.get_settings", _narrator_enabled)
 
         G, _ = _eight_player_game()
         G = G.model_copy(deep=True)
@@ -118,7 +165,7 @@ class TestNarratorTriggers:
         """Confirming the last role reveal fires narrate('night_open')."""
         mock_narrate = AsyncMock()
         monkeypatch.setattr("api.intents.handlers.narrate", mock_narrate)
-        monkeypatch.setattr("api.intents.handlers.get_settings", _narrator_settings)
+        monkeypatch.setattr("api.intents.handlers.get_settings", _narrator_enabled)
 
         G, _ = _eight_player_game()
         G = G.model_copy(deep=True)
@@ -137,10 +184,10 @@ class TestNarratorTriggers:
         assert mock_narrate.call_args[0][0] == "night_open"
 
     async def test_night_close_on_night_timeout(self, monkeypatch):
-        """handle_phase_timeout for NIGHT fires narrate('night_close')."""
-        mock_narrate = AsyncMock()
-        monkeypatch.setattr("api.intents.handlers.narrate", mock_narrate)
-        monkeypatch.setattr("api.intents.handlers.get_settings", _narrator_settings)
+        """handle_phase_timeout for NIGHT fires narrate_sequence with night_close + day_open."""
+        spy = _SeqSpy()
+        monkeypatch.setattr("api.intents.handlers.narrate_sequence", spy)
+        monkeypatch.setattr("api.intents.handlers.get_settings", _narrator_enabled)
 
         G, _ = _eight_player_game()
         G = G.model_copy(deep=True)
@@ -149,14 +196,16 @@ class TestNarratorTriggers:
         await _dispatch(G, {"type": "phase_timeout", "phase": G.phase})
         await asyncio.sleep(0)
 
-        triggers_fired = [call[0][0] for call in mock_narrate.call_args_list]
-        assert "night_close" in triggers_fired
+        assert spy.called, "narrate_sequence was not called for night timeout"
+        trigger_ids = spy.all_trigger_ids()
+        assert "night_close" in trigger_ids
+        assert "day_open" in trigger_ids
 
     async def test_player_eliminated_on_night_timeout_with_kill(self, monkeypatch):
-        """When a wolf kills during night timeout, narrate('player_eliminated') fires too."""
-        mock_narrate = AsyncMock()
-        monkeypatch.setattr("api.intents.handlers.narrate", mock_narrate)
-        monkeypatch.setattr("api.intents.handlers.get_settings", _narrator_settings)
+        """When a wolf kills during night timeout, specs include player_eliminated."""
+        spy = _SeqSpy()
+        monkeypatch.setattr("api.intents.handlers.narrate_sequence", spy)
+        monkeypatch.setattr("api.intents.handlers.get_settings", _narrator_enabled)
 
         G, _ = _eight_player_game()
         G = G.model_copy(deep=True)
@@ -166,19 +215,20 @@ class TestNarratorTriggers:
         await _dispatch(G, {"type": "phase_timeout", "phase": G.phase})
         await asyncio.sleep(0)
 
-        triggers_fired = [call[0][0] for call in mock_narrate.call_args_list]
-        assert "night_close" in triggers_fired
-        assert "player_eliminated" in triggers_fired
+        assert spy.called, "narrate_sequence was not called for night timeout with kill"
+        specs = spy.specs_for_call(0)
+        trigger_ids = [t for t, _, _ in specs]
+        assert "night_close" in trigger_ids
+        assert "player_eliminated" in trigger_ids
 
-        # Verify eliminated_name is passed for player_eliminated
-        elim_call = next(c for c in mock_narrate.call_args_list if c[0][0] == "player_eliminated")
-        assert elim_call[1].get("eliminated_name") == "Villager1"
+        elim_spec = next(s for s in specs if s[0] == "player_eliminated")
+        assert elim_spec[1] == "Villager1"
 
     async def test_vote_open_on_day_timeout(self, monkeypatch):
         """handle_phase_timeout for DAY fires narrate('vote_open')."""
         mock_narrate = AsyncMock()
         monkeypatch.setattr("api.intents.handlers.narrate", mock_narrate)
-        monkeypatch.setattr("api.intents.handlers.get_settings", _narrator_settings)
+        monkeypatch.setattr("api.intents.handlers.get_settings", _narrator_enabled)
 
         G, _ = _eight_player_game()
         G = G.model_copy(deep=True)
@@ -191,10 +241,10 @@ class TestNarratorTriggers:
         assert mock_narrate.call_args[0][0] == "vote_open"
 
     async def test_vote_elimination_on_day_vote(self, monkeypatch):
-        """Submitting the last day vote that causes elimination fires narrate('vote_elimination')."""
-        mock_narrate = AsyncMock()
-        monkeypatch.setattr("api.intents.handlers.narrate", mock_narrate)
-        monkeypatch.setattr("api.intents.handlers.get_settings", _narrator_settings)
+        """Submitting the last day vote fires narrate_sequence with vote_elimination."""
+        spy = _SeqSpy()
+        monkeypatch.setattr("api.intents.handlers.narrate_sequence", spy)
+        monkeypatch.setattr("api.intents.handlers.get_settings", _narrator_enabled)
 
         # 4-player game: 1 wolf + 3 villagers; 3 pre-votes for p4 (Villager3)
         players = {
@@ -213,17 +263,19 @@ class TestNarratorTriggers:
         await _dispatch(G, {"type": "submit_day_vote", "player_id": "p4", "target_id": "p1"})
         await asyncio.sleep(0)
 
-        triggers_fired = [call[0][0] for call in mock_narrate.call_args_list]
-        assert "vote_elimination" in triggers_fired
+        assert spy.called, "narrate_sequence was not called after vote elimination"
+        specs = spy.specs_for_call(0)
+        trigger_ids = [t for t, _, _ in specs]
+        assert "vote_elimination" in trigger_ids
 
-        elim_call = next(c for c in mock_narrate.call_args_list if c[0][0] == "vote_elimination")
-        assert elim_call[1].get("eliminated_name") == "Villager3"
+        elim_spec = next(s for s in specs if s[0] == "vote_elimination")
+        assert elim_spec[1] == "Villager3"
 
     async def test_village_wins_on_vote(self, monkeypatch):
-        """Voting out the last wolf fires narrate('village_wins')."""
-        mock_narrate = AsyncMock()
-        monkeypatch.setattr("api.intents.handlers.narrate", mock_narrate)
-        monkeypatch.setattr("api.intents.handlers.get_settings", _narrator_settings)
+        """Voting out the last wolf fires narrate_sequence with village_wins."""
+        spy = _SeqSpy()
+        monkeypatch.setattr("api.intents.handlers.narrate_sequence", spy)
+        monkeypatch.setattr("api.intents.handlers.get_settings", _narrator_enabled)
 
         # 3-player game: 1 wolf + 2 villagers; villagers have pre-voted for wolf
         players = {
@@ -241,14 +293,15 @@ class TestNarratorTriggers:
         await _dispatch(G, {"type": "submit_day_vote", "player_id": "p1", "target_id": "p2"})
         await asyncio.sleep(0)
 
-        triggers_fired = [call[0][0] for call in mock_narrate.call_args_list]
-        assert "village_wins" in triggers_fired
+        assert spy.called, "narrate_sequence was not called after village wins"
+        trigger_ids = spy.all_trigger_ids()
+        assert "village_wins" in trigger_ids
 
     async def test_wolves_win_on_vote(self, monkeypatch):
-        """Voting out the last villager fires narrate('wolves_win')."""
-        mock_narrate = AsyncMock()
-        monkeypatch.setattr("api.intents.handlers.narrate", mock_narrate)
-        monkeypatch.setattr("api.intents.handlers.get_settings", _narrator_settings)
+        """Voting out the last villager fires narrate_sequence with wolves_win."""
+        spy = _SeqSpy()
+        monkeypatch.setattr("api.intents.handlers.narrate_sequence", spy)
+        monkeypatch.setattr("api.intents.handlers.get_settings", _narrator_enabled)
 
         # 3-player game: 2 wolves + 1 villager; wolves pre-voted for villager
         players = {
@@ -266,5 +319,6 @@ class TestNarratorTriggers:
         await _dispatch(G, {"type": "submit_day_vote", "player_id": "p3", "target_id": "p1"})
         await asyncio.sleep(0)
 
-        triggers_fired = [call[0][0] for call in mock_narrate.call_args_list]
-        assert "wolves_win" in triggers_fired
+        assert spy.called, "narrate_sequence was not called after wolves win"
+        trigger_ids = spy.all_trigger_ids()
+        assert "wolves_win" in trigger_ids

@@ -10,6 +10,7 @@ from sqlalchemy import (
     Integer,
     SmallInteger,
     String,
+    Text,
     TIMESTAMP,
     UniqueConstraint,
 )
@@ -56,3 +57,12 @@ class DBGamePlayer(Base):
     outcome: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
     __table_args__ = (UniqueConstraint("game_id", "permanent_id"),)
+
+
+class NarratorScript(Base):
+    """Pre-seeded narration lines used as fallback when Ollama is unavailable."""
+    __tablename__ = "narrator_scripts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    trigger_id: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    text: Mapped[str] = mapped_column(Text, nullable=False)

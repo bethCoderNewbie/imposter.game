@@ -1,6 +1,6 @@
 #!/bin/sh
 set -e
-cd /app/backend-engine
+cd /app
 echo "Running database migrations..."
 alembic upgrade head
 echo "Migrations complete. Starting server..."

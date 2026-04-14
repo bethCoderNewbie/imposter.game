@@ -9,6 +9,12 @@ services:
       POSTGRES_DB: werewolf
       POSTGRES_USER: werewolf
       POSTGRES_PASSWORD: werewolf
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U werewolf -d werewolf"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
     restart: unless-stopped
 
   # Ollama LLM service (PRD-008) — internal only, reached by backend at http://ollama:11434
@@ -71,15 +77,20 @@ services:
       DATABASE_URL: postgresql+asyncpg://werewolf:werewolf@postgres/werewolf
       # Narrator settings (PRD-008) — all default to disabled; set NARRATOR_ENABLED=true to activate
       NARRATOR_ENABLED: ${NARRATOR_ENABLED:-false}
+      NARRATOR_MODE: ${NARRATOR_MODE:-auto}
       OLLAMA_URL: "http://ollama:11434"
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:3b}
       KOKORO_URL: "http://tts:8880"
       NARRATOR_VOICE: ${NARRATOR_VOICE:-af_bella}
     depends_on:
-      - redis
-      - postgres
-      - tts
-      - ollama
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      tts:
+        condition: service_started
+      ollama:
+        condition: service_started
     restart: unless-stopped
 
   frontend-display:
