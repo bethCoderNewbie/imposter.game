@@ -31,6 +31,7 @@ const DEFAULT_CONFIG: GameConfig = {
   player_count: 8,
   roles: { werewolf: 2, villager: 4, seer: 1, doctor: 1 },
   difficulty_level: 'standard',
+  narrator_voice: '',
 }
 
 const DEFAULT_NIGHT_ACTIONS: NightActions = {
