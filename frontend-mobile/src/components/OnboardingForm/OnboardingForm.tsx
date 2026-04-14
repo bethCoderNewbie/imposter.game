@@ -58,14 +58,28 @@ export default function OnboardingForm({ prefillCode, permanentId, onJoined }: P
         }
         const regData = (await reg.json()) as { permanent_id: string }
         pid = regData.permanent_id
-      } else if (name.trim() !== '') {
-        // Returning player may have edited their name — persist the change
-        await fetch(`/api/players/${pid}`, {
+      } else {
+        // Returning player: update name and verify the permanent_id still exists in DB.
+        // If 404, the stored ID is stale (DB reset / new deployment) — re-register fresh.
+        const update = await fetch(`/api/players/${pid}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ display_name: name.trim() }),
         })
-        // Non-fatal: join proceeds even if name update fails
+        if (update.status === 404) {
+          const reg = await fetch('/api/players/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ display_name: name.trim() }),
+          })
+          if (!reg.ok) {
+            setError('Could not register your name. Try again.')
+            return
+          }
+          const regData = (await reg.json()) as { permanent_id: string }
+          pid = regData.permanent_id
+        }
+        // Other non-404 errors on name update are non-fatal — join proceeds
       }
 
       const res = await fetch(`/api/games/${code.trim()}/join`, {
