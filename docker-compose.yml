@@ -11,6 +11,42 @@ services:
       POSTGRES_PASSWORD: werewolf
     restart: unless-stopped
 
+  # Ollama LLM service (PRD-008) — internal only, reached by backend at http://ollama:11434
+  # GPU: requires NVIDIA Container Toolkit. For CPU-only, remove the deploy.resources block.
+  ollama:
+    image: ollama/ollama
+    volumes:
+      - ollama_models:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  # One-shot init container: pulls the configured model into the shared volume on first run.
+  # Re-run manually if pull fails: docker compose run --rm ollama-pull
+  ollama-pull:
+    image: ollama/ollama
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["ollama pull ${OLLAMA_MODEL:-llama3.2:3b}"]
+    volumes:
+      - ollama_models:/root/.ollama
+    restart: "no"
+
   # Kokoro TTS service (PRD-008) — internal only, reached by backend at http://tts:8880
   tts:
     image: ghcr.io/remsky/kokoro-fastapi-gpu:latest
@@ -35,16 +71,15 @@ services:
       DATABASE_URL: postgresql+asyncpg://werewolf:werewolf@postgres/werewolf
       # Narrator settings (PRD-008) — all default to disabled; set NARRATOR_ENABLED=true to activate
       NARRATOR_ENABLED: ${NARRATOR_ENABLED:-false}
-      OLLAMA_URL: "http://host.docker.internal:11434"
+      OLLAMA_URL: "http://ollama:11434"
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:3b}
       KOKORO_URL: "http://tts:8880"
       NARRATOR_VOICE: ${NARRATOR_VOICE:-af_bella}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"   # reach Ollama running on the host
     depends_on:
       - redis
       - postgres
       - tts
+      - ollama
     restart: unless-stopped
 
   frontend-display:
@@ -75,3 +110,6 @@ services:
       - frontend-display
       - frontend-mobile
     restart: unless-stopped
+
+volumes:
+  ollama_models:   # persists downloaded models across compose restarts

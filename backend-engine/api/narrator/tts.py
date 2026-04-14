@@ -44,9 +44,14 @@ async def synthesize(text: str) -> tuple[str, int]:
         resp.raise_for_status()
         file_path.write_bytes(resp.content)
 
-    # Compute duration from WAV headers using stdlib
+    # Compute duration from actual file size rather than the WAV nframes header field.
+    # Kokoro writes 0xFFFFFFFF into nframes (streaming WAV) so the header value is
+    # unreliable; deriving from (data bytes / bytes-per-frame) is always correct.
     with wave.open(str(file_path)) as wf:
-        duration_ms = int(wf.getnframes() / wf.getframerate() * 1000)
+        framerate = wf.getframerate()
+        bytes_per_frame = wf.getnchannels() * wf.getsampwidth()
+    data_bytes = file_path.stat().st_size - 44  # 44-byte standard PCM WAV header
+    duration_ms = int(max(data_bytes, 0) / bytes_per_frame / framerate * 1000)
 
     return f"/tts/audio/{file_id}.wav", duration_ms
 

@@ -276,6 +276,7 @@ async def handle_submit_night_action(G, intent, redis_client, cm) -> MasterGameS
             G = transition_phase(G, Phase.DAY)
             if get_settings().narrator_enabled:
                 asyncio.create_task(narrate("night_close", G, cm, G.game_id))
+                asyncio.create_task(narrate("day_open", G, cm, G.game_id))
                 if len(G.elimination_log) > elim_count_before:
                     last_elim = G.elimination_log[-1]
                     elim_player = G.players.get(last_elim.player_id)
@@ -425,6 +426,7 @@ async def handle_phase_timeout(G, intent, redis_client, cm) -> MasterGameState:
             G = transition_phase(G, Phase.DAY)
             if get_settings().narrator_enabled:
                 asyncio.create_task(narrate("night_close", G, cm, G.game_id))
+                asyncio.create_task(narrate("day_open", G, cm, G.game_id))
                 if len(G.elimination_log) > elim_count_before:
                     last_elim = G.elimination_log[-1]
                     elim_player = G.players.get(last_elim.player_id)
