@@ -54,9 +54,10 @@ class TestDisplayClientConnection:
         assert "host_secret" not in state_json
 
     def test_display_state_shows_joined_players(self, client):
+        from tests.helpers.game_driver import register_and_join
         game_id = client.post("/api/games", json={}).json()["game_id"]
-        client.post(f"/api/games/{game_id}/join", json={"display_name": "Alice"})
-        client.post(f"/api/games/{game_id}/join", json={"display_name": "Bob"})
+        register_and_join(client, game_id, "Alice")
+        register_and_join(client, game_id, "Bob")
         with client.websocket_connect(f"/ws/{game_id}/display") as ws:
             msg = ws.receive_json()
         assert len(msg["state"]["players"]) == 2
@@ -92,8 +93,9 @@ class TestPlayerAuthentication:
         assert msg["code"] == "AUTH_FAILED"
 
     def test_player_valid_token_receives_initial_state(self, client):
+        from tests.helpers.game_driver import register_and_join
         game_id = client.post("/api/games", json={}).json()["game_id"]
-        join_data = client.post(f"/api/games/{game_id}/join", json={"display_name": "Alice"}).json()
+        join_data = register_and_join(client, game_id, "Alice")
         player_id = join_data["player_id"]
         token = join_data["session_token"]
 
@@ -105,9 +107,10 @@ class TestPlayerAuthentication:
 
     def test_player_token_wrong_game_receives_auth_error(self, client):
         """A token for game A cannot be used to connect to game B — server returns AUTH_FAILED."""
+        from tests.helpers.game_driver import register_and_join
         game_a = client.post("/api/games", json={}).json()["game_id"]
         game_b = client.post("/api/games", json={}).json()["game_id"]
-        join_data = client.post(f"/api/games/{game_a}/join", json={"display_name": "Alice"}).json()
+        join_data = register_and_join(client, game_a, "Alice")
         player_id = join_data["player_id"]
         token = join_data["session_token"]
 
@@ -122,31 +125,29 @@ class TestPlayerAuthentication:
 class TestJoinBroadcast:
     def test_display_receives_update_when_player_joins(self, client):
         """Joining a player should broadcast a state update to the connected display."""
+        from tests.helpers.game_driver import register_and_join
         game_id = client.post("/api/games", json={}).json()["game_id"]
 
         with client.websocket_connect(f"/ws/{game_id}/display") as ws:
-            # Consume the initial state
             initial = ws.receive_json()
             assert len(initial["state"]["players"]) == 0
 
-            # Join a player via REST — triggers broadcast
-            client.post(f"/api/games/{game_id}/join", json={"display_name": "Alice"})
+            register_and_join(client, game_id, "Alice")
 
-            # Display should receive the updated state
             updated = ws.receive_json()
             assert updated["type"] == "update"
             assert len(updated["state"]["players"]) == 1
 
     def test_display_receives_match_data_when_player_joins(self, client):
         """Joining a player broadcasts a match_data roster event to the display."""
+        from tests.helpers.game_driver import register_and_join
         game_id = client.post("/api/games", json={}).json()["game_id"]
 
         with client.websocket_connect(f"/ws/{game_id}/display") as ws:
             ws.receive_json()  # consume sync
 
-            client.post(f"/api/games/{game_id}/join", json={"display_name": "Alice"})
+            register_and_join(client, game_id, "Alice")
 
-            # update arrives first (full state), then match_data (roster)
             update_msg = ws.receive_json()
             assert update_msg["type"] == "update"
 

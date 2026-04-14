@@ -460,7 +460,10 @@ async def handle_phase_timeout(G, intent, redis_client, cm) -> MasterGameState:
         hunter_id = G.hunter_queue[0] if G.hunter_queue else None
         if hunter_id:
             G = resolve_hunter_timeout(G, hunter_id)
-        if G.phase not in (Phase.GAME_OVER, Phase.HUNTER_PENDING):
+        # resolve_hunter_timeout never changes phase away from HUNTER_PENDING;
+        # only check_win_condition can flip it to GAME_OVER. So we must explicitly
+        # transition when the queue is drained and game is still ongoing.
+        if G.phase == Phase.HUNTER_PENDING and not G.hunter_queue:
             G = transition_phase(G, Phase.DAY)
 
     from api.game_queue import get_or_create_queue

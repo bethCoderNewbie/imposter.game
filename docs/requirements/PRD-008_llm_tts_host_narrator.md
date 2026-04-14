@@ -1,8 +1,9 @@
 # PRD-008: LLM Text-to-Speech Host Narrator
 
-**Status:** Draft
+**Status:** Draft — Revalidated 2026-04-13
 **Date:** 2026-03-30
 **Schema version context:** 0.7
+**Revalidation note:** 4 inaccuracies corrected against current codebase (see §2.2, §3.1, §3.3, §3.4). Architecture confirmed feasible.
 
 ---
 
@@ -71,16 +72,29 @@ The backend calls Ollama's `/api/generate` endpoint (HTTP, non-streaming for sim
 
 ### New WebSocket Message Type: `NarrateMessage`
 
-Added to `backend-engine/api/schemas/shared_types.ts`:
+**Backend (Python):** Add as a `TypedDict` or Pydantic model in `backend-engine/engine/state/models.py` (alongside existing event models). The backend has no shared TypeScript schema file — all message types are plain Python dicts dispatched via `ConnectionManager`.
+
+```python
+class NarratePayload(TypedDict):
+    type: Literal["narrate"]
+    trigger: str          # NarratorTrigger literal
+    text: str             # generated narration text (for subtitle display)
+    audio_url: str        # "/tts/audio/abc123.wav" (Option A) or absolute tunnel URL (Option B)
+    duration_ms: int      # audio length for subtitle timing / client auto-advance
+    phase: str            # current game phase when triggered
+    round: int
+```
+
+**Frontend (TypeScript):** Add a TS interface in `frontend-display/src/types/narrator.ts` for type safety:
 
 ```typescript
 interface NarrateMessage {
   type: "narrate";
-  trigger: NarratorTrigger;       // enum of trigger IDs above
-  text: string;                   // generated narration text (for subtitle display)
-  audio_url: string;              // "/tts/audio/abc123.wav" (Option A) or absolute tunnel URL (Option B)
-  duration_ms: number;            // audio length for subtitle timing / client auto-advance
-  phase: Phase;                   // current game phase when triggered
+  trigger: NarratorTrigger;
+  text: string;
+  audio_url: string;
+  duration_ms: number;
+  phase: string;
   round: number;
 }
 
@@ -90,7 +104,7 @@ type NarratorTrigger =
   | "vote_elimination" | "wolves_win" | "village_wins";
 ```
 
-`NarrateMessage` is unicast to **Display client only** (`player_id == "display"`). Mobile clients do not receive it.
+`NarrateMessage` is unicast to **Display client only**. Mobile clients do not receive it. Confirm the display player_id registration key in `backend-engine/api/ws/endpoint.py` before implementing the unicast call.
 
 ### New TTS Service REST Contract
 
@@ -122,7 +136,9 @@ Audio files are ephemeral (TTL 5 min, cleaned by background task).
 | `narrator/triggers.py` | Maps game event → trigger ID → calls llm + tts → returns `NarratePayload`. |
 | `narrator/config.py` | `OLLAMA_URL`, `OLLAMA_MODEL`, `TTS_SERVICE_URL`, `NARRATOR_ENABLED` env vars. |
 
-**Integration point:** `backend-engine/api/intents/handlers.py`. After each state mutation matching a trigger, call `narrator/triggers.py` as a fire-and-forget `asyncio.create_task(...)`. On completion, call `connection_manager.send_to_display(game_id, narrate_payload)`.
+**Integration point:** `backend-engine/api/intents/handlers.py`. After each state mutation matching a trigger, call `narrator/triggers.py` as a fire-and-forget `asyncio.create_task(...)`. On completion, call `cm.unicast(game_id, <display_player_id>, narrate_payload)`.
+
+> **Note:** `ConnectionManager` has no `send_to_display()` method. The actual methods are `unicast(game_id, player_id, payload)`, `broadcast(game_id, G)`, and `broadcast_raw(game_id, payload)`. Either add a `send_to_display()` convenience wrapper to `ConnectionManager`, or call `cm.unicast()` directly. Confirm the display player_id key (`None` or `"display"`) by reading `backend-engine/api/ws/endpoint.py` first.
 
 **Key invariant:** Narration never blocks state mutation. If TTS or LLM fails, the game continues silently.
 
@@ -144,7 +160,7 @@ Isolated container so Kokoro model weights load once and stay in memory. Exposed
 ```typescript
 // Fires on "narrate" WS message
 const useNarrator = () => {
-  // 1. Play audio via <audio> element (audio context already unlocked by App.tsx:97-104 gesture)
+  // 1. Play audio via <audio> element (audio context already unlocked by App.tsx:96-111 gesture)
   // 2. Show subtitle overlay for duration_ms
   // 3. Dispatch to gameStore: set narratorText, clear after duration
 }
@@ -231,11 +247,13 @@ No changes. Mobile phones do not play or display narration.
 
 | File | Change |
 |---|---|
-| `frontend-display/src/hooks/useWebSocket.ts` | Replace hardcoded `ws://${HOST_IP}/ws/` with `import.meta.env.VITE_WS_URL` |
-| `frontend-mobile/src/hooks/useWebSocket.ts` | Same env var refactor |
+| `frontend-display/src/screens/LobbyScreen.tsx` | Replace build-time `HOST_IP` bake-in in QR code join URL with `import.meta.env.VITE_PUBLIC_BASE_URL` |
+| `frontend-mobile/src/screens/LobbyScreen.tsx` | Same env var refactor for join URL |
 | `backend-engine/engine/config.py` | Add `PUBLIC_BASE_URL` setting for absolute audio URL construction |
 | `start.sh` | Add `cloudflared` startup instructions / optional auto-launch |
-| Vercel project config | Set `VITE_WS_URL=wss://werewolf.yourdomain.com/ws` per deployment |
+| Vercel project config | Set `VITE_PUBLIC_BASE_URL=https://werewolf.yourdomain.com` per deployment |
+
+> **Note:** The WebSocket URL in both frontends is **already dynamic** via `window.location.host` (built at runtime in `useGameState.ts`, not `useWebSocket.ts`). No WS URL change is needed for Option B — it resolves correctly through the Cloudflare Tunnel automatically.
 
 **Player UX:** Scan a Vercel QR code instead of a LAN QR code. Otherwise identical.
 

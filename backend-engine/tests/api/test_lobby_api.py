@@ -1,6 +1,6 @@
 """
 Integration tests for lobby REST endpoints.
-Uses FastAPI TestClient + fakeredis — no real Redis or WebSocket server required.
+Uses FastAPI TestClient + fakeredis + in-memory SQLite — no real services required.
 
 Markers: pytest.mark.integration
 """
@@ -8,6 +8,13 @@ Markers: pytest.mark.integration
 from __future__ import annotations
 
 import pytest
+
+from tests.helpers.game_driver import register_and_join
+
+
+def _reg(client, name: str) -> str:
+    """Register a player and return their permanent_id."""
+    return client.post("/api/players/register", json={"display_name": name}).json()["permanent_id"]
 
 
 @pytest.mark.integration
@@ -36,60 +43,95 @@ class TestCreateGame:
 class TestJoinGame:
     def test_join_returns_200(self, client):
         game_id = client.post("/api/games", json={}).json()["game_id"]
-        resp = client.post(f"/api/games/{game_id}/join", json={"display_name": "Alice"})
+        resp = client.post(f"/api/games/{game_id}/join", json={"permanent_id": _reg(client, "Alice")})
         assert resp.status_code == 200
 
     def test_join_response_contains_required_fields(self, client):
         game_id = client.post("/api/games", json={}).json()["game_id"]
-        data = client.post(f"/api/games/{game_id}/join", json={"display_name": "Alice"}).json()
+        data = client.post(f"/api/games/{game_id}/join", json={"permanent_id": _reg(client, "Alice")}).json()
         assert "game_id" in data
         assert "player_id" in data
         assert "session_token" in data
 
     def test_join_returns_game_id_matching_request(self, client):
         game_id = client.post("/api/games", json={}).json()["game_id"]
-        data = client.post(f"/api/games/{game_id}/join", json={"display_name": "Alice"}).json()
+        data = client.post(f"/api/games/{game_id}/join", json={"permanent_id": _reg(client, "Alice")}).json()
         assert data["game_id"] == game_id
 
     def test_each_player_gets_unique_id(self, client):
         game_id = client.post("/api/games", json={}).json()["game_id"]
-        p1 = client.post(f"/api/games/{game_id}/join", json={"display_name": "Alice"}).json()
-        p2 = client.post(f"/api/games/{game_id}/join", json={"display_name": "Bob"}).json()
+        p1 = client.post(f"/api/games/{game_id}/join", json={"permanent_id": _reg(client, "Alice")}).json()
+        p2 = client.post(f"/api/games/{game_id}/join", json={"permanent_id": _reg(client, "Bob")}).json()
         assert p1["player_id"] != p2["player_id"]
 
     def test_join_nonexistent_game_returns_404(self, client):
-        resp = client.post("/api/games/NOPE99/join", json={"display_name": "Alice"})
+        resp = client.post("/api/games/NOPE/join", json={"permanent_id": _reg(client, "Alice")})
+        assert resp.status_code == 404
+
+    def test_join_with_unknown_permanent_id_returns_404(self, client):
+        game_id = client.post("/api/games", json={}).json()["game_id"]
+        resp = client.post(f"/api/games/{game_id}/join", json={"permanent_id": "00000000-0000-0000-0000-000000000000"})
         assert resp.status_code == 404
 
     def test_join_full_lobby_returns_409(self, client):
         game_id = client.post("/api/games", json={}).json()["game_id"]
-        # Join 16 players (max capacity)
         for i in range(16):
-            client.post(f"/api/games/{game_id}/join", json={"display_name": f"P{i}"})
-        # 17th player should be rejected
-        resp = client.post(f"/api/games/{game_id}/join", json={"display_name": "TooMany"})
+            register_and_join(client, game_id, f"P{i}")
+        resp = client.post(f"/api/games/{game_id}/join", json={"permanent_id": _reg(client, "TooMany")})
         assert resp.status_code == 409
 
-    def test_display_name_too_long_returns_422(self, client):
-        game_id = client.post("/api/games", json={}).json()["game_id"]
-        resp = client.post(f"/api/games/{game_id}/join", json={"display_name": "A" * 17})
+
+@pytest.mark.integration
+class TestPlayerRegistry:
+    def test_register_returns_200(self, client):
+        resp = client.post("/api/players/register", json={"display_name": "Alice"})
+        assert resp.status_code == 200
+
+    def test_register_returns_permanent_id_and_name(self, client):
+        data = client.post("/api/players/register", json={"display_name": "Alice"}).json()
+        assert "permanent_id" in data
+        assert data["display_name"] == "Alice"
+
+    def test_register_name_too_long_returns_422(self, client):
+        resp = client.post("/api/players/register", json={"display_name": "A" * 17})
         assert resp.status_code == 422
 
-    def test_empty_display_name_returns_422(self, client):
-        game_id = client.post("/api/games", json={}).json()["game_id"]
-        resp = client.post(f"/api/games/{game_id}/join", json={"display_name": ""})
+    def test_register_empty_name_returns_422(self, client):
+        resp = client.post("/api/players/register", json={"display_name": ""})
         assert resp.status_code == 422
+
+    def test_get_player_returns_name(self, client):
+        pid = _reg(client, "Bob")
+        data = client.get(f"/api/players/{pid}").json()
+        assert data["display_name"] == "Bob"
+
+    def test_get_unknown_player_returns_404(self, client):
+        resp = client.get("/api/players/00000000-0000-0000-0000-000000000000")
+        assert resp.status_code == 404
+
+    def test_update_name_returns_new_name(self, client):
+        pid = _reg(client, "OldName")
+        data = client.put(f"/api/players/{pid}", json={"display_name": "NewName"}).json()
+        assert data["display_name"] == "NewName"
+
+    def test_update_name_persists_on_get(self, client):
+        pid = _reg(client, "Before")
+        client.put(f"/api/players/{pid}", json={"display_name": "After"})
+        assert client.get(f"/api/players/{pid}").json()["display_name"] == "After"
+
+    def test_update_unknown_player_returns_404(self, client):
+        resp = client.put("/api/players/00000000-0000-0000-0000-000000000000", json={"display_name": "X"})
+        assert resp.status_code == 404
 
 
 @pytest.mark.integration
 class TestStartGame:
     def _create_and_fill(self, client, n: int = 5):
-        """Helper: create a game and join n players. Returns (game_id, host_secret)."""
         create_data = client.post("/api/games", json={}).json()
         game_id = create_data["game_id"]
         host_secret = create_data["host_secret"]
         for i in range(n):
-            client.post(f"/api/games/{game_id}/join", json={"display_name": f"P{i}"})
+            register_and_join(client, game_id, f"P{i}")
         return game_id, host_secret
 
     def test_start_with_correct_secret_returns_200(self, client):
@@ -111,21 +153,18 @@ class TestStartGame:
         create_data = client.post("/api/games", json={}).json()
         game_id = create_data["game_id"]
         host_secret = create_data["host_secret"]
-        # Only join 3 players (need 5)
         for i in range(3):
-            client.post(f"/api/games/{game_id}/join", json={"display_name": f"P{i}"})
+            register_and_join(client, game_id, f"P{i}")
         resp = client.post(f"/api/games/{game_id}/start", json={"host_secret": host_secret})
         assert resp.status_code == 409
 
     def test_start_with_no_players_returns_409(self, client):
         create_data = client.post("/api/games", json={}).json()
-        game_id = create_data["game_id"]
-        host_secret = create_data["host_secret"]
-        resp = client.post(f"/api/games/{game_id}/start", json={"host_secret": host_secret})
+        resp = client.post(f"/api/games/{create_data['game_id']}/start", json={"host_secret": create_data["host_secret"]})
         assert resp.status_code == 409
 
     def test_start_nonexistent_game_returns_404(self, client):
-        resp = client.post("/api/games/NOPE99/start", json={"host_secret": "any"})
+        resp = client.post("/api/games/NOPE/start", json={"host_secret": "any"})
         assert resp.status_code == 404
 
 
@@ -133,13 +172,13 @@ class TestStartGame:
 class TestRejoinGame:
     def test_rejoin_with_valid_token_returns_200(self, client):
         game_id = client.post("/api/games", json={}).json()["game_id"]
-        token = client.post(f"/api/games/{game_id}/join", json={"display_name": "Alice"}).json()["session_token"]
+        token = register_and_join(client, game_id, "Alice")["session_token"]
         resp = client.post(f"/api/games/{game_id}/rejoin", json={"session_token": token})
         assert resp.status_code == 200
 
     def test_rejoin_returns_same_player_id(self, client):
         game_id = client.post("/api/games", json={}).json()["game_id"]
-        join_data = client.post(f"/api/games/{game_id}/join", json={"display_name": "Alice"}).json()
+        join_data = register_and_join(client, game_id, "Alice")
         rejoin_data = client.post(f"/api/games/{game_id}/rejoin", json={"session_token": join_data["session_token"]}).json()
         assert rejoin_data["player_id"] == join_data["player_id"]
 
@@ -151,8 +190,7 @@ class TestRejoinGame:
     def test_rejoin_with_wrong_game_id_returns_401(self, client):
         game_id = client.post("/api/games", json={}).json()["game_id"]
         other_game_id = client.post("/api/games", json={}).json()["game_id"]
-        token = client.post(f"/api/games/{game_id}/join", json={"display_name": "Alice"}).json()["session_token"]
-        # Use the token on the wrong game
+        token = register_and_join(client, game_id, "Alice")["session_token"]
         resp = client.post(f"/api/games/{other_game_id}/rejoin", json={"session_token": token})
         assert resp.status_code == 401
 

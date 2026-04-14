@@ -31,6 +31,10 @@ async def lifespan(app: FastAPI):
     )
     logger.info("Redis pool created: %s", settings.redis_url)
 
+    from storage.db import get_engine
+    get_engine()  # warm the async DB connection pool
+    logger.info("Postgres pool created: %s", settings.database_url)
+
     # Start narrator audio cleanup loop if narrator is enabled
     cleanup_task = None
     if settings.narrator_enabled:
@@ -44,6 +48,8 @@ async def lifespan(app: FastAPI):
         cleanup_task.cancel()
     await app.state.redis.aclose()
     logger.info("Redis pool closed.")
+    await get_engine().dispose()
+    logger.info("Postgres pool closed.")
 
 
 def create_app() -> FastAPI:
@@ -69,9 +75,11 @@ def create_app() -> FastAPI:
 
     # Routers
     from api.lobby.routes import router as lobby_router
+    from api.players.routes import router as players_router
     from api.ws.endpoint import router as ws_router
 
     app.include_router(lobby_router)
+    app.include_router(players_router)
     app.include_router(ws_router)
 
     @app.get("/health", tags=["ops"])

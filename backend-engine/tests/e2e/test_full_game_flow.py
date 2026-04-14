@@ -20,12 +20,9 @@ def _create_game(client):
 
 
 def _join_players(client, game_id: str, n: int) -> list[dict]:
-    """Helper: join n players and return list of {player_id, session_token}."""
-    players = []
-    for i in range(n):
-        data = client.post(f"/api/games/{game_id}/join", json={"display_name": f"Player{i}"}).json()
-        players.append({"player_id": data["player_id"], "session_token": data["session_token"]})
-    return players
+    """Helper: register and join n players. Returns list of {player_id, session_token}."""
+    from tests.helpers.game_driver import register_and_join
+    return [register_and_join(client, game_id, f"Player{i}") for i in range(n)]
 
 
 @pytest.mark.e2e
@@ -51,8 +48,9 @@ class TestLobbyFlow:
         assert resp.status_code == 409
 
     def test_rejoin_preserves_player(self, e2e_client):
+        from tests.helpers.game_driver import register_and_join
         game_id, _ = _create_game(e2e_client)
-        join_data = e2e_client.post(f"/api/games/{game_id}/join", json={"display_name": "Alice"}).json()
+        join_data = register_and_join(e2e_client, game_id, "Alice")
         player_id = join_data["player_id"]
         token = join_data["session_token"]
 
@@ -83,15 +81,17 @@ class TestWebSocketLobbyBroadcast:
             assert len(initial["state"]["players"]) == 0
 
             # Join a player — triggers lobby broadcast
-            e2e_client.post(f"/api/games/{game_id}/join", json={"display_name": "Bob"})
+            from tests.helpers.game_driver import register_and_join
+            register_and_join(e2e_client, game_id, "Bob")
 
             updated = ws.receive_json()
             assert updated["state"]["phase"] == "lobby"
             assert len(updated["state"]["players"]) == 1
 
     def test_player_ws_receives_initial_state_after_auth(self, e2e_client):
+        from tests.helpers.game_driver import register_and_join
         game_id, _ = _create_game(e2e_client)
-        join_data = e2e_client.post(f"/api/games/{game_id}/join", json={"display_name": "Alice"}).json()
+        join_data = register_and_join(e2e_client, game_id, "Alice")
         player_id = join_data["player_id"]
         token = join_data["session_token"]
 

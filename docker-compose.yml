@@ -3,6 +3,14 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
 
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: werewolf
+      POSTGRES_USER: werewolf
+      POSTGRES_PASSWORD: werewolf
+    restart: unless-stopped
+
   # Kokoro TTS service (PRD-008) — internal only, reached by backend at http://tts:8880
   tts:
     image: ghcr.io/remsky/kokoro-fastapi-gpu:latest
@@ -24,6 +32,7 @@ services:
       dockerfile: ./backend-engine/Dockerfile
     environment:
       REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql+asyncpg://werewolf:werewolf@postgres/werewolf
       # Narrator settings (PRD-008) — all default to disabled; set NARRATOR_ENABLED=true to activate
       NARRATOR_ENABLED: ${NARRATOR_ENABLED:-false}
       OLLAMA_URL: "http://host.docker.internal:11434"
@@ -34,6 +43,7 @@ services:
       - "host.docker.internal:host-gateway"   # reach Ollama running on the host
     depends_on:
       - redis
+      - postgres
       - tts
     restart: unless-stopped
 
