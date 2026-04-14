@@ -16,6 +16,7 @@ interface Props {
 }
 
 const AVATAR_IDS = Object.keys(AVATAR_COLORS) // avatar_01 … avatar_08
+const PERMANENT_ID_KEY = 'ww_permanent_id'
 
 export default function OnboardingForm({ prefillCode, permanentId, onJoined }: Props) {
   const [name, setName] = useState('')
@@ -24,13 +25,27 @@ export default function OnboardingForm({ prefillCode, permanentId, onJoined }: P
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // If the player has a permanent_id, fetch their registered name to pre-fill.
+  // resolvedPermanentId is only set if the GET confirms the player exists in the DB.
+  // A stale localStorage entry (e.g. after a DB wipe) keeps permanentId non-null
+  // but resolvedPermanentId stays null, forcing the register path.
+  const [resolvedPermanentId, setResolvedPermanentId] = useState<string | null>(null)
+
   useEffect(() => {
     if (!permanentId) return
     fetch(`/api/players/${permanentId}`)
-      .then(r => (r.ok ? r.json() : null))
+      .then(r => {
+        if (r.ok) return r.json()
+        if (r.status === 404) {
+          // Stale permanent_id — not in DB. Clear it so the register path runs.
+          localStorage.removeItem(PERMANENT_ID_KEY)
+        }
+        return null
+      })
       .then((data: { display_name: string } | null) => {
-        if (data) setName(data.display_name)
+        if (data) {
+          setName(data.display_name)
+          setResolvedPermanentId(permanentId)
+        }
       })
       .catch(() => {})
   }, [permanentId])
@@ -43,10 +58,10 @@ export default function OnboardingForm({ prefillCode, permanentId, onJoined }: P
     setError(null)
 
     try {
-      let pid = permanentId
+      let pid = resolvedPermanentId
 
       if (!pid) {
-        // First-time player: register their name
+        // First-time player (or stale ID was cleared): register their name
         const reg = await fetch('/api/players/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -58,14 +73,29 @@ export default function OnboardingForm({ prefillCode, permanentId, onJoined }: P
         }
         const regData = (await reg.json()) as { permanent_id: string }
         pid = regData.permanent_id
-      } else if (name.trim() !== '') {
+      } else {
         // Returning player may have edited their name — persist the change
-        await fetch(`/api/players/${pid}`, {
+        const putRes = await fetch(`/api/players/${pid}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ display_name: name.trim() }),
         })
-        // Non-fatal: join proceeds even if name update fails
+        if (putRes.status === 404) {
+          // ID became stale (e.g. DB rebuilt) — clear and re-register
+          localStorage.removeItem(PERMANENT_ID_KEY)
+          const reg = await fetch('/api/players/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ display_name: name.trim() }),
+          })
+          if (!reg.ok) {
+            setError('Could not register your name. Try again.')
+            return
+          }
+          const regData = (await reg.json()) as { permanent_id: string }
+          pid = regData.permanent_id
+        }
+        // Other PUT errors (5xx, network) are non-fatal — proceed with existing ID
       }
 
       const res = await fetch(`/api/games/${code.trim()}/join`, {
