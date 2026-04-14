@@ -48,11 +48,15 @@ services:
 
   # Kokoro TTS service (PRD-008) — internal only, reached by backend at http://tts:8880
   # GPU acceleration: applied automatically by start.sh when nvidia-smi is detected (docker-compose.gpu.yml override).
+  # Opt-in via profile: docker compose --profile tts up
   tts:
     image: ghcr.io/remsky/kokoro-fastapi-cpu:latest
     container_name: kokoro-tts
+    profiles: ["tts"]
     expose:
-      - "8880"      # internal Docker network only; no host port exposed
+      - "8880"
+    ports:
+      - "8880:8880"    # host access for prebake script and local dev
     restart: unless-stopped
 
   backend:
@@ -74,9 +78,6 @@ services:
         condition: service_started
       postgres:
         condition: service_healthy
-      tts:
-        condition: service_started
-        required: false
       ollama:
         condition: service_started
         required: false
