@@ -1,24 +1,17 @@
 import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import GameOverScreen from '../../components/GameOverScreen/GameOverScreen'
 import { makeGameState, makePlayer, makeElimination } from '../fixtures'
 
 describe('GameOverScreen', () => {
-  const onPlayAgain = vi.fn()
-
-  beforeEach(() => {
-    onPlayAgain.mockReset()
-  })
-
   it('shows "Village Wins!" when winner is village', () => {
     const gameState = makeGameState({ winner: 'village' })
-    render(<GameOverScreen gameState={gameState} myPlayerId="p1" onPlayAgain={onPlayAgain} />)
+    render(<GameOverScreen gameState={gameState} myPlayerId="p1" />)
     expect(screen.getByRole('heading', { name: 'Village Wins!' })).toBeInTheDocument()
   })
 
   it('shows "Wolves Win!" when winner is werewolf', () => {
     const gameState = makeGameState({ winner: 'werewolf' })
-    render(<GameOverScreen gameState={gameState} myPlayerId="p1" onPlayAgain={onPlayAgain} />)
+    render(<GameOverScreen gameState={gameState} myPlayerId="p1" />)
     expect(screen.getByRole('heading', { name: 'Wolves Win!' })).toBeInTheDocument()
   })
 
@@ -30,7 +23,7 @@ describe('GameOverScreen', () => {
         p1: makePlayer({ player_id: 'p1', display_name: 'Jester', is_alive: false }),
       },
     })
-    render(<GameOverScreen gameState={gameState} myPlayerId="p1" onPlayAgain={onPlayAgain} />)
+    render(<GameOverScreen gameState={gameState} myPlayerId="p1" />)
     expect(screen.getByRole('heading', { name: 'Jester Wins!' })).toBeInTheDocument()
   })
 
@@ -39,7 +32,7 @@ describe('GameOverScreen', () => {
       winner: 'neutral',
       winner_player_id: 'unknown-id',
     })
-    render(<GameOverScreen gameState={gameState} myPlayerId="p1" onPlayAgain={onPlayAgain} />)
+    render(<GameOverScreen gameState={gameState} myPlayerId="p1" />)
     expect(screen.getByRole('heading', { name: 'Neutral Wins!' })).toBeInTheDocument()
   })
 
@@ -51,7 +44,7 @@ describe('GameOverScreen', () => {
       },
       winner: 'village',
     })
-    render(<GameOverScreen gameState={gameState} myPlayerId="p1" onPlayAgain={onPlayAgain} />)
+    render(<GameOverScreen gameState={gameState} myPlayerId="p1" />)
     expect(screen.getByText('Alice')).toBeInTheDocument()
     expect(screen.getByText('Bob')).toBeInTheDocument()
   })
@@ -63,16 +56,8 @@ describe('GameOverScreen', () => {
         makeElimination({ round: 1, player_id: 'p2', cause: 'wolf_kill' }),
       ],
     })
-    render(<GameOverScreen gameState={gameState} myPlayerId="p1" onPlayAgain={onPlayAgain} />)
+    render(<GameOverScreen gameState={gameState} myPlayerId="p1" />)
     expect(screen.getByText('R1')).toBeInTheDocument()
     expect(screen.getByText('Killed by wolves')).toBeInTheDocument()
-  })
-
-  it('"Play Again" button triggers onPlayAgain callback', async () => {
-    const user = userEvent.setup()
-    const gameState = makeGameState({ winner: 'village' })
-    render(<GameOverScreen gameState={gameState} myPlayerId="p1" onPlayAgain={onPlayAgain} />)
-    await user.click(screen.getByRole('button', { name: 'Play Again' }))
-    expect(onPlayAgain).toHaveBeenCalledOnce()
   })
 })
