@@ -49,6 +49,7 @@ class GameConfig(BaseModel):
     player_count: int
     roles: dict[str, int]  # role_id -> count
     difficulty_level: DifficultyLevel = DifficultyLevel.STANDARD
+    narrator_voice: str = "uncle_fu"  # subdir under api/narrator/audio/
 
 
 class PuzzleState(BaseModel):

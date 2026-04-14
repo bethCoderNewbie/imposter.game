@@ -310,6 +310,152 @@ redis-cli --scan --pattern "wolf:*" | xargs redis-cli DEL
 
 ---
 
+## Database Management (Postgres + Alembic)
+
+### Check current migration state
+
+```bash
+docker compose exec postgres psql -U werewolf -d werewolf \
+  -c "SELECT version_num FROM alembic_version;"
+```
+
+Expected output on a fully migrated DB:
+
+```
+    version_num
+--------------------
+ c3d4e5f6a7b8
+(1 row)
+```
+
+If the table does not exist yet, no migrations have been run (see "Apply pending migrations" below).
+
+### Migration chain
+
+```
+04bbb7370b42 → a1b2c3d4e5f6 → b2c3d4e5f6a7 → c3d4e5f6a7b8
+initial         narrator_scripts  reseed          hunter+no_elim
+```
+
+### Apply pending migrations (upgrade to head)
+
+Run from the project root while the `postgres` container is healthy:
+
+```bash
+docker compose run --rm \
+  -e DATABASE_URL=postgresql+asyncpg://werewolf:werewolf@postgres/werewolf \
+  backend alembic upgrade head
+```
+
+Or, if the backend service is already running:
+
+```bash
+docker compose exec backend alembic upgrade head
+```
+
+### Full dev reset — wipe all data and re-seed
+
+Use when you want a completely clean database (clears player registry, game history, and
+narrator_scripts, then re-seeds via migrations):
+
+```bash
+# 1. Drop and recreate the public schema (removes all tables + alembic_version)
+docker compose exec postgres psql -U werewolf -d werewolf \
+  -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public AUTHORIZATION werewolf;"
+
+# 2. Re-run all migrations to head (recreates tables + seeds narrator_scripts)
+docker compose run --rm \
+  -e DATABASE_URL=postgresql+asyncpg://werewolf:werewolf@postgres/werewolf \
+  backend alembic upgrade head
+```
+
+### Verify after reset
+
+```bash
+# Confirm revision is at head
+docker compose exec postgres psql -U werewolf -d werewolf \
+  -c "SELECT version_num FROM alembic_version;"
+# → c3d4e5f6a7b8
+
+# Confirm narrator_scripts is seeded (11 trigger types)
+docker compose exec postgres psql -U werewolf -d werewolf \
+  -c "SELECT trigger_id, COUNT(*) FROM narrator_scripts GROUP BY trigger_id ORDER BY trigger_id;"
+
+# Confirm data tables are empty
+docker compose exec postgres psql -U werewolf -d werewolf \
+  -c "SELECT COUNT(*) FROM players; SELECT COUNT(*) FROM games;"
+# → 0, 0
+```
+
+### Narrator Scripts: data model and sync
+
+`narrator_scripts` stores the subtitle text for every pre-baked narrator audio clip.
+It does **not** store file paths; paths are computed at runtime.
+
+| Column       | Type        | Description                                      |
+|--------------|-------------|--------------------------------------------------|
+| `id`         | Integer PK  | Auto-increment; determines subtitle index         |
+| `trigger_id` | String(32)  | Event type (e.g. `game_start`, `vote_open`)       |
+| `text`       | Text        | Script line; may contain `{eliminated_name}` placeholder |
+
+**Index contract:** `pick_prebaked()` selects `game_start_07.wav` and derives index `7`.
+`get_preset_script(trigger_id, index=7)` then fetches the 8th row (0-based) from
+`SELECT … WHERE trigger_id='game_start' ORDER BY id`. The WAV suffix and the DB row order
+**must stay in sync** — the `b2c3d4e5f6a7` reseed migration preserves this by doing
+`DELETE` + `bulk_insert` in the exact same order as the pre-baked files were generated.
+
+#### Expected row counts after full migration (head = c3d4e5f6a7b8)
+
+```bash
+docker compose exec postgres psql -U werewolf -d werewolf \
+  -c "SELECT trigger_id, COUNT(*) FROM narrator_scripts GROUP BY trigger_id ORDER BY trigger_id;"
+```
+
+Expected output:
+
+```
+    trigger_id     | count
+-------------------+-------
+ day_open          |    40
+ game_start        |    32
+ hunter_revenge    |    20
+ night_close       |    32
+ night_open        |    30
+ no_elimination    |    20
+ player_eliminated |    33
+ village_wins      |    21
+ vote_elimination  |    20
+ vote_open         |    33
+ wolves_win        |    20
+(11 rows)
+```
+
+Any deviation — wrong count, missing trigger_id, or extra row — means the table is out of sync.
+
+#### Symptom: subtitle shown does not match what is being played
+
+Cause: `narrator_scripts` row counts or order do not match the pre-baked WAV files in
+`backend-engine/api/narrator/audio/<voice>/`.
+
+Fix: **Full dev reset** (see "Full dev reset" above). This is the only supported path because
+`b2c3d4e5f6a7`'s `downgrade()` is a no-op — running `alembic downgrade` then `upgrade head`
+will **not** reseed the table; use the DROP SCHEMA approach instead.
+
+### Symptom: alembic_version table does not exist
+
+The DB has never been migrated. Run `alembic upgrade head` (see above).
+
+### Symptom: version_num does not match current head
+
+One or more migrations are pending. Run `alembic upgrade head` to apply them.
+
+### Note: narrator_voice does not require a migration
+
+`narrator_voice` is a field on `GameConfig` which is stored in Redis, not Postgres.
+Adding or changing it requires no Alembic migration.
+
+---
+
 ## Match Lifecycle (Step by Step)
 
 1. **Display TV** opens `POST /api/games` → receives `game_id`, `host_player_id`, `session_token`
@@ -723,7 +869,7 @@ Environment variables (see `.env.example`):
 | `DEBUG` | `false` | Enable debug logging |
 | `NARRATOR_ENABLED` | `false` | Enable LLM+TTS narration (PRD-008) |
 | `NARRATOR_MODE` | `auto` | `auto` \| `live` \| `static` \| `prebaked` |
-| `NARRATOR_PREBAKED_DIR` | (package `audio/`) | Path to pre-baked WAV directory |
+| `NARRATOR_PREBAKED_DIR` | (package `audio/`) | Base path for pre-baked WAV directories. Voice subdirectory (`kokoro/`, `cosyvoice-marvin/`, …) is selected per-game via `GameConfig.narrator_voice`. |
 | `OLLAMA_URL` | `http://ollama:11434` | Ollama service URL (Docker Compose internal) |
 | `OLLAMA_MODEL` | `llama3.2:3b` | Model used for narration text generation |
 | `KOKORO_URL` | `http://tts:8880` | Kokoro TTS service URL (Docker Compose internal) |
@@ -781,3 +927,17 @@ Total: 180 files (9 triggers × 20 lines). Estimated size: ~150–200 MB.
 Intentional — see ADR-021. Dynamic triggers (`vote_elimination`, `player_eliminated`) were baked
 with `"a player"` substituted for `{eliminated_name}`. The subtitle text uses the real player name
 drawn from the DB preset at runtime.
+
+### Symptom: Display client plays wrong voice or gets silent narrator after host changed voice
+
+**Cause:** `narrator_voice` set to a directory with no WAV files, or a directory name typo.
+**Fix:** `PATCH /api/games/{id}/config` with a valid voice name — must match a populated subdir
+under `api/narrator/audio/`. Available voices: any directory produced by `scripts/prebake_tts.py`
+(e.g. `"kokoro"`, `"cosyvoice-marvin"`).
+
+```bash
+curl -X PATCH http://localhost:8000/api/games/{game_id}/config \
+  -H "Content-Type: application/json" \
+  -d '{"host_secret":"...","narrator_voice":"cosyvoice-marvin"}'
+# Returns 400 if the subdir does not exist or contains no WAVs.
+```

@@ -23,6 +23,7 @@ export interface GameConfig {
   player_count: number
   roles: Record<string, number>
   difficulty_level: DifficultyLevel
+  narrator_voice: string
 }
 
 export interface PlayerState {

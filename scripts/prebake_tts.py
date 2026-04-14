@@ -8,13 +8,18 @@ Commit:   git add backend-engine/api/narrator/audio/ && git commit
 
 GPU recommended for generation speed; not needed at runtime (serves static files).
 
+docker compose -f /home/beth/work/ml/games/models/voice/fish-speech/docker-compose.yml up -d --build
+docker compose -f /home/beth/work/ml/games/models/voice/cosyvoice/docker-compose.yml up -d
+
 Model defaults (all expose OpenAI-compatible /v1/audio/speech):
   kokoro      http://localhost:8014  voice=af_bella      model_id=kokoro
   chatterbox  http://localhost:8012  voice=default       model_id=tts-1
   fish-speech http://localhost:8081  voice=rickman_clean_raw  model_id=fish-speech
   openedai    http://localhost:8010  voice=alloy         model_id=tts-1
   dia         http://localhost:8013  voice=default       model_id=tts-1
-  qwen3       http://localhost:8016  voice=default       model_id=tts-1
+  qwen3       http://localhost:8016  voice=uncle_fu       model_id=tts-1
+             supported voices: aiden, dylan, eric, ono_anna, ryan, serena, sohee, uncle_fu, vivian
+  cosyvoice   http://localhost:8015  voice=7c95bbd303fd (marvin)  model_id=tts-1
 
 Note: the imposter's bundled kokoro container runs on 8880, not 8014.
 Use --url http://localhost:8880/v1/audio/speech when using that container.
@@ -47,7 +52,8 @@ _MODELS: dict[str, dict] = {
     "fish-speech": {"port": 8081, "voice": "rickman_clean_raw", "model_id": "fish-speech"},
     "openedai":    {"port": 8010, "voice": "alloy",             "model_id": "tts-1"},
     "dia":         {"port": 8013, "voice": "default",           "model_id": "tts-1"},
-    "qwen3":       {"port": 8016, "voice": "default",           "model_id": "tts-1"},
+    "qwen3":       {"port": 8016, "voice": "uncle_fu",           "model_id": "tts-1"},
+    "cosyvoice":   {"port": 8015, "voice": "7c95bbd303fd",       "model_id": "tts-1"},  # marvin
 }
 
 # ---------------------------------------------------------------------------
@@ -158,9 +164,9 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--model",
-        default="kokoro",
+        default="qwen3",
         choices=list(_MODELS),
-        help="TTS model to use (default: kokoro).",
+        help="TTS model to use (default: qwen3).",
     )
     parser.add_argument(
         "--url",

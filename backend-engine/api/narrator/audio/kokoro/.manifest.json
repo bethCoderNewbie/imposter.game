@@ -1,0 +1,8 @@
+{
+  "model": "kokoro",
+  "url": "http://localhost:8014/v1/audio/speech",
+  "voice": "af_bella",
+  "seed_hash": "133d50590cad",
+  "generated_at": "2026-04-14T16:39:01",
+  "file_count": 301
+}

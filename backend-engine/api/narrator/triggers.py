@@ -49,7 +49,7 @@ async def narrate(
             # Pick WAV first to get the shared index, then fetch the matching subtitle row.
             # Audio: pre-baked WAV uses "a player" (generic — see ADR-021).
             # Text: DB row at the same index so subtitle matches what is spoken.
-            audio_url, duration_ms, idx = await pick_prebaked(trigger_id)
+            audio_url, duration_ms, idx = await pick_prebaked(trigger_id, voice=G.config.narrator_voice)
             text = await get_preset_script(trigger_id, eliminated_name, index=idx)
             if not text:
                 return 0
