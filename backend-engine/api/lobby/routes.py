@@ -52,6 +52,7 @@ class ConfigUpdateRequest(BaseModel):
     night_timer_seconds: int | None = None
     day_timer_seconds: int | None = None
     vote_timer_seconds: int | None = None
+    narrator_voice: str | None = None
 
 
 def _get_redis(request: Request):
@@ -221,6 +222,13 @@ async def update_game_config(game_id: str, body: ConfigUpdateRequest, redis=Depe
         if val is not None and not (lo <= val <= hi):
             raise HTTPException(status_code=422, detail=f"{field} must be {lo}–{hi}.")
 
+    if body.narrator_voice is not None:
+        from pathlib import Path
+        from api.narrator.config import get_narrator_settings as _ns
+        candidate_dir = Path(_ns().narrator_prebaked_dir) / body.narrator_voice
+        if not candidate_dir.exists() or not any(candidate_dir.glob("*.wav")):
+            raise HTTPException(status_code=400, detail=f"No prebaked audio for voice '{body.narrator_voice}'")
+
     G = G.model_copy(deep=True)
     updates: dict = {}
     if body.difficulty_level is not None:
@@ -229,6 +237,8 @@ async def update_game_config(game_id: str, body: ConfigUpdateRequest, redis=Depe
         val = getattr(body, field)
         if val is not None:
             updates[field] = val
+    if body.narrator_voice is not None:
+        updates["narrator_voice"] = body.narrator_voice
 
     G.config = G.config.model_copy(update=updates)
     await save_game(redis, game_id, G)

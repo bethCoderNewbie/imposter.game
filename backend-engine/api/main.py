@@ -104,6 +104,16 @@ def create_app() -> FastAPI:
     if _prebaked_dir.exists():
         app.mount("/tts/static", StaticFiles(directory=str(_prebaked_dir)), name="prebaked_audio")
 
+    @app.get("/api/narrator/voices", tags=["narrator"])
+    async def list_narrator_voices():
+        """Return sorted list of available prebaked voice IDs."""
+        prebaked = Path(_get_ns().narrator_prebaked_dir)
+        voices = sorted(
+            d.name for d in prebaked.iterdir()
+            if d.is_dir() and any(d.glob("*.wav"))
+        )
+        return {"voices": voices}
+
     return app
 
 

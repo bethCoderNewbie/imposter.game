@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { GameConfig, DifficultyLevel } from '../../types/game'
 import {
   formatSeconds,
@@ -6,6 +6,7 @@ import {
   TIMER_STEPS,
   TIMER_BOUNDS,
   TIMER_LABELS,
+  voiceLabel,
 } from './config'
 import './LobbyConfigPanel.css'
 
@@ -17,6 +18,14 @@ interface Props {
 
 export default function LobbyConfigPanel({ config, hostSecret, gameId }: Props) {
   const [isPatching, setIsPatching] = useState(false)
+  const [voices, setVoices] = useState<string[]>([])
+
+  useEffect(() => {
+    fetch('/api/narrator/voices')
+      .then(r => r.json())
+      .then(data => setVoices(data.voices ?? []))
+      .catch(() => {})
+  }, [])
 
   async function patch(updates: Record<string, unknown>) {
     if (!gameId || !hostSecret || isPatching) return
@@ -44,6 +53,9 @@ export default function LobbyConfigPanel({ config, hostSecret, gameId }: Props) 
           Night {formatSeconds(config.night_timer_seconds)}
           {' · '}Day {formatSeconds(config.day_timer_seconds)}
           {' · '}Vote {formatSeconds(config.vote_timer_seconds)}
+        </span>
+        <span className="lobby-config-panel__timer-summary">
+          {voiceLabel(config.narrator_voice)}
         </span>
       </div>
     )
@@ -91,6 +103,24 @@ export default function LobbyConfigPanel({ config, hostSecret, gameId }: Props) 
           )
         })}
       </div>
+
+      {voices.length > 0 && (
+        <div className="lobby-config-panel__section">
+          <span className="lobby-config-panel__label">NARRATOR</span>
+          <div className="lobby-config-panel__difficulty-group">
+            {voices.map(v => (
+              <button
+                key={v}
+                className={`lobby-config-panel__difficulty-btn${config.narrator_voice === v ? ' lobby-config-panel__difficulty-btn--active' : ''}`}
+                disabled={isPatching}
+                onClick={() => patch({ narrator_voice: v })}
+              >
+                {voiceLabel(v)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

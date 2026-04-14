@@ -66,3 +66,12 @@ Add `narrator_mode = "prebaked"` as a fourth operating mode alongside `auto`, `l
 - `backend-engine/api/main.py` — conditional `StaticFiles` mount
 - `scripts/prebake_tts.py` — one-time generation script
 - `docs/ops/runbook.md` — operator instructions
+
+---
+
+## Amendment — 2026-04-14: Per-Game Voice Selection
+
+`narrator_prebaked_dir` now points to the base `audio/` directory.
+`pick_prebaked()` selects the subdirectory from `GameConfig.narrator_voice` at runtime.
+The lobby `PATCH /api/games/{id}/config` endpoint validates that the voice subdir exists
+and contains at least one WAV before accepting the change.

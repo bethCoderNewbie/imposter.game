@@ -1,0 +1,8 @@
+{
+  "model": "cosyvoice",
+  "url": "http://localhost:8015/v1/audio/speech",
+  "voice": "7c95bbd303fd",
+  "seed_hash": "133d50590cad",
+  "generated_at": "2026-04-14T16:34:15",
+  "file_count": 301
+}

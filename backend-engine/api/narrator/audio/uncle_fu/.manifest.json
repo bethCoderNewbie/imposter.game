@@ -1,0 +1,8 @@
+{
+  "model": "qwen3",
+  "url": "http://localhost:8016/v1/audio/speech",
+  "voice": "uncle_fu",
+  "seed_hash": "133d50590cad",
+  "generated_at": "2026-04-14T17:33:17",
+  "file_count": 301
+}

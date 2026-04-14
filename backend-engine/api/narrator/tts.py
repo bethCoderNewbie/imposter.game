@@ -83,21 +83,21 @@ async def run_cleanup_loop() -> None:
             logger.debug("Audio cleanup error (non-fatal)")
 
 
-async def pick_prebaked(trigger_id: str) -> tuple[str, int, int]:
+async def pick_prebaked(trigger_id: str, voice: str = "kokoro") -> tuple[str, int, int]:
     """
-    Randomly select a pre-generated WAV for trigger_id.
+    Randomly select a pre-generated WAV for trigger_id from the given voice subdir.
     Files named: {trigger_id}_{index:02d}.wav
-    Returns ("/tts/static/{filename}", duration_ms, chosen_index).
+    Returns ("/tts/static/{voice}/{filename}", duration_ms, chosen_index).
     The index is used by get_preset_script() to select the matching subtitle row.
     Raises FileNotFoundError if no candidates — caught by narrate() try/except.
     """
     cfg = get_narrator_settings()
-    audio_dir = Path(cfg.narrator_prebaked_dir)
+    audio_dir = Path(cfg.narrator_prebaked_dir) / voice
     candidates = sorted(audio_dir.glob(f"{trigger_id}_*.wav"))
     if not candidates:
         raise FileNotFoundError(f"No prebaked audio for '{trigger_id}' in {audio_dir}")
-    idx = random.randrange(len(candidates))
-    chosen = candidates[idx]
+    chosen = random.choice(candidates)
+    actual_idx = int(chosen.stem.rsplit("_", 1)[-1])  # e.g. "game_start_07" → 7
 
     # Robust byte-count method — same as synthesize() — works for both Piper and Kokoro WAVs.
     with wave.open(str(chosen)) as wf:
@@ -106,4 +106,4 @@ async def pick_prebaked(trigger_id: str) -> tuple[str, int, int]:
     data_bytes = chosen.stat().st_size - 44
     duration_ms = int(max(data_bytes, 0) / bytes_per_frame / framerate * 1000)
 
-    return f"/tts/static/{chosen.name}", duration_ms, idx
+    return f"/tts/static/{voice}/{chosen.name}", duration_ms, actual_idx
