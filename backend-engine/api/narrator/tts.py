@@ -96,8 +96,8 @@ async def pick_prebaked(trigger_id: str) -> tuple[str, int, int]:
     candidates = sorted(audio_dir.glob(f"{trigger_id}_*.wav"))
     if not candidates:
         raise FileNotFoundError(f"No prebaked audio for '{trigger_id}' in {audio_dir}")
-    idx = random.randrange(len(candidates))
-    chosen = candidates[idx]
+    chosen = random.choice(candidates)
+    actual_idx = int(chosen.stem.rsplit("_", 1)[-1])  # e.g. "game_start_07" → 7
 
     # Robust byte-count method — same as synthesize() — works for both Piper and Kokoro WAVs.
     with wave.open(str(chosen)) as wf:
@@ -106,4 +106,4 @@ async def pick_prebaked(trigger_id: str) -> tuple[str, int, int]:
     data_bytes = chosen.stat().st_size - 44
     duration_ms = int(max(data_bytes, 0) / bytes_per_frame / framerate * 1000)
 
-    return f"/tts/static/{chosen.name}", duration_ms, idx
+    return f"/tts/static/{chosen.name}", duration_ms, actual_idx
