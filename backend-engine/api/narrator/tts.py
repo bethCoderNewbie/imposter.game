@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import random
 import time
 import uuid
 import wave
@@ -80,3 +81,27 @@ async def run_cleanup_loop() -> None:
             await cleanup_old_audio()
         except Exception:
             logger.debug("Audio cleanup error (non-fatal)")
+
+
+async def pick_prebaked(trigger_id: str) -> tuple[str, int]:
+    """
+    Randomly select a pre-generated WAV for trigger_id.
+    Files named: {trigger_id}_{index:02d}.wav
+    Returns ("/tts/static/{filename}", duration_ms).
+    Raises FileNotFoundError if no candidates — caught by narrate() try/except.
+    """
+    cfg = get_narrator_settings()
+    audio_dir = Path(cfg.narrator_prebaked_dir)
+    candidates = sorted(audio_dir.glob(f"{trigger_id}_*.wav"))
+    if not candidates:
+        raise FileNotFoundError(f"No prebaked audio for '{trigger_id}' in {audio_dir}")
+    chosen = random.choice(candidates)
+
+    # Robust byte-count method — same as synthesize() — works for both Piper and Kokoro WAVs.
+    with wave.open(str(chosen)) as wf:
+        framerate = wf.getframerate()
+        bytes_per_frame = wf.getnchannels() * wf.getsampwidth()
+    data_bytes = chosen.stat().st_size - 44
+    duration_ms = int(max(data_bytes, 0) / bytes_per_frame / framerate * 1000)
+
+    return f"/tts/static/{chosen.name}", duration_ms

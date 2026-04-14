@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from api.narrator.config import get_narrator_settings
 from api.narrator.llm import generate_narration
 from api.narrator.scripts import get_preset_script
-from api.narrator.tts import synthesize
+from api.narrator.tts import pick_prebaked, synthesize
 
 if TYPE_CHECKING:
     from api.connection_manager import ConnectionManager
@@ -45,22 +45,31 @@ async def narrate(
         alive_count = sum(1 for p in G.players.values() if p.is_alive)
         text = ""
 
-        if cfg.narrator_mode != "static":
-            text = await generate_narration(
-                trigger_id,
-                alive_count=alive_count,
-                eliminated_name=eliminated_name,
-                eliminated_role=eliminated_role,
-                round_num=G.round,
-            )
-
-        if not text and cfg.narrator_mode != "live":
+        if cfg.narrator_mode == "prebaked":
+            # Text: DB preset with real eliminated_name for subtitle display.
+            # Audio: pre-baked WAV uses "a player" (generic — see ADR-021).
             text = await get_preset_script(trigger_id, eliminated_name)
+            if not text:
+                return 0
+            audio_url, duration_ms = await pick_prebaked(trigger_id)
 
-        if not text:
-            return 0
+        else:
+            if cfg.narrator_mode != "static":
+                text = await generate_narration(
+                    trigger_id,
+                    alive_count=alive_count,
+                    eliminated_name=eliminated_name,
+                    eliminated_role=eliminated_role,
+                    round_num=G.round,
+                )
 
-        audio_url, duration_ms = await synthesize(text)
+            if not text and cfg.narrator_mode != "live":
+                text = await get_preset_script(trigger_id, eliminated_name)
+
+            if not text:
+                return 0
+
+            audio_url, duration_ms = await synthesize(text)
         phase_str = G.phase.value if hasattr(G.phase, "value") else str(G.phase)
         await connection_manager.unicast(game_id, None, {
             "type": "narrate",

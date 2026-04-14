@@ -1,6 +1,9 @@
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_PACKAGE_DIR = Path(__file__).parent
 
 
 class NarratorSettings(BaseSettings):
@@ -13,7 +16,8 @@ class NarratorSettings(BaseSettings):
     narrator_voice: str = "af_bella"
     narrator_audio_dir: str = "/tmp/narr_audio"
     narrator_audio_ttl_s: int = 300
-    narrator_mode: str = "auto"   # "auto" | "live" | "static"
+    narrator_mode: str = "prebaked"   # "prebaked" | "auto" | "live" | "static"
+    narrator_prebaked_dir: str = str(_PACKAGE_DIR / "audio")
 
 
 @lru_cache

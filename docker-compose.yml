@@ -21,6 +21,7 @@ services:
   # GPU acceleration: applied automatically by start.sh when nvidia-smi is detected (docker-compose.gpu.yml override).
   ollama:
     image: ollama/ollama
+    profiles: ["llm"]
     volumes:
       - ollama_models:/root/.ollama
     healthcheck:
@@ -35,6 +36,7 @@ services:
   # Re-run manually if pull fails: docker compose run --rm ollama-pull
   ollama-pull:
     image: ollama/ollama
+    profiles: ["llm"]
     depends_on:
       ollama:
         condition: service_healthy
@@ -68,7 +70,7 @@ services:
       DATABASE_URL: postgresql+asyncpg://werewolf:werewolf@postgres/werewolf
       # Narrator settings (PRD-008) — all default to disabled; set NARRATOR_ENABLED=true to activate
       NARRATOR_ENABLED: ${NARRATOR_ENABLED:-false}
-      NARRATOR_MODE: ${NARRATOR_MODE:-auto}
+      NARRATOR_MODE: ${NARRATOR_MODE:-prebaked}
       OLLAMA_URL: "http://ollama:11434"
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:3b}
       KOKORO_URL: "http://tts:8880"

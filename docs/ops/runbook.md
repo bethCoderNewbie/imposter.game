@@ -722,7 +722,62 @@ Environment variables (see `.env.example`):
 | `HUNTER_PENDING_TIMER_SECONDS` | `30` | Hunter revenge window |
 | `DEBUG` | `false` | Enable debug logging |
 | `NARRATOR_ENABLED` | `false` | Enable LLM+TTS narration (PRD-008) |
+| `NARRATOR_MODE` | `auto` | `auto` \| `live` \| `static` \| `prebaked` |
+| `NARRATOR_PREBAKED_DIR` | (package `audio/`) | Path to pre-baked WAV directory |
 | `OLLAMA_URL` | `http://ollama:11434` | Ollama service URL (Docker Compose internal) |
 | `OLLAMA_MODEL` | `llama3.2:3b` | Model used for narration text generation |
 | `KOKORO_URL` | `http://tts:8880` | Kokoro TTS service URL (Docker Compose internal) |
 | `NARRATOR_VOICE` | `af_bella` | Kokoro voice ID |
+
+---
+
+## Narrator — Prebaked Mode (CPU, no external services)
+
+Serves pre-generated WAV files from `backend-engine/api/narrator/audio/` instead of calling
+Ollama or Kokoro at runtime. See ADR-021 for design rationale.
+
+### Enabling
+
+```bash
+NARRATOR_ENABLED=true
+NARRATOR_MODE=prebaked
+docker compose up   # no --profile tts needed
+```
+
+### Generating audio (developer, one-time)
+
+Fish-Speech must be installed; GPU recommended for speed.
+
+```bash
+pip install fish-speech   # or: pip install -e /path/to/fish-speech
+python scripts/prebake_tts.py
+git add backend-engine/api/narrator/audio/
+git commit -m "feat(narrator): add pre-baked Rickman-voice audio files"
+```
+
+Naming convention: `{trigger_id}_{index:02d}.wav` → `game_start_00.wav` … `village_wins_19.wav`
+Total: 180 files (9 triggers × 20 lines). Estimated size: ~150–200 MB.
+
+### Symptom: audio silent, subtitle shows
+
+1. Check files are present:
+   ```bash
+   docker compose exec backend ls /app/api/narrator/audio/ | head
+   # → empty: WAVs not committed; run prebake script then recommit
+   ```
+2. Check static route responds:
+   ```bash
+   curl -I http://localhost:8000/tts/static/game_start_00.wav
+   # → 404: backend started before audio/ dir existed; restart backend
+   ```
+3. Confirm mode:
+   ```bash
+   docker compose exec backend printenv NARRATOR_MODE
+   # → should print "prebaked"
+   ```
+
+### Note: audio says "a player", subtitle shows real name
+
+Intentional — see ADR-021. Dynamic triggers (`vote_elimination`, `player_eliminated`) were baked
+with `"a player"` substituted for `{eliminated_name}`. The subtitle text uses the real player name
+drawn from the DB preset at runtime.

@@ -15,6 +15,7 @@ import redis.asyncio as aioredis
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from engine.config import get_settings
 
@@ -95,6 +96,13 @@ def create_app() -> FastAPI:
         if not audio_path.exists() or audio_path.suffix != ".wav":
             raise HTTPException(status_code=404, detail="Audio file not found")
         return FileResponse(str(audio_path), media_type="audio/wav")
+
+    # Prebaked TTS static files (ADR-021) — only mounted when audio dir is populated.
+    # Distinct from /tts/audio/ (ephemeral Kokoro files); nginx /tts/ proxy covers both.
+    from api.narrator.config import get_narrator_settings as _get_ns
+    _prebaked_dir = Path(_get_ns().narrator_prebaked_dir)
+    if _prebaked_dir.exists():
+        app.mount("/tts/static", StaticFiles(directory=str(_prebaked_dir)), name="prebaked_audio")
 
     return app
 
