@@ -46,12 +46,13 @@ async def narrate(
         text = ""
 
         if cfg.narrator_mode == "prebaked":
-            # Text: DB preset with real eliminated_name for subtitle display.
+            # Pick WAV first to get the shared index, then fetch the matching subtitle row.
             # Audio: pre-baked WAV uses "a player" (generic — see ADR-021).
-            text = await get_preset_script(trigger_id, eliminated_name)
+            # Text: DB row at the same index so subtitle matches what is spoken.
+            audio_url, duration_ms, idx = await pick_prebaked(trigger_id)
+            text = await get_preset_script(trigger_id, eliminated_name, index=idx)
             if not text:
                 return 0
-            audio_url, duration_ms = await pick_prebaked(trigger_id)
 
         else:
             if cfg.narrator_mode != "static":
