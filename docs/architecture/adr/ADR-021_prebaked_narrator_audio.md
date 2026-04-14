@@ -13,9 +13,9 @@ The narrator pipeline (PRD-008) requires two heavy runtime services:
 - **Ollama** — 2 GB LLM model for dynamic narration text
 - **Kokoro** — GPU TTS container for speech synthesis
 
-On CPU-only hosts or zero-dependency dev runs, both services are a barrier to running the full game stack. However, the 9 narrator triggers map to ~20 static seed lines each in the `narrator_scripts` DB table — these texts are fixed at migration time and can be converted to audio once and committed to the repo.
+On CPU-only hosts or zero-dependency dev runs, both services are a barrier to running the full game stack. However, the 11 narrator triggers map to ~20 static seed lines each in the `narrator_scripts` DB table — these texts are fixed at migration time and can be converted to audio once and committed to the repo.
 
-Two triggers (`vote_elimination`, `player_eliminated`) contain an `{eliminated_name}` template placeholder. A pre-baked WAV cannot encode a runtime player name, so these files are generated with the placeholder substituted to `"a player"`. The subtitle displayed to players uses the real eliminated player's name drawn from the DB preset at runtime.
+Three triggers (`vote_elimination`, `player_eliminated`, `hunter_revenge`) contain an `{eliminated_name}` template placeholder. A pre-baked WAV cannot encode a runtime player name, so these files are generated with the placeholder substituted to `"a player"`. The subtitle displayed to players uses the real eliminated player's name drawn from the DB preset at runtime.
 
 ---
 
@@ -26,7 +26,7 @@ Add `narrator_mode = "prebaked"` as a fourth operating mode alongside `auto`, `l
 **Audio generation (one-time, developer machine):**
 - Script: `scripts/prebake_tts.py`
 - Voice: Fish-Speech voice cloning with Rickman reference WAVs (`rickman_clean_raw/`)
-- Output: `backend-engine/api/narrator/audio/{trigger_id}_{nn:02d}.wav` (180 files)
+- Output: `backend-engine/api/narrator/audio/{trigger_id}_{nn:02d}.wav` (220 files across 11 triggers)
 - Committed to the repo; no runtime GPU or LLM dependency
 
 **Runtime serving:**
@@ -49,7 +49,7 @@ Add `narrator_mode = "prebaked"` as a fourth operating mode alongside `auto`, `l
 
 **Negative:**
 - ~150–200 MB binary assets added to the repo (Fish-Speech WAV output)
-- Audio/subtitle name divergence for `vote_elimination` and `player_eliminated` triggers — audio says "a player", subtitle shows the real name. This is intentional and documented here.
+- Audio/subtitle name divergence for `vote_elimination`, `player_eliminated`, and `hunter_revenge` triggers — audio says "a player", subtitle shows the real name. This is intentional and documented here.
 - WAVs must be regenerated if seed texts change (migration edit → re-run script)
 
 **Neutral:**

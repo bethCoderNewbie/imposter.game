@@ -319,6 +319,8 @@ async def handle_submit_day_vote(G, intent, redis_client, cm) -> MasterGameState
                 _specs.append(("wolves_win" if G.winner == Team.WEREWOLF else "village_wins", None, None))
             if _specs:
                 asyncio.create_task(narrate_sequence(_specs, G, cm, G.game_id))
+            else:
+                asyncio.create_task(narrate("no_elimination", G, cm, G.game_id))
         if G.phase not in (Phase.GAME_OVER, Phase.HUNTER_PENDING):
             G = transition_phase(G, Phase.NIGHT)
             from api.game_queue import get_or_create_queue
@@ -337,6 +339,13 @@ async def handle_hunter_revenge(G, intent, redis_client, cm) -> MasterGameState:
         G = resolve_hunter_revenge(G, hunter_id, target_id)
     except HunterError as e:
         raise IntentError(e.code, e.message)
+
+    if get_settings().narrator_enabled:
+        target = G.players.get(target_id)
+        _specs: list = [("hunter_revenge", target.display_name if target else None, None)]
+        if G.phase == Phase.GAME_OVER and G.winner is not None:
+            _specs.append(("wolves_win" if G.winner == Team.WEREWOLF else "village_wins", None, None))
+        asyncio.create_task(narrate_sequence(_specs, G, cm, G.game_id))
 
     # After hunter resolves, determine next phase
     if G.phase == Phase.HUNTER_PENDING and not G.hunter_queue:
@@ -388,6 +397,9 @@ async def handle_advance_phase(G, intent, redis_client, cm) -> MasterGameState:
 
     cancel_phase_timer(G.game_id)
     G = transition_phase(G, Phase.DAY_VOTE)
+
+    if get_settings().narrator_enabled:
+        asyncio.create_task(narrate("vote_open", G, cm, G.game_id))
 
     from api.game_queue import get_or_create_queue
     queue = get_or_create_queue(G.game_id)
@@ -445,6 +457,8 @@ async def handle_phase_timeout(G, intent, redis_client, cm) -> MasterGameState:
                 _specs.append(("wolves_win" if G.winner == Team.WEREWOLF else "village_wins", None, None))
             if _specs:
                 asyncio.create_task(narrate_sequence(_specs, G, cm, G.game_id))
+            else:
+                asyncio.create_task(narrate("no_elimination", G, cm, G.game_id))
         if G.phase not in (Phase.GAME_OVER, Phase.HUNTER_PENDING):
             G = transition_phase(G, Phase.NIGHT)
 

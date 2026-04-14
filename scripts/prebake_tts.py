@@ -23,9 +23,9 @@ OUTPUT_DIR = _PROJECT_ROOT / "backend-engine/api/narrator/audio"
 KOKORO_URL = "http://localhost:8880/v1/audio/speech"
 
 # Triggers that have {eliminated_name} placeholders — substitute generic text for audio.
-DYNAMIC_TRIGGERS = frozenset({"vote_elimination", "player_eliminated"})
+DYNAMIC_TRIGGERS = frozenset({"vote_elimination", "player_eliminated", "hunter_revenge"})
 
-# Load _SEED_DATA directly from the alembic migration — no DB needed.
+# Load _SEED_DATA directly from the alembic migrations — no DB needed.
 # Stub out alembic.op and sqlalchemy so the module-level imports don't fail.
 import types as _types
 _alembic_stub = _types.ModuleType("alembic")
@@ -35,12 +35,19 @@ sys.modules.setdefault("alembic.op", _alembic_stub.op)
 sys.modules.setdefault("sqlalchemy", _types.ModuleType("sqlalchemy"))
 sys.modules.setdefault("sqlalchemy.orm", _types.ModuleType("sqlalchemy.orm"))
 
-spec = importlib.util.spec_from_file_location(
-    "migration",
-    _PROJECT_ROOT / "backend-engine/alembic/versions/a1b2c3d4e5f6_add_narrator_scripts.py",
+
+def _load_seed(path: Path) -> list:
+    spec = importlib.util.spec_from_file_location("_mig_" + path.stem, path)
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m._SEED_DATA
+
+
+_VERSIONS = _PROJECT_ROOT / "backend-engine/alembic/versions"
+_SEED_DATA: list = (
+    _load_seed(_VERSIONS / "b2c3d4e5f6a7_reseed_narrator_scripts.py")
+    + _load_seed(_VERSIONS / "c3d4e5f6a7b8_narrator_hunter_no_elim.py")
 )
-mod = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(mod)
 
 
 def synthesize(text: str, out_path: Path) -> None:
@@ -72,7 +79,7 @@ def main() -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     grouped: dict[str, list[str]] = defaultdict(list)
-    for trigger_id, text in mod._SEED_DATA:
+    for trigger_id, text in _SEED_DATA:
         grouped[trigger_id].append(text)
 
     total = sum(len(v) for v in grouped.values())

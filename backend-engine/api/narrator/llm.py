@@ -91,6 +91,14 @@ _PROMPT_TEMPLATES: dict[str, str] = {
         "AUDIO RULE: Use an exclamation point (!) for a rousing, high-energy delivery. "
         "Use -- (double dash) before the final triumphant word for dramatic effect."
     ),
+    "hunter_revenge": (
+        "The hunter was just eliminated but fires one final shot, killing {eliminated_name}. "
+        "Dramatic narrator, max 20 words. Use double-dashes and exclamation point."
+    ),
+    "no_elimination": (
+        "The village vote ended in a deadlock — nobody was eliminated. "
+        "Ominous narrator, max 20 words. Use double-dashes for tension."
+    ),
 }
 
 

@@ -144,6 +144,7 @@ export type NarratorTrigger =
   | 'game_start' | 'night_open' | 'night_close'
   | 'day_open'   | 'player_eliminated' | 'vote_open'
   | 'vote_elimination' | 'wolves_win' | 'village_wins'
+  | 'hunter_revenge' | 'no_elimination'
 
 export interface NarrateMessage {
   type: 'narrate'
