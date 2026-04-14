@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useGameState } from './hooks/useGameState'
 import { useNarrator } from './hooks/useNarrator'
 import CreateMatchScreen from './components/CreateMatchScreen/CreateMatchScreen'
@@ -41,8 +41,42 @@ export default function App() {
   // Freeze votes at the moment day_vote closes (for VoteWeb reveal-all-at-once)
   const [frozenVotes, setFrozenVotes] = useState<Record<string, string> | null>(null)
   const prevPhaseRef = useRef<string | null>(null)
+  // Pending scream timeout — cancelled if night ends before it fires (PRD-012 §2.3)
+  const screamTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Brief toast shown when a player triggers a sound from the mobile sound board
+  const [soundToast, setSoundToast] = useState<{ emoji: string; playerName: string } | null>(null)
+  const soundToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const { narratorText, handleNarrate } = useNarrator()
+
+  // Handle a fun sound triggered by a player on mobile
+  const SOUND_EMOJIS: Record<string, string> = {
+    howl: '🐺', wolfcry: '🌕', spooky: '👻', boom: '💥',
+    siren: '🚨', ambulance: '🚑', warning: '⚠️', surprise: '🎉',
+    gasp: '😱', laugh: '😂', clap: '👏', people: '👥',
+    fail: '🎺', burp: '🤢', fart: '💨', walk: '🚶',
+  }
+  const handleSoundTriggered = useCallback((soundId: string, playerName: string) => {
+    if (!audioUnlocked) return
+    const audio = new Audio(`/audio/sounds/${soundId}.mp3`)
+    audio.volume = 0.75
+    audio.play().catch(() => {})
+    // Show toast for 2.5s
+    if (soundToastTimerRef.current) clearTimeout(soundToastTimerRef.current)
+    setSoundToast({ emoji: SOUND_EMOJIS[soundId] ?? '🔊', playerName })
+    soundToastTimerRef.current = setTimeout(() => setSoundToast(null), 2500)
+  }, [audioUnlocked]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Schedule a scream SFX with a random 3–30s delay after the first wolf kill vote
+  const handleWolfKillQueued = useCallback(() => {
+    if (!audioUnlocked) return
+    const delay = Math.random() * (30000 - 3000) + 3000
+    screamTimeoutRef.current = setTimeout(() => {
+      const audio = new Audio('/audio/scream.mp3')
+      audio.volume = 0.7
+      audio.play().catch(() => {})
+    }, delay)
+  }, [audioUnlocked])
 
   // Sync hostSecret from URL (or localStorage fallback) whenever gameId changes
   useEffect(() => {
@@ -80,6 +114,8 @@ export default function App() {
     gameId,
     playerId: 'display',
     onNarrate: handleNarrate,
+    onWolfKillQueued: handleWolfKillQueued,
+    onSoundTriggered: handleSoundTriggered,
   })
 
   // PRD-003 §4 rule: substrate class set here, not inside components
@@ -99,6 +135,11 @@ export default function App() {
       setResolutionState(gameState)
       setShowResolution(true)
       document.documentElement.className = 'phase-night-resolution'
+      // Cancel any pending scream that hasn't fired yet (PRD-012 §2.3)
+      if (screamTimeoutRef.current) {
+        clearTimeout(screamTimeoutRef.current)
+        screamTimeoutRef.current = null
+      }
     }
 
     // Freeze day_vote votes for VoteWeb reveal when voting closes
@@ -175,7 +216,7 @@ export default function App() {
     }
 
     if (phase === 'day' || phase === 'day_vote' || phase === 'hunter_pending') {
-      return <DayScreen gameState={gameState} frozenVotes={frozenVotes} />
+      return <DayScreen gameState={gameState} frozenVotes={frozenVotes} audioUnlocked={audioUnlocked} />
     }
 
     if (phase === 'game_over') {
@@ -207,6 +248,12 @@ export default function App() {
     <>
       {renderContent()}
       {audioUnlocked && <NarratorSubtitle text={narratorText} />}
+      {soundToast && (
+        <div className="sound-toast">
+          <span className="sound-toast__emoji">{soundToast.emoji}</span>
+          <span className="sound-toast__name">{soundToast.playerName}</span>
+        </div>
+      )}
     </>
   )
 }

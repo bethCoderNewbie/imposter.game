@@ -47,3 +47,40 @@
   padding: 0.1em 0.4em;
   border-radius: 4px;
 }
+
+/* Sound board toast — briefly shows which player triggered a sound */
+@keyframes sound-toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(12px) scale(0.9); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0)    scale(1);   }
+}
+
+.sound-toast {
+  position: fixed;
+  bottom: clamp(24px, 4vmin, 48px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.45em 1.1em;
+  background: rgba(10, 10, 20, 0.82);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  z-index: 500;
+  animation: sound-toast-in 0.2s ease-out both;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.sound-toast__emoji {
+  font-size: clamp(1.2rem, 2.5vmin, 2rem);
+  line-height: 1;
+}
+
+.sound-toast__name {
+  font-size: clamp(0.75rem, 1.4vmin, 1.1rem);
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 500;
+  letter-spacing: 0.03em;
+}

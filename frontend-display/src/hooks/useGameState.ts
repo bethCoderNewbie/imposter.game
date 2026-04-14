@@ -9,9 +9,13 @@ interface Options {
   playerId: string
   sessionToken?: string
   onNarrate?: (msg: NarrateMessage) => void
+  /** Called when the first wolf kill vote is queued this night (PRD-012 §2.3) */
+  onWolfKillQueued?: () => void
+  /** Called when a player triggers a fun sound from their mobile sound board */
+  onSoundTriggered?: (soundId: string, playerName: string) => void
 }
 
-export function useGameState({ gameId, playerId, sessionToken, onNarrate }: Options) {
+export function useGameState({ gameId, playerId, sessionToken, onNarrate, onWolfKillQueued, onSoundTriggered }: Options) {
   const [gameState, setGameState] = useState<StrippedGameState | null>(null)
   const [status, setStatus] = useState<WsStatus>('closed')
   const lastStateIdRef = useRef(-1)
@@ -50,7 +54,13 @@ export function useGameState({ gameId, playerId, sessionToken, onNarrate }: Opti
     if (msg.type === 'narrate') {
       onNarrate?.(msg as NarrateMessage)
     }
-  }, [onNarrate]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (msg.type === 'wolf_kill_queued') {
+      onWolfKillQueued?.()
+    }
+    if (msg.type === 'sound_triggered') {
+      onSoundTriggered?.(msg.sound_id, msg.player_name)
+    }
+  }, [onNarrate, onWolfKillQueued, onSoundTriggered]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const { send } = useWebSocket({
     url,

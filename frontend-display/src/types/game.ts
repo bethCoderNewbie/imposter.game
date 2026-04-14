@@ -156,7 +156,19 @@ export interface NarrateMessage {
   round: number
 }
 
-export type ServerMessage = SyncMessage | UpdateMessage | MatchDataMessage | ErrorMessage | NarrateMessage
+// ── Wolf Kill Signal (PRD-012 §2.3) ──────────────────────────────────────────
+
+/** Emitted by the server when the first wolf vote is recorded this night. */
+export interface WolfKillQueuedMessage { type: 'wolf_kill_queued' }
+
+/** Emitted when a player triggers a fun sound from their mobile sound board. */
+export interface SoundTriggeredMessage {
+  type: 'sound_triggered'
+  sound_id: string
+  player_name: string
+}
+
+export type ServerMessage = SyncMessage | UpdateMessage | MatchDataMessage | ErrorMessage | NarrateMessage | WolfKillQueuedMessage | SoundTriggeredMessage
 
 // Avatar color palette — 8 preset colors for avatar_01…avatar_08
 export const AVATAR_COLORS: Record<string, string> = {

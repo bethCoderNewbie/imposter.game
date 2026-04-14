@@ -9,17 +9,17 @@ vi.mock('../../hooks/useTimer', () => ({
 
 describe('DayScreen', () => {
   it('shows Discussion label in day phase', () => {
-    render(<DayScreen gameState={makeGameState({ phase: 'day' })} frozenVotes={null} />)
+    render(<DayScreen gameState={makeGameState({ phase: 'day' })} frozenVotes={null} audioUnlocked={false} />)
     expect(screen.getByText('Discussion')).toBeInTheDocument()
   })
 
   it('shows Voting label in day_vote phase', () => {
-    render(<DayScreen gameState={makeGameState({ phase: 'day_vote' })} frozenVotes={null} />)
+    render(<DayScreen gameState={makeGameState({ phase: 'day_vote' })} frozenVotes={null} audioUnlocked={false} />)
     expect(screen.getByText('Voting')).toBeInTheDocument()
   })
 
   it('renders a PlayerCard for each player', () => {
-    render(<DayScreen gameState={makeGameState()} frozenVotes={null} />)
+    render(<DayScreen gameState={makeGameState()} frozenVotes={null} audioUnlocked={false} />)
     // default fixture has 5 players; check all names present
     expect(screen.getByText('Alice')).toBeInTheDocument()
     expect(screen.getByText('Bob')).toBeInTheDocument()
@@ -29,7 +29,7 @@ describe('DayScreen', () => {
   })
 
   it('displays round number in header', () => {
-    render(<DayScreen gameState={makeGameState({ round: 3 })} frozenVotes={null} />)
+    render(<DayScreen gameState={makeGameState({ round: 3 })} frozenVotes={null} audioUnlocked={false} />)
     expect(screen.getByText('Day 3')).toBeInTheDocument()
   })
 
@@ -44,7 +44,7 @@ describe('DayScreen', () => {
       players,
       day_votes: { p2: 'p1', p3: 'p1' }, // 2 votes on p1
     })
-    render(<DayScreen gameState={gameState} frozenVotes={null} />)
+    render(<DayScreen gameState={gameState} frozenVotes={null} audioUnlocked={false} />)
     expect(screen.getByText('2')).toBeInTheDocument()
   })
 
@@ -58,13 +58,13 @@ describe('DayScreen', () => {
       players,
       day_votes: {},
     })
-    render(<DayScreen gameState={gameState} frozenVotes={{ p2: 'p1' }} />)
+    render(<DayScreen gameState={gameState} frozenVotes={{ p2: 'p1' }} audioUnlocked={false} />)
     expect(screen.getByText('1')).toBeInTheDocument()
   })
 
   it('does not render VoteWeb when frozenVotes is null', () => {
     const { container } = render(
-      <DayScreen gameState={makeGameState({ phase: 'day' })} frozenVotes={null} />
+      <DayScreen gameState={makeGameState({ phase: 'day' })} frozenVotes={null} audioUnlocked={false} />
     )
     expect(container.querySelector('.vote-web')).not.toBeInTheDocument()
   })
@@ -78,6 +78,7 @@ describe('DayScreen', () => {
       <DayScreen
         gameState={makeGameState({ phase: 'day', players })}
         frozenVotes={{}}
+        audioUnlocked={false}
       />
     )
     // VoteWeb renders null when lines=[] (empty votes), so check the component
@@ -98,7 +99,7 @@ describe('DayScreen', () => {
       players,
       day_votes: { p2: 'p1', p3: 'p1', p4: 'p1' }, // 3 votes on p1
     })
-    const { container } = render(<DayScreen gameState={gameState} frozenVotes={null} />)
+    const { container } = render(<DayScreen gameState={gameState} frozenVotes={null} audioUnlocked={false} />)
     expect(container.querySelector('[data-player-id="p1"].player-card--majority')).toBeInTheDocument()
   })
 })

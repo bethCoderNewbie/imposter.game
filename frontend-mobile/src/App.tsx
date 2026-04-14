@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { useGameState } from './hooks/useGameState'
 import { useHaptics } from './hooks/useHaptics'
 import type { HintPayload, RedirectMessage } from './types/game'
@@ -11,6 +11,7 @@ import DayVoteScreen from './components/DayVoteScreen/DayVoteScreen'
 import HunterPendingScreen from './components/HunterPendingScreen/HunterPendingScreen'
 import DeadSpectatorScreen from './components/DeadSpectatorScreen/DeadSpectatorScreen'
 import GameOverScreen from './components/GameOverScreen/GameOverScreen'
+import SoundPanel from './components/SoundPanel/SoundPanel'
 import './App.css'
 
 interface Session {
@@ -168,61 +169,49 @@ export default function App() {
   const myPlayer = gameState.players[session.player_id]
   const { phase } = gameState
 
-  // ── Game over → final reveal for all players (alive and dead) ─────────────────
+  // ── Resolve phase content ──────────────────────────────────────────────────────
+  let phaseContent: React.ReactNode = null
+
   if (phase === 'game_over') {
-    return (
+    phaseContent = (
       <GameOverScreen
         gameState={gameState}
         myPlayerId={session.player_id}
       />
     )
-  }
-
-  // ── Hunter pending → only the eliminated hunter acts; everyone else waits ─────
-  if (phase === 'hunter_pending') {
+  } else if (phase === 'hunter_pending') {
     if (myPlayer && !myPlayer.is_alive && myPlayer.role === 'hunter') {
-      return (
+      phaseContent = (
         <HunterPendingScreen
           gameState={gameState}
           myPlayer={myPlayer}
           sendIntent={sendIntent}
         />
       )
+    } else {
+      phaseContent = <div className="app-status"><p>Waiting…</p></div>
     }
-    return (
-      <div className="app-status">
-        <p>Waiting…</p>
-      </div>
-    )
-  }
-
-  // ── Player eliminated → Dead spectator view (overrides all live phases) ──────
-  if (myPlayer && !myPlayer.is_alive) {
-    return <DeadSpectatorScreen gameState={gameState} myPlayerId={session.player_id} />
-  }
-
-  if (phase === 'lobby') {
-    return (
+  } else if (myPlayer && !myPlayer.is_alive) {
+    // ── Player eliminated → Dead spectator view (overrides all live phases) ──────
+    phaseContent = <DeadSpectatorScreen gameState={gameState} myPlayerId={session.player_id} />
+  } else if (phase === 'lobby') {
+    phaseContent = (
       <LobbyWaitingScreen
         gameState={gameState}
         myPlayerId={session.player_id}
         sendIntent={sendIntent}
       />
     )
-  }
-
-  if (phase === 'role_deal') {
-    return (
+  } else if (phase === 'role_deal') {
+    phaseContent = (
       <RoleRevealScreen
         myPlayer={myPlayer!}
         gameState={gameState}
         sendIntent={sendIntent}
       />
     )
-  }
-
-  if (phase === 'night') {
-    return (
+  } else if (phase === 'night') {
+    phaseContent = (
       <NightActionShell
         gameState={gameState}
         myPlayer={myPlayer!}
@@ -230,19 +219,15 @@ export default function App() {
         latestHint={latestHint}
       />
     )
-  }
-
-  if (phase === 'day') {
-    return (
+  } else if (phase === 'day') {
+    phaseContent = (
       <DayDiscussionScreen
         gameState={gameState}
         myPlayerId={session.player_id}
       />
     )
-  }
-
-  if (phase === 'day_vote') {
-    return (
+  } else if (phase === 'day_vote') {
+    phaseContent = (
       <DayVoteScreen
         gameState={gameState}
         myPlayer={myPlayer!}
@@ -251,5 +236,19 @@ export default function App() {
     )
   }
 
-  return null
+  // Sound panel shown in all phases once the game has started (post-lobby).
+  // Even dead spectators and waiting players can trigger sounds.
+  const showSoundPanel = phase !== 'lobby'
+
+  return (
+    <>
+      {phaseContent}
+      {showSoundPanel && (
+        <SoundPanel
+          sendIntent={sendIntent}
+          playerName={myPlayer?.display_name ?? ''}
+        />
+      )}
+    </>
+  )
 }

@@ -18,6 +18,34 @@ from engine.config import get_settings
 from engine.stripper import player_view
 from storage.redis_store import load_game, validate_session_token
 
+# ── Sound board side-channel ───────────────────────────────────────────────────
+# Allowed sound IDs — validated server-side to prevent arbitrary payload injection
+_ALLOWED_SOUNDS = {
+    "ambulance", "boom", "burp", "clap", "fail", "fart",
+    "gasp", "howl", "laugh", "people", "siren", "spooky",
+    "surprise", "walk", "warning", "wolfcry",
+}
+
+
+async def _handle_trigger_sound(
+    game_id: str,
+    intent: dict,
+    player_id: str | None,
+) -> None:
+    """
+    Broadcast a sound trigger to the display client only.
+    Does NOT touch game state or the queue — pure side-channel (PRD-012).
+    """
+    sound_id = str(intent.get("sound_id", ""))
+    if sound_id not in _ALLOWED_SOUNDS:
+        return  # silently ignore unrecognised sounds
+    player_name = str(intent.get("player_name", ""))[:32]
+    await manager.unicast(
+        game_id,
+        None,  # player_id=None → display client
+        {"type": "sound_triggered", "sound_id": sound_id, "player_name": player_name},
+    )
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["websocket"])
@@ -135,6 +163,12 @@ async def websocket_endpoint(websocket: WebSocket, game_id: str, player_id: str)
             data["game_id"] = game_id
             if authenticated_player_id and "player_id" not in data:
                 data["player_id"] = authenticated_player_id
+
+            # ── Sound board: side-channel — does not mutate game state ──────────
+            if data.get("type") == "trigger_sound":
+                await _handle_trigger_sound(game_id, data, authenticated_player_id)
+                continue
+
             await queue.enqueue(data)
     except WebSocketDisconnect:
         manager.disconnect(game_id, authenticated_player_id)

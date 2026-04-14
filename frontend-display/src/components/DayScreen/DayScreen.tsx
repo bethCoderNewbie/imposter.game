@@ -8,9 +8,10 @@ interface Props {
   gameState: StrippedGameState
   /** Votes snapshot frozen at day_vote close — passed to VoteWeb for reveal-all-at-once */
   frozenVotes: Record<string, string> | null
+  audioUnlocked: boolean
 }
 
-export default function DayScreen({ gameState, frozenVotes }: Props) {
+export default function DayScreen({ gameState, frozenVotes, audioUnlocked }: Props) {
   const players = Object.values(gameState.players)
   const isVoting = gameState.phase === 'day_vote'
 
@@ -28,7 +29,12 @@ export default function DayScreen({ gameState, frozenVotes }: Props) {
       {/* Top-center: round label + timer — PRD-003 §6 */}
       <div className="day-screen__header">
         <span className="day-screen__round">Day {gameState.round}</span>
-        <PhaseTimer timerEndsAt={gameState.timer_ends_at} className="day-screen__timer" />
+        <PhaseTimer
+          timerEndsAt={gameState.timer_ends_at}
+          className="day-screen__timer"
+          enableCountdownBeep={isVoting}
+          audioUnlocked={audioUnlocked}
+        />
       </div>
 
       {/* Player grid — relative so VoteWeb SVG can overlay it */}

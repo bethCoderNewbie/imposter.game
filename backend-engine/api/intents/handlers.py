@@ -137,6 +137,12 @@ async def handle_submit_night_action(G, intent, redis_client, cm) -> MasterGameS
         if G.players[target_id].team == Team.WEREWOLF:
             raise IntentError("INVALID_TARGET", "Wolves cannot vote to kill their teammates.")
         na.wolf_votes[player_id] = target_id
+        # Signal display client to play a scream SFX after a random delay.
+        # Only on the first wolf vote this night to avoid duplicate screams (PRD-012 §2.3).
+        if len(na.wolf_votes) == 1:
+            asyncio.create_task(
+                cm.broadcast_raw(G.game_id, {"type": "wolf_kill_queued"})
+            )
 
     elif role_id == "wolf_shaman":
         target_id = intent.get("target_id")
