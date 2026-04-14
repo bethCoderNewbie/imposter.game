@@ -608,9 +608,21 @@ The LLM and TTS steps succeeded (subtitle = text from LLM, cleared after `durati
 2. **Audio URL reachable** — open `http://<LAN-IP>/tts/audio/<any>.wav` in the display browser; should return a WAV file (not 404).
 3. **Kokoro health** — `docker compose logs tts | grep -i error`
 
-### Switching Ollama to CPU (no GPU)
+### GPU vs CPU narrator services
 
-Remove the `deploy.resources` block from the `ollama` service in `docker-compose.yml`, then `docker compose up -d ollama`. Inference will be slower (~10–30 s per narration vs ~2–5 s on GPU).
+`start.sh` auto-detects GPU via `nvidia-smi` and applies `docker-compose.gpu.yml` when found. CPU is the default — no manual changes needed.
+
+To force GPU mode manually:
+```bash
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build
+```
+
+To force CPU mode on a GPU host:
+```bash
+docker compose -f docker-compose.yml up --build
+```
+
+CPU inference is slower (~10–30 s per narration vs ~2–5 s on GPU).
 
 ### Clearing the model volume (forces re-download)
 

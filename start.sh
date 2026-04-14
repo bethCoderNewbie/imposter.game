@@ -52,8 +52,18 @@ echo "Display    : ${HOST_IP}/display/?g=<GAME_CODE>"
 echo "API        : ${HOST_IP}/api/health"
 echo ""
 
-# ── 2. Build and launch ────────────────────────────────────────────────────────
+# ── 2. GPU detection ──────────────────────────────────────────────────────────
+COMPOSE_FILES="-f docker-compose.yml"
+if nvidia-smi &>/dev/null 2>&1; then
+  echo "GPU detected  — narrator will use GPU-accelerated Ollama + Kokoro"
+  COMPOSE_FILES="$COMPOSE_FILES -f docker-compose.gpu.yml"
+else
+  echo "No GPU detected — narrator will run on CPU (inference ~10–30 s per line)"
+fi
+
+# ── 3. Build and launch ────────────────────────────────────────────────────────
 # HOST_IP is picked up by docker-compose.yml → frontend-display build arg → VITE_HOST_IP
 # so the QR code is baked with the correct LAN address at build time.
 
-docker compose up --build "$@"
+# shellcheck disable=SC2086
+docker compose $COMPOSE_FILES up --build "$@"

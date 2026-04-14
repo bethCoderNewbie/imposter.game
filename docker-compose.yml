@@ -18,7 +18,7 @@ services:
     restart: unless-stopped
 
   # Ollama LLM service (PRD-008) — internal only, reached by backend at http://ollama:11434
-  # GPU: requires NVIDIA Container Toolkit. For CPU-only, remove the deploy.resources block.
+  # GPU acceleration: applied automatically by start.sh when nvidia-smi is detected (docker-compose.gpu.yml override).
   ollama:
     image: ollama/ollama
     volumes:
@@ -29,13 +29,6 @@ services:
       timeout: 5s
       retries: 10
       start_period: 30s
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
     restart: unless-stopped
 
   # One-shot init container: pulls the configured model into the shared volume on first run.
@@ -54,18 +47,12 @@ services:
     restart: "no"
 
   # Kokoro TTS service (PRD-008) — internal only, reached by backend at http://tts:8880
+  # GPU acceleration: applied automatically by start.sh when nvidia-smi is detected (docker-compose.gpu.yml override).
   tts:
-    image: ghcr.io/remsky/kokoro-fastapi-gpu:latest
+    image: ghcr.io/remsky/kokoro-fastapi-cpu:latest
     container_name: kokoro-tts
     expose:
       - "8880"      # internal Docker network only; no host port exposed
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
     restart: unless-stopped
 
   backend:
@@ -89,8 +76,10 @@ services:
         condition: service_healthy
       tts:
         condition: service_started
+        required: false
       ollama:
         condition: service_started
+        required: false
     restart: unless-stopped
 
   frontend-display:
