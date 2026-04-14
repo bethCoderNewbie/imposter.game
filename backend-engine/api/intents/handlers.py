@@ -339,9 +339,8 @@ async def handle_hunter_revenge(G, intent, redis_client, cm) -> MasterGameState:
         raise IntentError(e.code, e.message)
 
     # After hunter resolves, determine next phase
-    if G.phase not in (Phase.GAME_OVER, Phase.HUNTER_PENDING):
-        # Transition to appropriate next phase (caller context determines this)
-        # For now, advance to DAY (post-night) — intent handler in future may track pre-hunter phase
+    if G.phase == Phase.HUNTER_PENDING and not G.hunter_queue:
+        # Queue drained and game still ongoing — advance to DAY
         G = transition_phase(G, Phase.DAY)
         from api.game_queue import get_or_create_queue
         queue = get_or_create_queue(G.game_id)

@@ -370,6 +370,7 @@ class TestADR011NightIntents:
         })
         assert G_new.players["p3"].is_alive is False
         assert "p5" not in G_new.hunter_queue
+        assert G_new.phase == Phase.DAY
 
     @pytest.mark.asyncio
     async def test_hunter_revenge_wrong_phase_rejected(self):
