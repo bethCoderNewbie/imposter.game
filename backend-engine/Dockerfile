@@ -12,5 +12,5 @@ COPY puzzles.md ./puzzles.md
 
 RUN pip install --no-cache-dir -e .
 
-RUN chmod +x /app/backend-engine/entrypoint.sh
+RUN sed -i 's/\r//' /app/backend-engine/entrypoint.sh && chmod +x /app/backend-engine/entrypoint.sh
 CMD ["/app/backend-engine/entrypoint.sh"]
