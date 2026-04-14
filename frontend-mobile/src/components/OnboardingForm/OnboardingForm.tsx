@@ -75,7 +75,7 @@ export default function OnboardingForm({ prefillCode, permanentId, onJoined }: P
       })
 
       if (res.status === 409) {
-        setError('Game already started. Close and reopen the app to rejoin.')
+        setError('Game already started and you were not part of it.')
         return
       }
 

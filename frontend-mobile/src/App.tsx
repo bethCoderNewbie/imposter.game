@@ -96,12 +96,17 @@ export default function App() {
         } else if (r.status === 401 || r.status === 404) {
           // Definitively invalid token or game gone — safe to discard
           clearSession()
+        } else {
+          // 5xx or unexpected status: proceed optimistically.
+          // The WS auth handshake is the final arbiter — if the token is
+          // actually invalid the WS will close and the player will be prompted.
+          setSession(stored)
         }
-        // Any other status (5xx, network hiccup): keep session in localStorage
-        // so the player can manually rejoin via OnboardingForm without re-entering
-        // their token. Next app open will retry the bootstrap automatically.
       })
-      .catch(() => { /* network error — preserve session for retry */ })
+      .catch(() => {
+        // Network error: proceed optimistically, same reasoning as 5xx above.
+        setSession(stored)
+      })
       .finally(() => setBootstrapping(false))
   }, [])
 

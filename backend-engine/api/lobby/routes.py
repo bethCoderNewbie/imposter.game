@@ -104,6 +104,21 @@ async def join_game(game_id: str, body: JoinGameRequest, redis=Depends(_get_redi
     if G is None:
         raise HTTPException(status_code=404, detail="Game not found.")
     if G.phase != Phase.LOBBY:
+        # Allow re-entry: player was already in this game (token expired / storage cleared)
+        existing = next(
+            (p for p in G.players.values() if p.permanent_id == body.permanent_id),
+            None,
+        )
+        if existing:
+            new_token = await issue_session_token(redis, game_id, existing.player_id)
+            G = G.model_copy(deep=True)
+            G.players[existing.player_id].is_connected = True
+            await save_game(redis, game_id, G)
+            return {
+                "game_id": game_id,
+                "player_id": existing.player_id,
+                "session_token": new_token,
+            }
         raise HTTPException(status_code=409, detail="Game already started.")
     if len(G.players) >= 16:
         raise HTTPException(status_code=409, detail="Lobby is full.")
