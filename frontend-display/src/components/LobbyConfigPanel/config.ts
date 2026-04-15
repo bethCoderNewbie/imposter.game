@@ -16,10 +16,22 @@ export const TIMER_STEPS: Record<string, number> = {
   vote_timer_seconds: 15,
 }
 
+export const TIMER_MIN: Record<string, number> = {
+  night_timer_seconds: 30,
+  day_timer_seconds:   60,
+  vote_timer_seconds:  30,
+}
+
+export const TIMER_MAX: Record<string, number> = {
+  night_timer_seconds: 300,
+  day_timer_seconds:   600,
+  vote_timer_seconds:  300,
+}
+
 export const TIMER_BOUNDS: Record<string, [number, number]> = {
-  night_timer_seconds:  [30,  120],
-  day_timer_seconds:    [60,  300],
-  vote_timer_seconds:   [30,  120],
+  night_timer_seconds: [30, 300],
+  day_timer_seconds:   [60, 600],
+  vote_timer_seconds:  [30, 300],
 }
 
 export const TIMER_LABELS: Record<string, string> = {

@@ -4,7 +4,7 @@ import {
   formatSeconds,
   DIFFICULTY_LABELS,
   TIMER_STEPS,
-  TIMER_BOUNDS,
+  TIMER_MIN,
   TIMER_LABELS,
   voiceLabel,
 } from './config'
@@ -19,6 +19,19 @@ interface Props {
 export default function LobbyConfigPanel({ config, hostSecret, gameId }: Props) {
   const [isPatching, setIsPatching] = useState(false)
   const [voices, setVoices] = useState<string[]>([])
+  const [draftTimers, setDraftTimers] = useState<Record<string, string>>({
+    night_timer_seconds: String(config.night_timer_seconds),
+    day_timer_seconds:   String(config.day_timer_seconds),
+    vote_timer_seconds:  String(config.vote_timer_seconds),
+  })
+
+  useEffect(() => {
+    setDraftTimers({
+      night_timer_seconds: String(config.night_timer_seconds),
+      day_timer_seconds:   String(config.day_timer_seconds),
+      vote_timer_seconds:  String(config.vote_timer_seconds),
+    })
+  }, [config.night_timer_seconds, config.day_timer_seconds, config.vote_timer_seconds])
 
   useEffect(() => {
     fetch('/api/narrator/voices')
@@ -39,6 +52,16 @@ export default function LobbyConfigPanel({ config, hostSecret, gameId }: Props) 
     } finally {
       setIsPatching(false)
     }
+  }
+
+  function commitTimer(field: string, raw: string) {
+    const lo = TIMER_MIN[field]
+    const parsed = parseInt(raw, 10)
+    if (isNaN(parsed) || parsed < lo) {
+      setDraftTimers(d => ({ ...d, [field]: String((config as unknown as Record<string, unknown>)[field]) }))
+      return
+    }
+    patch({ [field]: parsed })
   }
 
   const isHost = Boolean(hostSecret)
@@ -84,7 +107,7 @@ export default function LobbyConfigPanel({ config, hostSecret, gameId }: Props) 
         {(['night_timer_seconds', 'day_timer_seconds', 'vote_timer_seconds'] as const).map(field => {
           const value = config[field]
           const step = TIMER_STEPS[field]
-          const [lo, hi] = TIMER_BOUNDS[field]
+          const lo = TIMER_MIN[field]
           return (
             <div key={field} className="lobby-config-panel__timer-row">
               <span className="lobby-config-panel__timer-label">{TIMER_LABELS[field]}</span>
@@ -93,10 +116,19 @@ export default function LobbyConfigPanel({ config, hostSecret, gameId }: Props) 
                 disabled={isPatching || value <= lo}
                 onClick={() => patch({ [field]: value - step })}
               >−</button>
-              <span className="lobby-config-panel__timer-value">{formatSeconds(value)}</span>
+              <input
+                type="number"
+                className="lobby-config-panel__timer-input"
+                value={draftTimers[field]}
+                min={lo}
+                disabled={isPatching}
+                onChange={e => setDraftTimers(d => ({ ...d, [field]: e.target.value }))}
+                onBlur={e => commitTimer(field, e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') commitTimer(field, (e.target as HTMLInputElement).value) }}
+              />
               <button
                 className="lobby-config-panel__stepper"
-                disabled={isPatching || value >= hi}
+                disabled={isPatching}
                 onClick={() => patch({ [field]: value + step })}
               >+</button>
             </div>
