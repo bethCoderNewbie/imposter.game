@@ -4,7 +4,7 @@
 
 /* ── Night substrate ───────────────────────────────────────────────────────── */
 html.phase-night {
-  background: url('https://i.pinimg.com/originals/44/6e/3b/446e3b79395a287ca32f7977dd83b290.jpg') center / cover no-repeat;
+  background: url('/images/night-forest.jpg') center / cover no-repeat;
 }
 
 html.phase-night::after {
