@@ -223,7 +223,7 @@ class MasterGameState(BaseModel):
     night_actions: NightActions = Field(default_factory=NightActions)
     day_votes: dict[str, str] = Field(default_factory=dict)  # voter_pid -> target_pid
     elimination_log: list[EliminationEvent] = Field(default_factory=list)
-    winner: str | None = None   # "village" | "werewolf" | "neutral" | null
+    winner: str | None = None   # "village" | "werewolf" | "neutral" | "draw" | null
     winner_player_id: str | None = None  # neutral solo wins only
     seer_knowledge: dict[str, str] = Field(default_factory=dict)  # target_pid -> InvestigationResult
     hunter_queue: list[str] = Field(default_factory=list)  # hunter player_ids pending revenge

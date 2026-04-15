@@ -1061,3 +1061,438 @@ class TestAlphaWolf:
         G.night_actions.seer_target_id = "p1"
         G_new = resolve_night(G)
         assert G_new.night_actions.seer_result == InvestigationResult.WOLF
+
+
+# -- Infector (extended) -------------------------------------------------------
+
+class TestInfectorExtended:
+    def _infector_game(self):
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.players["p2"].role = "infector"  # p2 stays werewolf team
+        G.players["p2"].team = Team.WEREWOLF
+        return G
+
+    def test_infector_roleblock_preserves_infect_ability(self):
+        G = self._infector_game()
+        G.night_actions.roleblocked_player_id = "p2"  # infector blocked
+        G.night_actions.infector_target_id = "p6"
+        G.players["p2"].infect_used = False
+        G_new = resolve_night(G)
+        # Roleblock fires before infect_used is set in step 4
+        assert not G_new.players["p2"].infect_used
+        # p6 was NOT converted
+        assert G_new.players["p6"].team == "village"
+
+    def test_doctor_protection_does_not_block_infect_conversion(self):
+        G = self._infector_game()
+        G.night_actions.infector_target_id = "p6"
+        G.night_actions.doctor_target_id = "p6"  # doctor protects same target
+        G_new = resolve_night(G)
+        # Infect (step 4+7) is independent of Doctor (step 5); conversion succeeds
+        assert G_new.players["p6"].role == "werewolf"
+        assert G_new.players["p6"].team == "werewolf"
+
+    def test_tracker_does_not_see_infector_visit(self):
+        G = self._infector_game()
+        G.night_actions.infector_target_id = "p6"
+        G.night_actions.tracker_target_id = "p6"  # tracker watches p6
+        G_new = resolve_night(G)
+        # Infect is not a "visit" in tracker step 11
+        assert "p2" not in G_new.night_actions.tracker_result
+
+    def test_infect_converts_role_and_team(self):
+        G = self._infector_game()
+        G.night_actions.infector_target_id = "p6"
+        G_new = resolve_night(G)
+        assert G_new.players["p6"].role == "werewolf"
+        assert G_new.players["p6"].team == "werewolf"
+
+    def test_infect_cancels_wolf_kill(self):
+        G = self._infector_game()
+        G.night_actions.infector_target_id = "p6"
+        G.night_actions.wolf_votes = {"p1": "p7", "p2": "p7"}  # pack votes kill p7
+        G_new = resolve_night(G)
+        # Infect replaces kill; p7 survives, p6 converted
+        assert G_new.players["p7"].is_alive
+        assert G_new.players["p6"].role == "werewolf"
+
+    def test_infector_roleblocked_wolf_kill_proceeds(self):
+        G = self._infector_game()
+        G.night_actions.roleblocked_player_id = "p2"
+        G.night_actions.infector_target_id = "p6"
+        G.night_actions.wolf_votes = {"p1": "p7", "p2": "p7"}
+        G_new = resolve_night(G)
+        # Infect blocked; wolf kill proceeds normally
+        assert not G_new.players["p7"].is_alive
+        assert G_new.players["p6"].role != "werewolf"  # not converted
+
+    def test_infector_cannot_infect_dead_player(self):
+        G = self._infector_game()
+        G.players["p6"].is_alive = False  # target already dead
+        G.night_actions.infector_target_id = "p6"
+        G_new = resolve_night(G)
+        # Step 7 skips: target not alive
+        assert G_new.players["p6"].role != "werewolf"
+
+
+# -- Arsonist (extended) -------------------------------------------------------
+
+class TestArsonistExtended:
+    def _arsonist_game(self):
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.players["p6"].role = "arsonist"
+        G.players["p6"].team = Team.NEUTRAL
+        return G
+
+    def test_arsonist_douse_same_player_twice_is_idempotent(self):
+        G = self._arsonist_game()
+        G.players["p6"].doused_player_ids = ["p7"]  # already doused p7
+        G.night_actions.arsonist_action = "douse"
+        G.night_actions.arsonist_douse_target_id = "p7"  # douse p7 again
+        G_new = resolve_night(G)
+        assert G_new.players["p6"].doused_player_ids.count("p7") == 1
+
+    def test_arsonist_roleblock_prevents_ignite(self):
+        G = self._arsonist_game()
+        G.players["p6"].doused_player_ids = ["p7"]
+        G.night_actions.roleblocked_player_id = "p6"
+        G.night_actions.arsonist_action = "ignite"
+        G_new = resolve_night(G)
+        assert G_new.players["p7"].is_alive  # ignite blocked by roleblock
+
+    def test_arsonist_ignite_triggers_hunter_queue(self):
+        from engine.state.enums import Phase
+        G = self._arsonist_game()
+        G.players["p7"].role = "hunter"
+        G.players["p6"].doused_player_ids = ["p7"]
+        G.night_actions.arsonist_action = "ignite"
+        G_new = resolve_night(G)
+        assert not G_new.players["p7"].is_alive
+        assert "p7" in G_new.hunter_queue
+        assert G_new.phase == Phase.HUNTER_PENDING
+
+    def test_arsonist_ignite_skips_already_dead_doused_players(self):
+        G = self._arsonist_game()
+        G.players["p6"].doused_player_ids = ["p7", "p8"]
+        G.players["p7"].is_alive = False  # already dead
+        G.night_actions.arsonist_action = "ignite"
+        G_new = resolve_night(G)
+        assert not G_new.players["p8"].is_alive  # alive doused player dies
+        # p7 already dead; no duplicate elimination event for p7
+        p7_events = [e for e in G_new.elimination_log if e.player_id == "p7"]
+        assert len(p7_events) == 0  # no new event (was already dead before this night)
+
+    def test_arsonist_village_cursed_does_not_affect_ignite(self):
+        G = self._arsonist_game()
+        G.village_powers_cursed = True
+        G.players["p6"].doused_player_ids = ["p7"]
+        G.night_actions.arsonist_action = "ignite"
+        G_new = resolve_night(G)
+        assert not G_new.players["p7"].is_alive  # curse only affects village roles
+
+    def test_arsonist_ignite_triggers_lovers_death_chain(self):
+        G = self._arsonist_game()
+        G.lovers_pair = ["p7", "p8"]
+        G.players["p7"].lovers_partner_id = "p8"
+        G.players["p8"].lovers_partner_id = "p7"
+        G.players["p6"].doused_player_ids = ["p7"]
+        G.night_actions.arsonist_action = "ignite"
+        G_new = resolve_night(G)
+        assert not G_new.players["p7"].is_alive  # arsonist kill
+        assert not G_new.players["p8"].is_alive  # broken heart
+        causes = [e.cause for e in G_new.elimination_log]
+        assert EliminationCause.BROKEN_HEART in causes
+
+    def test_arsonist_douse_adds_to_list(self):
+        G = self._arsonist_game()
+        G.night_actions.arsonist_action = "douse"
+        G.night_actions.arsonist_douse_target_id = "p7"
+        G_new = resolve_night(G)
+        assert "p7" in G_new.players["p6"].doused_player_ids
+
+
+# -- Lunatic (extended) --------------------------------------------------------
+
+class TestLunaticExtended:
+    def _lunatic_game(self):
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.players["p6"].role = "lunatic"
+        G.players["p6"].team = Team.NEUTRAL
+        return G
+
+    def test_lunatic_redirect_blocked_when_infector_converting(self):
+        G = self._lunatic_game()
+        G.players["p2"].role = "infector"
+        G.players["p2"].infect_used = True  # infect queued this night
+        G.night_actions.infector_target_id = "p3"
+        G.night_actions.wolf_votes = {"p1": "p7", "p2": "p7"}
+        G.night_actions.lunatic_redirect = True
+        G_new = resolve_night(G)
+        # Redirect blocked (infector converting), lunatic survives
+        assert G_new.players["p6"].is_alive
+        # Infector conversion proceeds
+        assert G_new.players["p3"].role == "werewolf"
+
+    def test_lunatic_redirect_blocked_when_no_wolf_votes(self):
+        G = self._lunatic_game()
+        # No wolf votes at all
+        G.night_actions.lunatic_redirect = True
+        G_new = resolve_night(G)
+        assert G_new.players["p6"].is_alive
+        assert G_new.lunatic_cursed_wolf_id is None
+
+    def test_lunatic_sacrifice_triggers_lovers_death_chain(self):
+        G = self._lunatic_game()
+        G.lovers_pair = ["p6", "p7"]
+        G.players["p6"].lovers_partner_id = "p7"
+        G.players["p7"].lovers_partner_id = "p6"
+        G.night_actions.wolf_votes = {"p1": "p8", "p2": "p8"}
+        G.night_actions.lunatic_redirect = True
+        G_new = resolve_night(G)
+        assert not G_new.players["p6"].is_alive   # lunatic sacrifice
+        assert not G_new.players["p7"].is_alive   # broken heart
+        causes = [e.cause for e in G_new.elimination_log]
+        assert EliminationCause.BROKEN_HEART in causes
+
+    def test_lunatic_curse_bypasses_doctor_protection(self):
+        G = self._lunatic_game()
+        # Simulate: p1 (wolf) was cursed last night
+        G.lunatic_cursed_wolf_id = "p1"
+        # Doctor tries to protect p1 this night
+        G.night_actions.doctor_target_id = "p1"
+        G_new = resolve_night(G)
+        # Step 0 fires BEFORE step 5 (Doctor) — curse always kills
+        assert not G_new.players["p1"].is_alive
+        causes = [e.cause for e in G_new.elimination_log]
+        assert EliminationCause.LUNATIC_CURSE in causes
+
+    def test_lunatic_cursed_wolf_id_cleared_after_curse_fires(self):
+        G = self._lunatic_game()
+        G.lunatic_cursed_wolf_id = "p1"
+        G_new = resolve_night(G)
+        assert G_new.lunatic_cursed_wolf_id is None
+
+    def test_lunatic_redirect_skipped_when_already_dead(self):
+        G = self._lunatic_game()
+        G.players["p6"].is_alive = False
+        G.night_actions.wolf_votes = {"p1": "p7", "p2": "p7"}
+        G.night_actions.lunatic_redirect = True
+        G_new = resolve_night(G)
+        # Dead lunatic found by _find_role_player only if alive; skip redirect
+        # Wolf kill proceeds normally
+        assert not G_new.players["p7"].is_alive
+        assert G_new.lunatic_cursed_wolf_id is None
+
+    def test_lunatic_cursed_dead_wolf_clears_gracefully(self):
+        G = self._lunatic_game()
+        G.players["p1"].is_alive = False  # cursed wolf already dead
+        G.lunatic_cursed_wolf_id = "p1"
+        G_new = resolve_night(G)
+        # Step 0: wolf already dead, no new event, curse cleared
+        assert G_new.lunatic_cursed_wolf_id is None
+        new_events = [e for e in G_new.elimination_log if e.cause == EliminationCause.LUNATIC_CURSE]
+        assert len(new_events) == 0
+
+
+# -- Wise (extended, night) ----------------------------------------------------
+
+class TestWiseExtended:
+    def _wise_game(self):
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.players["p6"].role = "wise"
+        G.players["p6"].team = Team.VILLAGE
+        return G
+
+    def test_wise_shield_fires_first_even_with_doctor(self):
+        G = self._wise_game()
+        G.night_actions.wolf_votes = {"p1": "p6", "p2": "p6"}
+        G.night_actions.doctor_target_id = "p6"  # doctor also protects
+        G_new = resolve_night(G)
+        assert G_new.players["p6"].is_alive
+        assert G_new.players["p6"].wise_shield_used is True  # shield fired
+
+    def test_wise_shield_spent_doctor_is_fallback(self):
+        G = self._wise_game()
+        G.players["p6"].wise_shield_used = True  # shield already spent
+        G.night_actions.wolf_votes = {"p1": "p6", "p2": "p6"}
+        G.night_actions.doctor_target_id = "p6"
+        G_new = resolve_night(G)
+        # Shield skipped; Doctor's is_protected saves Wise
+        assert G_new.players["p6"].is_alive
+
+    def test_arsonist_ignite_bypasses_wise_shield(self):
+        G = self._wise_game()
+        G.players["p7"].role = "arsonist"
+        G.players["p7"].team = Team.NEUTRAL
+        G.players["p7"].doused_player_ids = ["p6"]
+        G.night_actions.arsonist_action = "ignite"
+        G_new = resolve_night(G)
+        # Ignite (step 8) is not a wolf kill; shield (step 7) does not intercept
+        assert not G_new.players["p6"].is_alive
+        assert not G_new.players["p6"].wise_shield_used  # shield never triggered
+
+    def test_wise_curse_disables_cupid_in_round_1(self):
+        G = self._wise_game()
+        G.village_powers_cursed = True
+        G.round = 1
+        G.players["p5"].role = "cupid"
+        G.players["p5"].team = Team.VILLAGE
+        G.night_actions.cupid_link = ["p7", "p8"]
+        G_new = resolve_night(G)
+        # Curse blocks Cupid (village team check in step 3)
+        assert G_new.lovers_pair is None
+
+    def test_wise_shield_not_consumed_when_village_cursed(self):
+        G = self._wise_game()
+        G.village_powers_cursed = True
+        G.night_actions.wolf_votes = {"p1": "p6", "p2": "p6"}
+        G_new = resolve_night(G)
+        # Shield disabled by curse; wolf kill lands; shield was NOT used
+        assert not G_new.players["p6"].is_alive
+
+
+# ── Neutral killer win conditions ─────────────────────────────────────────────
+
+class TestNeutralKillerWinConditions:
+    """
+    Verify that village does NOT win merely because wolves die if a neutral killer
+    is still alive, and that neutral killers win only when they are the last ones
+    standing (per roles.json:664–673).
+    """
+
+    def _sk_game(self) -> MasterGameState:
+        """3-player game: 1 wolf, 1 villager, 1 serial killer."""
+        from engine.setup import setup_game
+        G = setup_game("test-sk", "p1", {})
+        G = G.model_copy(deep=True)
+        G.players = {
+            "p1": _make_player("p1", "Wolf", "werewolf", Team.WEREWOLF),
+            "p2": _make_player("p2", "Villager", "villager", Team.VILLAGE),
+            "p3": _make_player("p3", "SK", "serial_killer", Team.NEUTRAL),
+        }
+        G.phase = Phase.NIGHT
+        G.round = 1
+        G.host_player_id = "p1"
+        G.night_actions = NightActions(actions_required_count=0)
+        return G
+
+    def _arsonist_game(self) -> MasterGameState:
+        """3-player game: 1 wolf, 1 villager, 1 arsonist."""
+        from engine.setup import setup_game
+        G = setup_game("test-arsonist", "p1", {})
+        G = G.model_copy(deep=True)
+        G.players = {
+            "p1": _make_player("p1", "Wolf", "werewolf", Team.WEREWOLF),
+            "p2": _make_player("p2", "Villager", "villager", Team.VILLAGE),
+            "p3": _make_player("p3", "Arsonist", "arsonist", Team.NEUTRAL),
+        }
+        G.phase = Phase.NIGHT
+        G.round = 1
+        G.host_player_id = "p1"
+        G.night_actions = NightActions(actions_required_count=0)
+        return G
+
+    def test_village_does_not_win_when_wolves_dead_but_sk_alive(self):
+        """Wolves eliminated but SK still alive → game must continue."""
+        from engine.resolver._win import check_win_condition
+        G = self._sk_game()
+        # Kill the wolf manually
+        G = G.model_copy(deep=True)
+        G.players["p1"].is_alive = False
+        G_new = check_win_condition(G)
+        assert G_new.winner is None
+        assert G_new.phase == Phase.NIGHT
+
+    def test_sk_wins_when_last_player_standing(self):
+        """SK is the only living player → winner = neutral, winner_player_id = SK."""
+        from engine.resolver._win import check_win_condition
+        G = self._sk_game()
+        G = G.model_copy(deep=True)
+        G.players["p1"].is_alive = False
+        G.players["p2"].is_alive = False
+        G_new = check_win_condition(G)
+        assert G_new.winner == "neutral"
+        assert G_new.winner_player_id == "p3"
+        assert G_new.phase == Phase.GAME_OVER
+
+    def test_arsonist_wins_when_last_player_standing(self):
+        """Arsonist is the only living player → winner = neutral, winner_player_id = arsonist."""
+        from engine.resolver._win import check_win_condition
+        G = self._arsonist_game()
+        G = G.model_copy(deep=True)
+        G.players["p1"].is_alive = False
+        G.players["p2"].is_alive = False
+        G_new = check_win_condition(G)
+        assert G_new.winner == "neutral"
+        assert G_new.winner_player_id == "p3"
+        assert G_new.phase == Phase.GAME_OVER
+
+    def test_village_wins_when_wolves_and_sk_both_dead(self):
+        """All threats eliminated → village wins."""
+        from engine.resolver._win import check_win_condition
+        G = self._sk_game()
+        G = G.model_copy(deep=True)
+        G.players["p1"].is_alive = False
+        G.players["p3"].is_alive = False
+        G_new = check_win_condition(G)
+        assert G_new.winner == "village"
+        assert G_new.phase == Phase.GAME_OVER
+
+    def test_draw_when_sk_and_arsonist_are_last(self):
+        """Only SK + Arsonist alive simultaneously → draw."""
+        from engine.resolver._win import check_win_condition
+        from engine.setup import setup_game
+        G = setup_game("test-draw", "p1", {})
+        G = G.model_copy(deep=True)
+        G.players = {
+            "p1": _make_player("p1", "Wolf", "werewolf", Team.WEREWOLF, alive=False),
+            "p2": _make_player("p2", "Villager", "villager", Team.VILLAGE, alive=False),
+            "p3": _make_player("p3", "SK", "serial_killer", Team.NEUTRAL),
+            "p4": _make_player("p4", "Arsonist", "arsonist", Team.NEUTRAL),
+        }
+        G.phase = Phase.NIGHT
+        G.round = 1
+        G_new = check_win_condition(G)
+        assert G_new.winner == "draw"
+        assert G_new.winner_player_id is None
+        assert G_new.phase == Phase.GAME_OVER
+
+    def test_wolf_parity_counts_sk_as_opposition(self):
+        """1 wolf vs 1 villager + 1 SK → wolves do NOT win (1 < 2 non-wolf).
+        Old logic: 1 >= 1 village → wolf wins. New logic: 1 < 2 non-wolf → game continues."""
+        from engine.resolver._win import check_win_condition
+        from engine.setup import setup_game
+        G = setup_game("test-parity", "p1", {})
+        G = G.model_copy(deep=True)
+        G.players = {
+            "p1": _make_player("p1", "Wolf", "werewolf", Team.WEREWOLF),
+            "p2": _make_player("p2", "Villager", "villager", Team.VILLAGE),
+            "p3": _make_player("p3", "SK", "serial_killer", Team.NEUTRAL),
+        }
+        G.phase = Phase.NIGHT
+        G.round = 1
+        G_new = check_win_condition(G)
+        assert G_new.winner is None
+        assert G_new.phase == Phase.NIGHT
+
+    def test_wolf_parity_wins_when_outnumber_all_including_sk(self):
+        """2 wolves vs 1 SK (village dead) → wolves win (2 ≥ 1 non-wolf)."""
+        from engine.resolver._win import check_win_condition
+        from engine.setup import setup_game
+        G = setup_game("test-parity-win", "p1", {})
+        G = G.model_copy(deep=True)
+        G.players = {
+            "p1": _make_player("p1", "Wolf1", "werewolf", Team.WEREWOLF),
+            "p2": _make_player("p2", "Wolf2", "werewolf", Team.WEREWOLF),
+            "p3": _make_player("p3", "Villager", "villager", Team.VILLAGE, alive=False),
+            "p4": _make_player("p4", "SK", "serial_killer", Team.NEUTRAL),
+        }
+        G.phase = Phase.NIGHT
+        G.round = 1
+        G_new = check_win_condition(G)
+        assert G_new.winner == "werewolf"
+        assert G_new.phase == Phase.GAME_OVER

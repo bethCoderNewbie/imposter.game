@@ -28,34 +28,42 @@ def check_win_condition(G: MasterGameState, jester_voted_out_id: str | None = No
 
     living = [p for p in G.players.values() if p.is_alive]
     wolves_alive = [p for p in living if p.team == "werewolf"]
-    village_alive = [p for p in living if p.team == "village"]
     sk_alive = [p for p in living if p.role == "serial_killer"]
     arsonist_alive = [p for p in living if p.role == "arsonist"]
+    neutral_killers_alive = sk_alive + arsonist_alive
 
-    # Village wins: all wolves eliminated
-    if len(wolves_alive) == 0:
-        # Check if any neutral threats remain — village still wins
+    # Village wins: all wolves AND all neutral killers eliminated
+    if len(wolves_alive) == 0 and len(neutral_killers_alive) == 0:
         G = G.model_copy(deep=True)
         G.winner = "village"
         G.phase = Phase.GAME_OVER
         G.timer_ends_at = None
         return _reveal_roles_on_game_over(G)
 
-    # Wolves win: wolves equal or outnumber village (non-wolf) living players
-    if len(wolves_alive) >= len(village_alive):
-        # But only if no Serial Killer or Arsonist can contest
-        # Per roles.json: wolf win > SK standalone in simultaneous clash
+    # Wolves win: wolves equal or outnumber ALL non-wolf living players (village + neutrals)
+    # SK and Arsonist oppose wolves at the vote, so they count toward opposition for parity
+    non_wolf_alive = [p for p in living if p.team != "werewolf"]
+    if len(wolves_alive) >= len(non_wolf_alive):
         G = G.model_copy(deep=True)
         G.winner = "werewolf"
         G.phase = Phase.GAME_OVER
         G.timer_ends_at = None
         return _reveal_roles_on_game_over(G)
 
-    # Serial Killer solo win: SK is the last player standing (or only non-SK are dead)
-    if sk_alive and len(living) == len(sk_alive):
+    # Neutral killer win: only neutral killers remain (all wolves and village dead)
+    non_killer_alive = [p for p in living if p not in neutral_killers_alive]
+    if neutral_killers_alive and len(non_killer_alive) == 0:
         G = G.model_copy(deep=True)
-        G.winner = "neutral"
-        G.winner_player_id = sk_alive[0].player_id
+        if sk_alive and arsonist_alive:
+            # Simultaneous last-standing — draw (per roles.json note, line 673)
+            G.winner = "draw"
+            G.winner_player_id = None
+        elif sk_alive:
+            G.winner = "neutral"
+            G.winner_player_id = sk_alive[0].player_id
+        else:  # arsonist alone
+            G.winner = "neutral"
+            G.winner_player_id = arsonist_alive[0].player_id
         G.phase = Phase.GAME_OVER
         G.timer_ends_at = None
         return _reveal_roles_on_game_over(G)
