@@ -1,15 +1,5 @@
-/* ── Hex grid placement ─────────────────────────────────────────────────────
-   --i is set via inline style; --n is inherited from .day-screen__grid.
-   The column formula produces staggered odd/even rows (honeycomb offset).   */
+/* ── Flex item — no grid formula needed ───────────────────────────────────── */
 .player-card {
-  --m: round(down, .5 * var(--n));
-  --j: mod(var(--i, 0), calc(var(--n) - 1));
-  --e: clamp(0, calc(var(--j) - var(--m) + 1), 1);
-
-  grid-column:
-    calc(2 * mod(var(--j), var(--m)) + 1 + var(--e)) /
-    span 2;
-
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -18,33 +8,53 @@
   overflow: visible;
 }
 
-/* ── Hex-shaped avatar ──────────────────────────────────────────────────────
-   clip-path polygon(50% 0, 150% 50%, 50% 100%, -50% 50%) is a diamond whose
-   left/right extremes are clipped by the element bounds, producing a wide
-   six-sided hexagon.  overflow:hidden clips children to the same shape.      */
+/* ── Circle avatar ──────────────────────────────────────────────────────────
+   --s    : diameter, tracks --u so size scales with player count
+   --b    : ring thickness
+   --c    : ring colour (overridden per game-state)
+   --f    : scale factor — dead shrinks, majority stays full-size (card glow)
+   outline + outline-offset produce the coloured ring outside the circle      */
 .player-card__avatar-wrap {
-  position: relative;
+  --s: calc(var(--u) * 1.4);
+  --b: max(3px, calc(var(--u) * 0.04));
+  --c: rgba(255, 255, 255, 0.70);
+  --f: 1;
+
+  width: var(--s);
+  aspect-ratio: 1;
+  border-radius: 50%;
   overflow: hidden;
-  clip-path: polygon(50% 0, 150% 50%, 50% 100%, -50% 50%);
-  width: 100%;
-  aspect-ratio: sqrt(3) / 2;
-  transition: opacity 0.8s ease-in-out, filter 0.8s ease-in-out;
+  position: relative;
+
+  outline: var(--b) solid var(--c);
+  outline-offset: max(3px, calc(var(--u) * 0.04));
+
+  filter: drop-shadow(1px 2px 5px rgba(0, 0, 0, 0.50));
+  transform: scale(var(--f));
+  transition: transform 0.5s, filter 0.8s ease-in-out, opacity 0.8s ease-in-out;
 }
 
-/* Avatar fills the hex entirely (overrides PlayerAvatar's fixed vmin sizing) */
+/* Avatar fills the tombstone content area */
 .player-card .player-avatar {
   width: 100%;
   height: 100%;
   border-radius: 0;
-  font-size: clamp(12px, 2.2vmin, 30px);
+  font-size: calc(var(--u) * 0.55);
 }
 
 .player-card .player-avatar__photo {
   border-radius: 0;
 }
 
+/* Hover scale — mirrors img:hover { --f: 1.4 } from reference CSS */
+.player-card__avatar-wrap:hover {
+  --f: 1.4;
+}
+
 /* ── Dead state ─────────────────────────────────────────────────────────── */
 .player-card--dead .player-card__avatar-wrap {
+  --f: 0.85;
+  --c: rgba(100, 80, 110, 0.4);
   filter: grayscale(1) sepia(0.3) brightness(0.5);
   opacity: 0.6;
 }
@@ -65,14 +75,15 @@
 }
 
 /* ── Vote tally badge ───────────────────────────────────────────────────────
-   Positioned at the top-right visible corner of the hex (≈ 100%, 25%).      */
+   Moved outside .player-card__avatar-wrap so overflow:hidden no longer clips it.
+   Positioned relative to .player-card (position:relative, overflow:visible).  */
 .player-card__vote-badge {
   position: absolute;
-  top: 0.15em;
-  right: 1%;
+  top: 0;
+  right: 0;
   background: var(--wolf-primary);
   color: #fff;
-  font-size: clamp(11px, 1.7vmin, 22px);
+  font-size: clamp(10px, calc(var(--u) * 0.15), 24px);
   font-weight: 700;
   width: 2em;
   height: 2em;
@@ -85,8 +96,12 @@
 }
 
 /* ── Majority vote leader ───────────────────────────────────────────────────
-   drop-shadow on the card propagates through the clip-path on avatar-wrap,
-   so it glows along the hex outline rather than a rectangle.                 */
+   Gold border ring via --c; drop-shadow on the card follows the tombstone
+   outline (mask-aware parent filter).                                        */
+.player-card--majority .player-card__avatar-wrap {
+  --c: rgba(237, 201, 75, 0.9);
+}
+
 .player-card--majority {
   animation: hex-majority-pulse 3s ease-in-out infinite;
 }
@@ -109,7 +124,7 @@
 
 /* ── Player name ────────────────────────────────────────────────────────── */
 .player-card__name {
-  font-size: clamp(11px, 1.7vmin, 22px);
+  font-size: clamp(12px, calc(var(--u) * 0.22), 32px);
   color: rgba(40, 25, 55, 0.9);
   text-align: center;
   font-weight: 600;

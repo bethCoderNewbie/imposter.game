@@ -33,12 +33,12 @@ export default function PlayerCard({ player, voteCount, hasMajority, index }: Pr
             </svg>
           </div>
         )}
-
-        {/* Vote tally badge — PRD-003 §2.2 */}
-        {voteCount > 0 && (
-          <div className="player-card__vote-badge">{voteCount}</div>
-        )}
       </div>
+
+      {/* Vote tally badge — outside avatar-wrap so overflow:hidden doesn't clip it */}
+      {voteCount > 0 && (
+        <div className="player-card__vote-badge">{voteCount}</div>
+      )}
 
       <p className="player-card__name">{player.display_name}</p>
     </div>
