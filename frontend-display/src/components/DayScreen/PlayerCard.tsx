@@ -30,13 +30,7 @@ export default function PlayerCard({ player, voteCount, hasMajority, index, isSo
       <div className="player-card__avatar-wrap">
         <PlayerAvatar player={player} />
 
-        {/* Cause icon or tombstone fallback for eliminated players */}
-        {isDead && eliminationCause && (() => {
-          const icon = getCauseIcon(eliminationCause)
-          return icon.type === 'image'
-            ? <img className="player-card__cause-icon" src={icon.src} alt={icon.alt} />
-            : <span className="player-card__cause-icon player-card__cause-icon--emoji" aria-hidden="true">{icon.char}</span>
-        })()}
+        {/* Tombstone fallback — inside avatar-wrap so it inherits the dead filter */}
         {isDead && !eliminationCause && (
           <div className="player-card__tombstone" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -48,6 +42,14 @@ export default function PlayerCard({ player, voteCount, hasMajority, index, isSo
           </div>
         )}
       </div>
+
+      {/* Cause icon — outside avatar-wrap so grayscale filter doesn't desaturate it */}
+      {isDead && eliminationCause && (() => {
+        const icon = getCauseIcon(eliminationCause)
+        return icon.type === 'image'
+          ? <img className="player-card__cause-icon" src={icon.src} alt={icon.alt} />
+          : <span className="player-card__cause-icon player-card__cause-icon--emoji" aria-hidden="true">{icon.char}</span>
+      })()}
 
       {/* Vote tally badge — outside avatar-wrap so overflow:hidden doesn't clip it */}
       {voteCount > 0 && (

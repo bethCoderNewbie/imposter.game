@@ -287,6 +287,13 @@ export default function App() {
   return (
     <>
       <button className="app-leave-btn" onClick={handleLeaveMatch}>Leave</button>
+      <PlayerInfoBadge
+        gameId={session.game_id}
+        playerId={session.player_id}
+        sessionToken={session.session_token}
+        displayName={myPlayer?.display_name ?? '—'}
+        role={myPlayer?.role ?? null}
+      />
       {phaseContent}
       {showSoundPanel && (
         <SoundPanel
@@ -295,5 +302,55 @@ export default function App() {
         />
       )}
     </>
+  )
+}
+
+// ── Player info badge — tap ⓘ to expand/collapse ──────────────────────────────
+interface InfoBadgeProps {
+  gameId: string
+  playerId: string
+  sessionToken: string
+  displayName: string
+  role: string | null
+}
+
+function PlayerInfoBadge({ gameId, playerId, sessionToken, displayName, role }: InfoBadgeProps) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div className="info-badge">
+      <button
+        className="info-badge__toggle"
+        onClick={() => setOpen(v => !v)}
+        aria-label="Player info"
+        aria-expanded={open}
+      >
+        ⓘ
+      </button>
+      {open && (
+        <div className="info-badge__panel">
+          <div className="info-badge__row">
+            <span className="info-badge__label">Name</span>
+            <span className="info-badge__value">{displayName}</span>
+          </div>
+          <div className="info-badge__row">
+            <span className="info-badge__label">Player ID</span>
+            <span className="info-badge__value info-badge__mono">{playerId}</span>
+          </div>
+          <div className="info-badge__row">
+            <span className="info-badge__label">Token</span>
+            <span className="info-badge__value info-badge__mono info-badge__truncate">{sessionToken}</span>
+          </div>
+          <div className="info-badge__row">
+            <span className="info-badge__label">Role</span>
+            <span className="info-badge__value">{role ?? '—'}</span>
+          </div>
+          <div className="info-badge__row">
+            <span className="info-badge__label">Match ID</span>
+            <span className="info-badge__value info-badge__mono">{gameId}</span>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
