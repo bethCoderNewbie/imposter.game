@@ -102,8 +102,11 @@
   --c: rgba(237, 201, 75, 0.9);
 }
 
+/* Majority: glow pulse + wobble combined so neither overrides the other */
 .player-card--majority {
-  animation: hex-majority-pulse 3s ease-in-out infinite;
+  animation:
+    hex-majority-pulse 3s ease-in-out 0s infinite,
+    wobble 4s ease-in-out calc(var(--i, 0) * 0.5s) infinite;
 }
 
 /* WANTED label above the hex */
@@ -146,7 +149,43 @@
   animation: card-shimmer 2.5s linear infinite;
 }
 
+/* ── Floating wobble ────────────────────────────────────────────────────────
+   Applied to all living (non-dead) cards. Staggered by --i so cards drift
+   out of phase with each other. Dead cards stay still.                       */
+.player-card:not(.player-card--dead) {
+  animation: wobble 4s ease-in-out calc(var(--i, 0) * 0.5s) infinite;
+}
+
+/* Ground shadow — blurred ellipse that contracts as the card floats up */
+.player-card:not(.player-card--dead)::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  bottom: -6px;
+  left: 50%;
+  width: 70%;
+  height: 10px;
+  border-radius: 100%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.35);
+  filter: blur(5px);
+  pointer-events: none;
+  animation: wobble-shadow 4s ease-in-out calc(var(--i, 0) * 0.5s) infinite;
+}
+
 /* ── Keyframes ──────────────────────────────────────────────────────────── */
+@keyframes wobble {
+  0%, 100% { transform: translateY(0px);   }
+  25%       { transform: translateY(-5px)  rotate(-0.4deg); }
+  50%       { transform: translateY(-12px) rotate(0deg); }
+  75%       { transform: translateY(-5px)  rotate(0.4deg); }
+}
+
+@keyframes wobble-shadow {
+  0%, 100% { transform: translateX(-50%) scaleX(1);   opacity: 0.35; }
+  50%       { transform: translateX(-50%) scaleX(0.55); opacity: 0.12; }
+}
+
 @keyframes hex-majority-pulse {
   0%, 100% {
     filter:
