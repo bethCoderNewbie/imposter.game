@@ -1,38 +1,19 @@
 #visuals {
   position: fixed;
-  bottom: 8%;
+  bottom: 6%;
   left: 2%;
-  height: 50px;
-  width: 50px;
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  grid-template-rows: repeat(2, 1fr);
-  background: url('/images/host.jpeg') center / cover no-repeat;
-  border-radius: 6px;
-  overflow: hidden;
+  /* Viewport-relative size — adapts to screen resolution */
+  height: 8vmin;
+  width: 8vmin;
   z-index: 100;
   pointer-events: none;
   animation: visuals-fade-in 0.35s ease-in;
 }
 
-/* Cells — empty for now, available for future per-quadrant content */
-.visuals__cell {
-  /* placeholder */
-}
-
-/* Override orientation queries to keep the avatar at 50px */
-@media (orientation: landscape) {
-  #visuals {
-    height: 50px;
-    width: 50px;
-  }
-}
-
-@media (orientation: portrait) {
-  #visuals {
-    height: 50px;
-    width: 50px;
-  }
+.narrator-avatar-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible; /* allow pulse ring to render outside the box */
 }
 
 @keyframes visuals-fade-in {

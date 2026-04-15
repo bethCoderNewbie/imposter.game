@@ -1,17 +1,20 @@
 .narrator-subtitle {
   position: fixed;
-  bottom: 8%;
-  left: calc(2% + 58px); /* clears the 50px avatar + 8px gap */
+  bottom: 6%;
+  /* Start just past the 8vmin avatar + 2% left + 8px gap */
+  left: calc(2% + 8vmin + 8px);
+  /* Fill the remaining screen width with a small right margin */
+  width: calc(96% - 8vmin - 8px);
   background: rgba(0, 0, 0, 0.78);
   color: #f5f0e8;
   padding: 0.55em 1.3em;
   border-radius: 6px;
-  font-size: 1.45rem;
+  font-size: clamp(1rem, 2.2vw, 1.6rem);
   font-style: italic;
   text-align: left;
-  max-width: 45%;
   z-index: 100;
   pointer-events: none;
+  box-sizing: border-box;
   animation: narrator-fade-in 0.35s ease-in;
 }
 
