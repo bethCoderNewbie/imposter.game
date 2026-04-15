@@ -323,8 +323,14 @@ class TestNightPhaseFlow:
                     {"type": "submit_night_action", "target_id": kill_target["player_id"]},
                 )
 
+            # Advance night phase — same as drive_night() does via phase_timeout.
+            send_player_intent(
+                client, game_id, players[0],
+                {"type": "phase_timeout", "phase": "night"},
+            )
+
             # Drain seer WS to DAY (has seer_result populated)
-            day_msg = consume_until(seer_ws, until_phase("day"))
+            day_msg = consume_until(seer_ws, until_phase("day"), max_messages=50)
 
         na = day_msg["state"]["night_actions"]
         assert na.get("seer_result") == "wolf", (
