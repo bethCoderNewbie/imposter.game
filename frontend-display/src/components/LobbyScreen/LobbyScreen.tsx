@@ -20,10 +20,12 @@ export default function LobbyScreen({ gameState, hostSecret, gameId }: Props) {
   const joinUrl = `${HOST_BASE}/?g=${gameState.game_id}`
   // roster is updated in real-time via match_data on every player join/leave.
   // gameState.players only updates on sync/update (not sent during lobby phase).
-  const players = useGameStore(state => state.roster).filter(p => p.is_connected)
-  const playerCount = players.length
+  const roster = useGameStore(state => state.roster)
+  const connectedPlayers = roster.filter(p => p.is_connected)
+  const playerCount = connectedPlayers.length
   const canStart = playerCount >= 5
   const [starting, setStarting] = useState(false)
+  const [kickingIds, setKickingIds] = useState(new Set<string>())
 
   async function handleStart() {
     if (!gameId || starting) return
@@ -39,12 +41,26 @@ export default function LobbyScreen({ gameState, hostSecret, gameId }: Props) {
     }
   }
 
+  async function handleKick(playerId: string) {
+    if (!gameId || !hostSecret || kickingIds.has(playerId)) return
+    setKickingIds(prev => new Set([...prev, playerId]))
+    try {
+      await fetch(`/api/games/${gameId}/players/${playerId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ host_secret: hostSecret }),
+      })
+    } finally {
+      setKickingIds(prev => { const n = new Set(prev); n.delete(playerId); return n })
+    }
+  }
+
   // Track which player_ids are new arrivals for pop-in animation
   const knownIdsRef = useRef(new Set<string>())
   const [newIds, setNewIds] = useState(new Set<string>())
 
   useEffect(() => {
-    const currentIds = new Set(players.map(p => p.player_id))
+    const currentIds = new Set(connectedPlayers.map(p => p.player_id))
     const arrived = new Set<string>()
     currentIds.forEach(id => {
       if (!knownIdsRef.current.has(id)) arrived.add(id)
@@ -61,7 +77,7 @@ export default function LobbyScreen({ gameState, hostSecret, gameId }: Props) {
       }, 500)
     }
     knownIdsRef.current = currentIds
-  }, [players.map(p => p.player_id).join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [connectedPlayers.map(p => p.player_id).join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const isDealing = gameState.phase === 'role_deal'
 
@@ -69,7 +85,7 @@ export default function LobbyScreen({ gameState, hostSecret, gameId }: Props) {
     <div className="lobby-screen">
       {/* Top-right: player count badge — PRD-003 §6 */}
       <div className="lobby-screen__count">
-        {playerCount} / {gameState.config.player_count || 18} joined
+        {playerCount} active / {roster.length} joined
       </div>
 
       {/* Center: QR code + join URL + room code */}
@@ -86,11 +102,11 @@ export default function LobbyScreen({ gameState, hostSecret, gameId }: Props) {
         <p className="lobby-screen__code">{gameState.game_id}</p>
       </div>
 
-      {/* Campfire + avatar parade */}
+      {/* Campfire + avatar parade (connected players only) */}
       <div className="lobby-screen__parade">
         <div className="lobby-screen__campfire">🔥</div>
         <div className="lobby-screen__avatars">
-          {players.map((p: PlayerRosterEntry) => (
+          {connectedPlayers.map((p: PlayerRosterEntry) => (
             <PlayerAvatar
               key={p.player_id}
               player={p}
@@ -99,6 +115,32 @@ export default function LobbyScreen({ gameState, hostSecret, gameId }: Props) {
           ))}
         </div>
       </div>
+
+      {/* Player roster — all entries with connection status + host kick controls */}
+      {roster.length > 0 && (
+        <div className="lobby-screen__roster">
+          {roster.map((p: PlayerRosterEntry) => (
+            <div
+              key={p.player_id}
+              className={`lobby-screen__roster-row${p.is_connected ? '' : ' lobby-screen__roster-row--offline'}`}
+            >
+              <span className={`lobby-screen__dot${p.is_connected ? ' lobby-screen__dot--on' : ''}`} />
+              <PlayerAvatar player={p} size={28} />
+              <span className="lobby-screen__roster-name">{p.display_name}</span>
+              {!p.is_connected && hostSecret && (
+                <button
+                  className="lobby-screen__kick-btn"
+                  disabled={kickingIds.has(p.player_id)}
+                  onClick={() => handleKick(p.player_id)}
+                  aria-label={`Remove ${p.display_name}`}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Config panel: difficulty + timers — PRD-005 */}
       <LobbyConfigPanel

@@ -411,3 +411,32 @@ async def start_game_via_display(game_id: str, body: StartGameRequest, redis=Dep
     })
 
     return {"ok": True}
+
+
+class KickPlayerRequest(BaseModel):
+    host_secret: str
+
+
+@router.delete("/{game_id}/players/{player_id}")
+async def kick_player(game_id: str, player_id: str, body: KickPlayerRequest, redis=Depends(_get_redis)):
+    """Remove a disconnected player from the lobby. Host-secret required. Lobby phase only."""
+    G = await load_game(redis, game_id)
+    if G is None:
+        raise HTTPException(status_code=404, detail="Game not found.")
+    if G.host_secret != body.host_secret:
+        raise HTTPException(status_code=403, detail="Invalid host secret.")
+    if G.phase != Phase.LOBBY:
+        raise HTTPException(status_code=409, detail="Can only remove players during lobby phase.")
+    player = G.players.get(player_id)
+    if player is None:
+        raise HTTPException(status_code=404, detail="Player not in game.")
+    if player.is_connected:
+        raise HTTPException(status_code=409, detail="Cannot remove a connected player.")
+
+    from api.connection_manager import manager
+    G = G.model_copy(deep=True)
+    del G.players[player_id]
+    await save_game(redis, game_id, G)
+    await manager.broadcast_roster(game_id, list(G.players.values()))
+
+    return {"ok": True}

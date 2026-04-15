@@ -118,3 +118,78 @@
   color: rgba(255, 255, 255, 0.5);
   cursor: not-allowed;
 }
+
+/* ── Player roster panel ─────────────────────────────────────────────────── */
+.lobby-screen__roster {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4vmin;
+  max-height: 28vmin;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.8vmin;
+  padding: 0.8vmin 1.2vmin;
+  min-width: 28vmin;
+  max-width: 48vmin;
+}
+
+.lobby-screen__roster-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7vmin;
+  padding: 0.3vmin 0;
+  transition: opacity 0.3s;
+}
+
+.lobby-screen__roster-row--offline {
+  opacity: 0.45;
+}
+
+/* Connection status dot */
+.lobby-screen__dot {
+  width: clamp(6px, 0.8vmin, 10px);
+  height: clamp(6px, 0.8vmin, 10px);
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: rgba(229, 62, 62, 0.85);
+}
+
+.lobby-screen__dot--on {
+  background: rgba(72, 187, 120, 0.9);
+  box-shadow: 0 0 4px rgba(72, 187, 120, 0.6);
+}
+
+.lobby-screen__roster-name {
+  flex: 1;
+  font-size: clamp(11px, 1.5vmin, 20px);
+  color: rgba(255, 255, 255, 0.85);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Kick button — only visible on offline rows when host */
+.lobby-screen__kick-btn {
+  background: rgba(229, 62, 62, 0.75);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: clamp(9px, 1.1vmin, 14px);
+  font-weight: 700;
+  padding: 0.15em 0.55em;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, opacity 0.15s;
+  line-height: 1.4;
+}
+
+.lobby-screen__kick-btn:hover {
+  background: rgba(229, 62, 62, 1);
+}
+
+.lobby-screen__kick-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
