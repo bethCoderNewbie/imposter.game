@@ -471,6 +471,65 @@ Adding or changing it requires no Alembic migration.
 
 ---
 
+## Duplicate Players in Lobby or Active Game
+
+### Symptom: Display shows two (or more) entries with the same name
+
+Players in the lobby or mid-game appear multiple times on the display TV. Each duplicate entry has the same `display_name` but a different `player_id`. Only one entry ever shows as connected; the rest remain permanently grey/disconnected.
+
+**Cause:** A mobile player retried the join form after a network failure. The server processed each retry as a new join during the LOBBY phase, creating one player slot per HTTP attempt. See ADR-024 for full root-cause analysis. Fixed in commit after 2026-04-14 — this symptom cannot recur once the fix is deployed.
+
+---
+
+### Diagnosing a game that already started with ghost players
+
+**1. Identify the game ID** from the display URL or host's browser (e.g., `QVN9`).
+
+**2. Inspect the live game state in Redis:**
+```bash
+redis-cli GET wolf:game:QVN9 | python3 -m json.tool | grep -A3 '"permanent_id"'
+```
+Look for repeated `permanent_id` values — each occurrence is a separate player slot for the same physical person.
+
+**3. Find the ghost player IDs** (the ones with no active WebSocket):
+```bash
+redis-cli GET wolf:game:QVN9 | python3 -m json.tool | python3 -c "
+import json, sys
+G = json.load(sys.stdin)
+seen = {}
+for pid, p in G['players'].items():
+    perm = p.get('permanent_id', '')
+    seen.setdefault(perm, []).append((pid, p.get('display_name'), p.get('is_connected')))
+for perm, entries in seen.items():
+    if len(entries) > 1:
+        print(f'DUPLICATE permanent_id={perm}:')
+        for pid, name, conn in entries:
+            print(f'  player_id={pid}  name={name}  is_connected={conn}')
+"
+```
+
+**4. Identify which is the active slot** — it will have `is_connected: true` or will be the one whose `session_token` is still valid in Redis:
+```bash
+# Check if a session token is still live (replace TOKEN with value from game state)
+redis-cli GET wolf:token:TOKEN
+```
+
+**5. Accept the situation** — there is no safe hot-patch to remove a ghost slot from an in-progress game without risking state corruption. Ghost players:
+- Hold a role (they received one at game start)
+- Will never submit night actions or votes (permanently disconnected)
+- The game engine's auto-resolve logic will time out their action slot and advance normally
+- They show as grey/dead-looking on the display for the remainder of the game
+
+**6. At game over** — the ghosts appear in the role-reveal grid. Explain to players that the extra entries are disconnected retry slots, not real participants.
+
+---
+
+### Prevention
+
+ADR-024 (`docs/architecture/adr/ADR-024_lobby_join_idempotency.md`) documents the fix: `POST /api/games/{game_id}/join` is now idempotent during LOBBY phase. Retrying a failed join returns the existing player slot and a fresh token instead of creating a new entry. Deploy the fix to prevent recurrence.
+
+---
+
 ## Diagnosing WebSocket Issues
 
 ### Symptom: Mobile client shows "Reconnecting…" immediately after joining via QR code

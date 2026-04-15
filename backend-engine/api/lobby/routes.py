@@ -125,6 +125,21 @@ async def join_game(game_id: str, body: JoinGameRequest, redis=Depends(_get_redi
     if len(G.players) >= 16:
         raise HTTPException(status_code=409, detail="Lobby is full.")
 
+    # Idempotency: re-issue token for an existing slot rather than creating a ghost.
+    # Covers the lost-in-transit case where the server committed the player but the
+    # client never received the response and retried. See ADR-024.
+    existing = next(
+        (p for p in G.players.values() if p.permanent_id == body.permanent_id),
+        None,
+    )
+    if existing:
+        new_token = await issue_session_token(redis, game_id, existing.player_id)
+        return {
+            "game_id": game_id,
+            "player_id": existing.player_id,
+            "session_token": new_token,
+        }
+
     player_id = str(uuid.uuid4())
     G = G.model_copy(deep=True)
     G.players[player_id] = PlayerState(

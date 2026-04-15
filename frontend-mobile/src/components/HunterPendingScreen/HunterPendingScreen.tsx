@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useHaptics } from '../../hooks/useHaptics'
 import PlayerAvatar from '../PlayerAvatar/PlayerAvatar'
 import type { PlayerState, StrippedGameState } from '../../types/game'
+import '../NightActionShell/ActionUI.css'
 import './HunterPendingScreen.css'
 
 interface Props {
