@@ -37,16 +37,28 @@ html.phase-day {
 
 /* ── Lobby substrate ───────────────────────────────────────────────────────── */
 html.phase-lobby {
-  background: radial-gradient(ellipse at 50% 60%, #1a0f0a 0%, #0a0806 60%, #030202 100%);
+  background-image: linear-gradient(to top, #dbdcd7 0%, #dddcd7 24%, #e2c9cc 30%, #e7627d 46%, #b8235a 59%, #801357 71%, #3d1635 84%, #1c1a27 100%);
+}
+
+html.phase-lobby body {
+  background: transparent;
 }
 
 /* ── Game Over — winner variants ───────────────────────────────────────────── */
 html.winner-village {
-  background: radial-gradient(ellipse at 50% 30%, #2d2510 0%, #1a1408 60%, #0d0a04 100%);
+  background-image: linear-gradient(to top, #dbdcd7 0%, #dddcd7 24%, #e2c9cc 30%, #e7627d 46%, #b8235a 59%, #801357 71%, #3d1635 84%, #1c1a27 100%);
+}
+
+html.winner-village body {
+  background: transparent;
 }
 
 html.winner-wolf {
-  background: radial-gradient(ellipse at 50% 30%, #2d0d0d 0%, #1a0808 60%, #0d0404 100%);
+  background-image: linear-gradient(to top, #dbdcd7 0%, #dddcd7 24%, #e2c9cc 30%, #e7627d 46%, #b8235a 59%, #801357 71%, #3d1635 84%, #1c1a27 100%);
+}
+
+html.winner-wolf body {
+  background: transparent;
 }
 
 /* ── Ensure all overlaid components stack above grain pseudo-element ─────── */
