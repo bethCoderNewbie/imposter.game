@@ -490,4 +490,17 @@ async def handle_player_disconnected(G, intent, redis_client, cm) -> MasterGameS
     if player_id and player_id in G.players:
         G = G.model_copy(deep=True)
         G.players[player_id].is_connected = False
+        # No explicit roster broadcast here — the game queue broadcasts the full
+        # state (sync/update) after this handler returns, which carries the updated
+        # is_connected flag to all clients including the Display.
+    return G
+
+
+async def handle_player_connected(G, intent, redis_client, cm) -> MasterGameState:
+    """Mark a player connected after their WebSocket auth succeeds."""
+    player_id = intent.get("player_id")
+    if player_id and player_id in G.players:
+        G = G.model_copy(deep=True)
+        G.players[player_id].is_connected = True
+        # No explicit roster broadcast — the queue broadcasts updated state after return.
     return G

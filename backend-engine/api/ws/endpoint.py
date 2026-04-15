@@ -16,7 +16,7 @@ from api.game_queue import get_or_create_queue
 from api.intents.dispatch import dispatch_intent
 from engine.config import get_settings
 from engine.stripper import player_view
-from storage.redis_store import load_game, validate_session_token
+from storage.redis_store import load_game, save_game, validate_session_token
 
 # ── Sound board side-channel ───────────────────────────────────────────────────
 # Allowed sound IDs — validated server-side to prevent arbitrary payload injection
@@ -129,6 +129,13 @@ async def websocket_endpoint(websocket: WebSocket, game_id: str, player_id: str)
     # Push current state immediately so the display doesn't wait for next event
     G_init = await load_game(redis, game_id)
     if G_init is not None:
+        # Mark player as connected now that WS auth succeeded.
+        # Done here (same pattern as rejoin endpoint) rather than via the queue
+        # to avoid injecting an extra broadcast that would break sequential test flows.
+        if authenticated_player_id and authenticated_player_id in G_init.players:
+            G_init = G_init.model_copy(deep=True)
+            G_init.players[authenticated_player_id].is_connected = True
+            await save_game(redis, game_id, G_init)
         settings = get_settings()
         stripped = player_view(G_init, authenticated_player_id)
         await websocket.send_text(json.dumps({

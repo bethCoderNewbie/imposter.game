@@ -142,12 +142,14 @@ async def join_game(game_id: str, body: JoinGameRequest, redis=Depends(_get_redi
 
     player_id = str(uuid.uuid4())
     G = G.model_copy(deep=True)
+    # is_connected starts False — set to True only when WS auth succeeds (player_connected intent)
     G.players[player_id] = PlayerState(
         player_id=player_id,
         display_name=player_rec.display_name,
         avatar_id=body.avatar_id,
         photo_url=body.photo_url,
         permanent_id=body.permanent_id,
+        is_connected=False,
     )
 
     # First player to join becomes the host

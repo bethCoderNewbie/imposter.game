@@ -18,7 +18,11 @@ const HOST_BASE: string = import.meta.env.VITE_HOST_IP || window.location.origin
 
 export default function LobbyScreen({ gameState, hostSecret, gameId }: Props) {
   const joinUrl = `${HOST_BASE}/?g=${gameState.game_id}`
-  const players = useGameStore(state => state.roster)
+  useGameStore(state => state.roster) // keep store subscription for photo_url updates
+  // Derive the connected player list from gameState.players (updated on every sync/update)
+  // rather than the Zustand roster (updated only on match_data). This ensures the lobby
+  // reflects is_connected in real-time without extra roster broadcasts inside the queue.
+  const players = Object.values(gameState.players).filter(p => p.is_connected)
   const playerCount = players.length
   const canStart = playerCount >= 5
   const [starting, setStarting] = useState(false)
