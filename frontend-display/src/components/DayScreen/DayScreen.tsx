@@ -26,6 +26,14 @@ export default function DayScreen({ gameState, frozenVotes, audioUnlocked }: Pro
 
   return (
     <div className="day-screen">
+      {/* Parallax background — behind all game content */}
+      <div className="day-parallax" aria-hidden="true">
+        <div className="day-parallax__layer day-parallax__rocks2" />
+        <div className="day-parallax__layer day-parallax__rocks1" />
+        <div className="day-parallax__layer day-parallax__hills" />
+        <div className="day-parallax__layer day-parallax__foreground" />
+      </div>
+
       {/* Top-center: round label + timer — PRD-003 §6 */}
       <div className="day-screen__header">
         <span className="day-screen__round">Day {gameState.round}</span>
@@ -39,12 +47,13 @@ export default function DayScreen({ gameState, frozenVotes, audioUnlocked }: Pro
 
       {/* Player grid — relative so VoteWeb SVG can overlay it */}
       <div className={`day-screen__grid${isVoting ? ' day-screen__grid--voting' : ''}`} id="player-grid">
-        {players.map(player => (
+        {players.map((player, index) => (
           <PlayerCard
             key={player.player_id}
             player={player}
             voteCount={voteCounts[player.player_id] ?? 0}
             hasMajority={(voteCounts[player.player_id] ?? 0) > majorityThreshold}
+            index={index}
           />
         ))}
 

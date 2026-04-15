@@ -23,6 +23,7 @@ interface Session {
 
 const SESSION_KEY = 'ww_session'
 const PERMANENT_ID_KEY = 'ww_permanent_id'
+const LAST_GAME_KEY = 'ww_last_game'
 
 function loadSession(): Session | null {
   try {
@@ -33,10 +34,13 @@ function loadSession(): Session | null {
 
 function saveSession(s: Session) {
   localStorage.setItem(SESSION_KEY, JSON.stringify(s))
+  // Always track the game_id separately so it survives token expiry / clearSession()
+  localStorage.setItem(LAST_GAME_KEY, s.game_id)
 }
 
 function clearSession() {
   localStorage.removeItem(SESSION_KEY)
+  // Intentionally keep LAST_GAME_KEY — used as rejoin code fallback in OnboardingForm
 }
 
 function loadPermanentId(): string | null {
@@ -66,6 +70,9 @@ export default function App() {
       setSession(null)
       return
     }
+    // Track the new game_id even before the session updates so a player who
+    // loses their token before the redirect completes can still rejoin via Join.
+    localStorage.setItem(LAST_GAME_KEY, msg.new_game_id)
     setSession(prev => {
       if (!prev) return null
       const entry = msg.players[prev.player_id]
@@ -160,9 +167,13 @@ export default function App() {
   // ── No session → Onboarding ──────────────────────────────────────────────────
   if (!session) {
     const storedSession = loadSession()
+    // Fall back to the last known game code so a returning player (token expired
+    // or missed a rematch redirect) gets the code pre-filled and can re-enter via
+    // the join endpoint, which re-issues a token for existing players in any phase.
+    const fallbackCode = URL_GAME_CODE || localStorage.getItem(LAST_GAME_KEY) || ''
     return (
       <OnboardingForm
-        prefillCode={URL_GAME_CODE}
+        prefillCode={fallbackCode}
         permanentId={loadPermanentId()}
         onJoined={handleJoined}
         savedSession={storedSession}

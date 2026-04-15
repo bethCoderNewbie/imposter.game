@@ -1,3 +1,4 @@
+import React from 'react'
 import PlayerAvatar from '../PlayerAvatar/PlayerAvatar'
 import type { PlayerState } from '../../types/game'
 import './PlayerCard.css'
@@ -6,15 +7,17 @@ interface Props {
   player: PlayerState
   voteCount: number
   hasMajority: boolean
+  index: number
 }
 
-export default function PlayerCard({ player, voteCount, hasMajority }: Props) {
+export default function PlayerCard({ player, voteCount, hasMajority, index }: Props) {
   const isDead = !player.is_alive
 
   return (
     <div
       className={`player-card ${isDead ? 'player-card--dead' : ''} ${hasMajority ? 'player-card--majority' : ''}`}
       data-player-id={player.player_id}
+      style={{ '--i': index } as React.CSSProperties}
     >
       <div className="player-card__avatar-wrap">
         <PlayerAvatar player={player} />

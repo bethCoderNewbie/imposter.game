@@ -9,6 +9,65 @@
   gap: 2vmin;
 }
 
+/* ── Parallax background ────────────────────────────────────────────────────── */
+.day-parallax {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: url("http://www.testomic.com/public/codepen-assets/img/paralax/background.jpg") center / cover no-repeat;
+  z-index: 0;
+}
+
+.day-parallax__layer {
+  position: absolute;
+  width: 400%;
+}
+
+.day-parallax__foreground {
+  height: 50%;
+  bottom: 0;
+  background: url("http://www.testomic.com/public/codepen-assets/img/paralax/foreground.png") repeat-x;
+  background-size: 25% 100%;
+  animation: day-parallax-slide 30s linear infinite;
+}
+
+.day-parallax__hills {
+  height: 40%;
+  bottom: 15%;
+  background: url("http://www.testomic.com/public/codepen-assets/img/paralax/hills.png") repeat-x;
+  background-size: 25% 100%;
+  animation: day-parallax-slide 60s linear infinite;
+}
+
+.day-parallax__rocks1 {
+  height: 35%;
+  bottom: 25%;
+  background: url("http://www.testomic.com/public/codepen-assets/img/paralax/rocks1.png") repeat-x;
+  background-size: 25% 100%;
+  animation: day-parallax-slide 120s linear infinite;
+}
+
+.day-parallax__rocks2 {
+  height: 40%;
+  bottom: 15%;
+  background: url("http://www.testomic.com/public/codepen-assets/img/paralax/rocks2.png") repeat-x;
+  background-size: 25% 100%;
+  animation: day-parallax-slide 240s linear infinite;
+}
+
+@keyframes day-parallax-slide {
+  0%   { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}
+
+/* Ensure all game content renders above the parallax layers */
+.day-screen__header,
+.day-screen__grid,
+.day-screen__phase-label {
+  position: relative;
+  z-index: 1;
+}
+
 /* Header: round label + timer — PRD-003 §6 top-center */
 .day-screen__header {
   position: fixed;
@@ -41,15 +100,30 @@
 .day-screen__timer.timer--warning { color: #c05621; }
 .day-screen__timer.timer--critical { color: #c53030; text-shadow: 0 0 8px currentColor; }
 
-/* Player grid */
+/* Player grid — honeycomb hex layout (adapted from container-query hex grid) */
 .day-screen__grid {
+  container-type: inline-size;
   position: relative;
+  z-index: 1;
+
+  /* Hex sizing formula: n = how many unit columns (--u wide) fit in the container */
+  --u: 7vmin;
+  --s: max(.25rem, .6vmin);
+  --w: 100cqw;
+  --p: calc(var(--w) + var(--s));
+  --q: calc(var(--u) + var(--s));
+  --f: var(--p) / var(--q);
+  --n: max(2, round(down, var(--f)));
+
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(clamp(80px, 9vmin, 130px), 1fr));
-  gap: 1.5vmin;
+  grid-gap: calc(.5 * var(--s) * sqrt(3)) var(--s);
+  grid-template-columns: repeat(var(--n), 1fr);
+  justify-content: center;
   width: 100%;
   max-width: 80vmin;
-  margin-top: 8vmin;
+  margin: 10vmin auto 0;
+  /* drop-shadow follows the hex clip-path on children */
+  filter: drop-shadow(2px 3px 7px rgba(0, 0, 0, 0.45));
 }
 
 /* Phase label — bottom center — PRD-003 §2.2 */

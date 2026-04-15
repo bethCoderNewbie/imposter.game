@@ -1,42 +1,78 @@
+/* ── Hex grid placement ─────────────────────────────────────────────────────
+   --i is set via inline style; --n is inherited from .day-screen__grid.
+   The column formula produces staggered odd/even rows (honeycomb offset).   */
 .player-card {
+  --m: round(down, .5 * var(--n));
+  --j: mod(var(--i, 0), calc(var(--n) - 1));
+  --e: clamp(0, calc(var(--j) - var(--m) + 1), 1);
+
+  grid-column:
+    calc(2 * mod(var(--j), var(--m)) + 1 + var(--e)) /
+    span 2;
+
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.8vmin;
-  position: relative; /* required for ::before/::after pseudo-elements */
+  gap: .35vmin;
+  position: relative;
+  overflow: visible;
 }
 
+/* ── Hex-shaped avatar ──────────────────────────────────────────────────────
+   clip-path polygon(50% 0, 150% 50%, 50% 100%, -50% 50%) is a diamond whose
+   left/right extremes are clipped by the element bounds, producing a wide
+   six-sided hexagon.  overflow:hidden clips children to the same shape.      */
 .player-card__avatar-wrap {
   position: relative;
+  overflow: hidden;
+  clip-path: polygon(50% 0, 150% 50%, 50% 100%, -50% 50%);
+  width: 100%;
+  aspect-ratio: sqrt(3) / 2;
+  transition: opacity 0.8s ease-in-out, filter 0.8s ease-in-out;
 }
 
-/* Dead state: grayscale filter (PRD-002 §2.5) */
-.player-card--dead .player-avatar {
+/* Avatar fills the hex entirely (overrides PlayerAvatar's fixed vmin sizing) */
+.player-card .player-avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  font-size: clamp(12px, 2.2vmin, 30px);
+}
+
+.player-card .player-avatar__photo {
+  border-radius: 0;
+}
+
+/* ── Dead state ─────────────────────────────────────────────────────────── */
+.player-card--dead .player-card__avatar-wrap {
   filter: grayscale(1) sepia(0.3) brightness(0.5);
-  transition: filter 0.8s ease-in-out;
-  opacity: 0.65;
+  opacity: 0.6;
 }
 
-/* Tombstone overlay */
+/* Tombstone SVG — clipped to hex shape alongside the avatar */
 .player-card__tombstone {
   position: absolute;
-  inset: -4px;
-  color: rgba(80, 60, 80, 0.6);
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(80, 60, 80, 0.65);
 }
 
 .player-card__tombstone svg {
-  width: 100%;
-  height: 100%;
+  width: 50%;
+  height: 50%;
 }
 
-/* Vote tally badge — PRD-003 §2.2 */
+/* ── Vote tally badge ───────────────────────────────────────────────────────
+   Positioned at the top-right visible corner of the hex (≈ 100%, 25%).      */
 .player-card__vote-badge {
   position: absolute;
-  top: -4px;
-  right: -4px;
+  top: 0.15em;
+  right: 1%;
   background: var(--wolf-primary);
   color: #fff;
-  font-size: clamp(12px, 1.9vmin, 24px);
+  font-size: clamp(11px, 1.7vmin, 22px);
   font-weight: 700;
   width: 2em;
   height: 2em;
@@ -45,38 +81,21 @@
   align-items: center;
   justify-content: center;
   line-height: 1;
+  z-index: 2;
 }
 
-/* Majority vote pulse (PRD-003 §3.3) */
-.player-card--majority .player-avatar {
-  animation: vote-majority-pulse 3s ease-in-out infinite;
+/* ── Majority vote leader ───────────────────────────────────────────────────
+   drop-shadow on the card propagates through the clip-path on avatar-wrap,
+   so it glows along the hex outline rather than a rectangle.                 */
+.player-card--majority {
+  animation: hex-majority-pulse 3s ease-in-out infinite;
 }
 
-/* Wanted poster rotating-border on majority card */
-.player-card--majority::before {
-  content: '';
-  position: absolute;
-  inset: -5px;
-  border-radius: 8px;
-  background: linear-gradient(
-    135deg,
-    rgba(237, 201, 75, 0.0)  0%,
-    rgba(237, 201, 75, 0.9) 30%,
-    rgba(229,  62,  62, 0.8) 50%,
-    rgba(237, 201, 75, 0.9) 70%,
-    rgba(237, 201, 75, 0.0) 100%
-  );
-  background-size: 200% 200%;
-  animation: wanted-border-rotate 2s linear infinite;
-  z-index: -1;
-  pointer-events: none;
-}
-
-/* WANTED label above majority card */
+/* WANTED label above the hex */
 .player-card--majority::after {
   content: 'WANTED';
   position: absolute;
-  top: -2.0em;
+  top: -1.6em;
   left: 50%;
   transform: translateX(-50%) rotate(-3deg);
   font-size: clamp(7px, 1.0vmin, 13px);
@@ -88,25 +107,40 @@
   pointer-events: none;
 }
 
-/* Player name — PRD-003 §2.2 */
+/* ── Player name ────────────────────────────────────────────────────────── */
 .player-card__name {
-  font-size: clamp(14px, 2.0vmin, 26px);
-  color: rgba(70, 50, 80, 0.85);
+  font-size: clamp(11px, 1.7vmin, 22px);
+  color: rgba(40, 25, 55, 0.9);
   text-align: center;
-  font-weight: 500;
-  max-width: clamp(80px, 9vmin, 130px);
+  font-weight: 600;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.55);
 }
 
 .player-card--dead .player-card__name {
-  color: rgba(70, 50, 80, 0.4);
+  color: rgba(70, 50, 80, 0.38);
 }
 
-/* Shimmer on living non-majority cards during voting phase */
+/* ── Voting phase shimmer on living cards ───────────────────────────────── */
 .day-screen__grid--voting .player-card:not(.player-card--dead):not(.player-card--majority) .player-card__avatar-wrap {
-  background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,0.07) 50%, transparent 70%);
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.08) 50%, transparent 70%);
   background-size: 200% 100%;
   animation: card-shimmer 2.5s linear infinite;
+}
+
+/* ── Keyframes ──────────────────────────────────────────────────────────── */
+@keyframes hex-majority-pulse {
+  0%, 100% {
+    filter:
+      drop-shadow(0 0 4px rgba(237, 201, 75, 0.85))
+      drop-shadow(0 0 10px rgba(237, 201, 75, 0.40));
+  }
+  50% {
+    filter:
+      drop-shadow(0 0 8px rgba(237, 201, 75, 1.0))
+      drop-shadow(0 0 18px rgba(229,  62,  62, 0.65));
+  }
 }

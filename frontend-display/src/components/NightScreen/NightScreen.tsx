@@ -40,8 +40,14 @@ export default function NightScreen({ gameState, audioUnlocked }: Props) {
     }
   }, [audioUnlocked])
 
+  const fireflies = Array.from({ length: 15 }, (_, i) => (
+    <div key={i} className="firefly" aria-hidden="true" />
+  ))
+
   return (
     <div className="night-screen">
+      {fireflies}
+
       {/* Preloaded audio — plays on phase enter */}
       <audio ref={ambientRef} src={`${import.meta.env.BASE_URL}audio/night-ambient.mp3`} loop preload="auto" />
 
