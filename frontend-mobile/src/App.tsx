@@ -154,6 +154,12 @@ export default function App() {
     setSession(null)
   }
 
+  // Leave match from any phase — fully clears session so OnboardingForm appears clean
+  function handleLeaveMatch() {
+    clearSession()
+    setSession(null)
+  }
+
   // Game over "New Game" — fully clears so no stale rejoin card appears
   function handleNewGame() {
     clearSession()
@@ -185,9 +191,12 @@ export default function App() {
   // ── Connecting ───────────────────────────────────────────────────────────────
   if (!gameState) {
     return (
-      <div className="app-status">
-        <p>{status === 'closed' ? 'Reconnecting…' : 'Connecting…'}</p>
-      </div>
+      <>
+        <button className="app-leave-btn" onClick={handleLeaveMatch}>Leave</button>
+        <div className="app-status">
+          <p>{status === 'closed' ? 'Reconnecting…' : 'Connecting…'}</p>
+        </div>
+      </>
     )
   }
 
@@ -269,6 +278,7 @@ export default function App() {
 
   return (
     <>
+      <button className="app-leave-btn" onClick={handleLeaveMatch}>Leave</button>
       {phaseContent}
       {showSoundPanel && (
         <SoundPanel

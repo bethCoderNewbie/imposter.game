@@ -36,3 +36,26 @@
   font-size: 1rem;
   cursor: pointer;
 }
+
+/* Persistent leave button — fixed top-right on all active game screens */
+.app-leave-btn {
+  position: fixed;
+  top: max(0.8rem, env(safe-area-inset-top));
+  right: 0.8rem;
+  z-index: 9000;
+  background: rgba(0, 0, 0, 0.45);
+  color: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  padding: 0.35em 0.9em;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  transition: opacity 0.15s;
+}
+
+.app-leave-btn:active {
+  opacity: 0.6;
+}
