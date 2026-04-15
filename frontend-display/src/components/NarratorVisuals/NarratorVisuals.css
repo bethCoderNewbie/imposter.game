@@ -1,0 +1,39 @@
+#visuals {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  background: url('/images/host.jpeg') center / cover no-repeat;
+  z-index: 50;
+  pointer-events: none;
+  animation: visuals-fade-in 0.4s ease-out;
+}
+
+/* Landscape: 90vh square */
+@media (orientation: landscape) {
+  #visuals {
+    height: 90vh;
+    width: 90vh;
+  }
+}
+
+/* Portrait: 90vw square */
+@media (orientation: portrait) {
+  #visuals {
+    height: 90vw;
+    width: 90vw;
+  }
+}
+
+/* Individual grid cells — empty for now, available for future overlay content */
+.visuals__cell {
+  /* placeholder for per-quadrant content (e.g. player photos, role icons) */
+}
+
+@keyframes visuals-fade-in {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.97); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}

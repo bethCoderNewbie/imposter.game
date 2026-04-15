@@ -8,6 +8,7 @@ import NightResolution from './components/NightResolution/NightResolution'
 import DayScreen from './components/DayScreen/DayScreen'
 import GameOverScreen from './components/GameOverScreen/GameOverScreen'
 import NarratorSubtitle from './components/NarratorSubtitle/NarratorSubtitle'
+import NarratorVisuals from './components/NarratorVisuals/NarratorVisuals'
 import type { StrippedGameState } from './types/game'
 import './App.css'
 
@@ -248,6 +249,7 @@ export default function App() {
   return (
     <>
       {renderContent()}
+      {audioUnlocked && <NarratorVisuals visible={!!narratorText} />}
       {audioUnlocked && <NarratorSubtitle text={narratorText} />}
       {soundToast && (
         <div className="sound-toast">
