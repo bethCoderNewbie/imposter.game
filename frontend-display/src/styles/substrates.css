@@ -7,6 +7,12 @@ html.phase-night {
   background: url('/images/night-forest.jpg') center / cover no-repeat;
 }
 
+/* body has background: #060810 in index.html — make it transparent so the
+   html background image shows through rather than being covered */
+html.phase-night body {
+  background: transparent;
+}
+
 html.phase-night::after {
   content: '';
   position: fixed;
