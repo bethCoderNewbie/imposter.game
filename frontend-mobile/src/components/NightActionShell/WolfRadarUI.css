@@ -1,0 +1,198 @@
+.wolf-radar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  width: 100%;
+}
+
+.wolf-radar__title {
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  color: #68d391;
+  margin: 0;
+  font-weight: 700;
+}
+
+.wolf-radar__subtitle {
+  font-size: 0.75rem;
+  color: #718096;
+  margin: 0;
+}
+
+/* 2×2 radar display — fills available width, stays square */
+.wolf-radar__display {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 2px;
+  width: 100%;
+  aspect-ratio: 1;
+  max-width: 320px;
+  border: 1px solid #2d3748;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #0d1117;
+}
+
+.wolf-radar__quadrant {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(104, 211, 145, calc(var(--heat, 0) * 0.15));
+  transition: background 0.4s;
+  overflow: hidden;
+}
+
+.wolf-radar__quadrant--active {
+  background: rgba(104, 211, 145, 0.08);
+}
+
+.wolf-radar__quadrant--pinged {
+  outline: 1px solid rgba(104, 211, 145, 0.4);
+}
+
+.wolf-radar__heat-wrap {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.wolf-radar__heat {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #68d391;
+  opacity: 0.7;
+}
+
+/* Ripple color legend */
+.wolf-radar__ripple-legend {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.62rem;
+  color: #718096;
+  margin: 0;
+}
+
+.wolf-radar__q-label {
+  position: absolute;
+  bottom: 4px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 0.55rem;
+  color: #4a5568;
+  letter-spacing: 0.05em;
+}
+
+/* Ripple animation */
+.wolf-radar__ripple {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  animation: radar-ripple 2s ease-out forwards;
+}
+
+@keyframes radar-ripple {
+  0%   { transform: scale(0.3); opacity: 0.9; }
+  100% { transform: scale(3.5); opacity: 0; }
+}
+
+/* Ping result — kept away from the circular clip corners */
+.wolf-radar__ping-result {
+  position: absolute;
+  top: 18%;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.6rem;
+  color: #a0aec0;
+}
+
+.wolf-radar__tier-dots {
+  display: flex;
+  gap: 4px;
+  font-size: 0.55rem;
+  font-weight: 700;
+}
+
+/* Crosshair lines */
+.wolf-radar__crosshair-h,
+.wolf-radar__crosshair-v {
+  position: absolute;
+  background: #2d3748;
+  pointer-events: none;
+  z-index: 10;
+}
+.wolf-radar__crosshair-h {
+  left: 0; right: 0;
+  top: 50%; height: 2px;
+  transform: translateY(-50%);
+}
+.wolf-radar__crosshair-v {
+  top: 0; bottom: 0;
+  left: 50%; width: 2px;
+  transform: translateX(-50%);
+}
+
+/* Sonar ping controls */
+.wolf-radar__ping-label {
+  font-size: 0.65rem;
+  letter-spacing: 0.15em;
+  color: #718096;
+  margin: 0;
+}
+
+.wolf-radar__ping-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  width: 100%;
+  max-width: 320px;
+}
+
+.wolf-radar__ping-btn {
+  padding: 8px 4px;
+  background: #1a202c;
+  border: 1px solid #2d3748;
+  border-radius: 6px;
+  color: #68d391;
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.wolf-radar__ping-btn:hover {
+  background: #2d3748;
+}
+
+.wolf-radar__ping-btn:active {
+  background: #4a5568;
+}
+
+.wolf-radar__ping-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.wolf-radar__ping-budget {
+  font-size: 0.6rem;
+  color: #4a5568;
+}
+
+.wolf-radar__ping-empty {
+  font-size: 0.7rem;
+  color: #4a5568;
+  text-align: center;
+  margin: 4px 0 0;
+  font-style: italic;
+}
