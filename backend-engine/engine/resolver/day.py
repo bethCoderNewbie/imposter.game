@@ -26,11 +26,11 @@ def resolve_day_vote(G: MasterGameState) -> MasterGameState:
         # No votes cast — no elimination, move on
         return G
 
-    # Total eligible vote weight = sum of all alive players' weights
+    # Total eligible vote weight = alive players + dead Ghost (can vote while dead)
     total_eligible_weight: float = sum(
         _voter_weight(pid, G)
         for pid, p in G.players.items()
-        if p.is_alive
+        if p.is_alive or (not p.is_alive and p.role == "ghost")
     )
 
     # Build weighted vote tally from actual votes cast
@@ -38,8 +38,10 @@ def resolve_day_vote(G: MasterGameState) -> MasterGameState:
 
     for voter_pid, target_pid in G.day_votes.items():
         voter = G.players.get(voter_pid)
-        if not voter or not voter.is_alive:
-            continue  # dead players cannot vote
+        if not voter:
+            continue
+        if not voter.is_alive and voter.role != "ghost":
+            continue  # only Ghost can vote while dead
         if voter_pid == target_pid:
             continue  # self-vote not allowed
 
@@ -72,17 +74,22 @@ def resolve_day_vote(G: MasterGameState) -> MasterGameState:
         cause=EliminationCause.VILLAGE_VOTE,
     ))
 
+    # Wise: burned at the stake disables all village role powers permanently
+    if target.role == "wise":
+        G.village_powers_cursed = True
+
     # Priority 1: Jester win check (before generic win check)
     if target.role == "jester":
         G = check_win_condition(G, jester_voted_out_id=top_target)
         return G
 
-    # Hunter: trigger hunter_pending
+    # Hunter: trigger hunter_pending (blocked if village powers are cursed)
     if target.role == "hunter" and not target.hunter_fired:
-        G.hunter_queue.append(top_target)
-        G.phase = Phase.HUNTER_PENDING
-        G.timer_ends_at = None
-        return G
+        if not (G.village_powers_cursed and target.team == "village"):
+            G.hunter_queue.append(top_target)
+            G.phase = Phase.HUNTER_PENDING
+            G.timer_ends_at = None
+            return G
 
     # Lovers death-chain
     if G.lovers_pair and top_target in G.lovers_pair:
@@ -96,21 +103,25 @@ def resolve_day_vote(G: MasterGameState) -> MasterGameState:
                 player_id=partner_id,
                 cause=EliminationCause.BROKEN_HEART,
             ))
-            # Broken-heart death may also trigger Hunter
+            # Broken-heart death may also trigger Hunter (blocked if village powers are cursed)
             if partner.role == "hunter" and not partner.hunter_fired:
-                G.hunter_queue.append(partner_id)
-                G.phase = Phase.HUNTER_PENDING
-                G.timer_ends_at = None
-                return G
+                if not (G.village_powers_cursed and partner.team == "village"):
+                    G.hunter_queue.append(partner_id)
+                    G.phase = Phase.HUNTER_PENDING
+                    G.timer_ends_at = None
+                    return G
 
     G = check_win_condition(G)
     return G
 
 
 def _voter_weight(voter_pid: str, G: MasterGameState) -> float:
-    """Return the vote weight for a voter. Mayor has weight 2, everyone else 1."""
+    """Return the vote weight for a voter. Mayor has weight 2, everyone else 1.
+    Mayor's double-vote is disabled when village powers are cursed."""
     player = G.players.get(voter_pid)
     if player and player.role == "mayor":
+        if G.village_powers_cursed and player.team == "village":
+            return 1.0
         role_def = ROLE_REGISTRY.get("mayor", {})
         return float(role_def.get("voteWeight", 2))
     return 1.0

@@ -494,6 +494,150 @@
         "icon": "serial_killer.svg",
         "revealBackground": "#1a202c"
       }
+    },
+    {
+      "id": "witch",
+      "name": "Witch",
+      "team": "village",
+      "investigationResult": "village",
+      "balanceWeight": 2,
+      "wakeOrder": 4,
+      "actionPhase": "night",
+      "actionType": "heal_or_kill",
+      "maxUses": null,
+      "description": "You possess two potions — one to save the wolf's target, one to strike any player dead. Each can only be used once per game.",
+      "uiPromptNight": "Brew tonight — shield an ally or curse a player?",
+      "abilities": [
+        "Heal potion (one-use per game): protect any living player from death tonight.",
+        "Kill potion (one-use per game): eliminate any living player tonight, bypassing all protection.",
+        "You may skip using a potion any night.",
+        "You cannot use the kill potion on yourself."
+      ],
+      "winCondition": "wolves_eliminated",
+      "nightAction": {
+        "targetPool": "living_all_including_self",
+        "actionChoices": ["heal", "kill"],
+        "resultSilent": true,
+        "canBeBlocked": true
+      },
+      "ui": {
+        "colorToken": "--role-witch",
+        "icon": "witch.svg",
+        "revealBackground": "#553399"
+      }
+    },
+    {
+      "id": "lunatic",
+      "name": "Lunatic",
+      "team": "neutral",
+      "investigationResult": "neutral",
+      "balanceWeight": 1,
+      "wakeOrder": 3,
+      "actionPhase": "night",
+      "actionType": "redirect_kill",
+      "maxUses": 1,
+      "description": "Once per game, redirect the wolf kill onto yourself. The wolf who made the kill is cursed and dies the following night.",
+      "uiPromptNight": "Do you dare redirect the wolves' kill onto yourself tonight?",
+      "abilities": [
+        "Once per game, activate your redirect during the night phase.",
+        "If wolves have a majority kill target that night, you die in their place.",
+        "The wolf who cast the deciding vote is cursed — they die at the start of the next night.",
+        "Your sacrifice bypasses Doctor protection.",
+        "If no wolf kill is resolved that night, your ability is not consumed."
+      ],
+      "winCondition": "wolves_eliminated",
+      "nightAction": {
+        "targetPool": "none",
+        "skippable": true,
+        "resultSilent": true,
+        "canBeBlocked": true
+      },
+      "ui": {
+        "colorToken": "--role-lunatic",
+        "icon": "lunatic.svg",
+        "revealBackground": "#2d3748"
+      }
+    },
+    {
+      "id": "wise",
+      "name": "The Wise",
+      "team": "village",
+      "investigationResult": "village",
+      "balanceWeight": 1,
+      "wakeOrder": 0,
+      "actionPhase": "none",
+      "actionType": "none",
+      "maxUses": null,
+      "description": "You survive the first wolf kill against you. But if the village votes you out, all village role powers are permanently disabled.",
+      "uiPromptNight": "The Archives await. Solve the puzzle to earn a clue.",
+      "abilities": [
+        "Passive: you automatically survive the first wolf kill that targets you.",
+        "After your shield is used, you are vulnerable like any other player.",
+        "WARNING: if you are eliminated by village vote (burned at the stake), all village role powers are permanently disabled for the rest of the game.",
+        "Werewolves and neutral roles are unaffected by the curse."
+      ],
+      "winCondition": "wolves_eliminated",
+      "ui": {
+        "colorToken": "--role-wise",
+        "icon": "wise.svg",
+        "revealBackground": "#b7791f"
+      }
+    },
+    {
+      "id": "bodyguard",
+      "name": "Bodyguard",
+      "team": "village",
+      "investigationResult": "village",
+      "balanceWeight": 2,
+      "wakeOrder": 3,
+      "actionPhase": "night",
+      "actionType": "protect",
+      "maxUses": null,
+      "description": "Each night, guard one player. If that player is wolf-targeted, either the attacking wolf or you will die — 50/50.",
+      "uiPromptNight": "Choose who to guard tonight.",
+      "abilities": [
+        "Each night, choose one living player to guard.",
+        "If the wolves attack your guarded player, they always survive.",
+        "50% chance: the attacking wolf dies instead.",
+        "50% chance: you die in their place.",
+        "If the Doctor also protected you on the night you sacrifice yourself, you survive.",
+        "Can be blocked by the Wolf Shaman."
+      ],
+      "winCondition": "wolves_eliminated",
+      "nightAction": {
+        "targetPool": "living_all_including_self",
+        "resultSilent": true,
+        "canBeBlocked": true
+      },
+      "ui": {
+        "colorToken": "--role-bodyguard",
+        "icon": "bodyguard.svg",
+        "revealBackground": "#2b6cb0"
+      }
+    },
+    {
+      "id": "ghost",
+      "name": "The Ghost",
+      "team": "village",
+      "investigationResult": "village",
+      "balanceWeight": 0,
+      "wakeOrder": 0,
+      "actionPhase": "day",
+      "actionType": "none",
+      "maxUses": null,
+      "description": "You cannot vote while alive. When you die, you gain the ability to vote from beyond the grave. Your identity is never revealed.",
+      "uiPromptNight": "The Archives await. Solve the puzzle to earn a clue.",
+      "abilities": [
+        "You cannot vote during the day phase while alive.",
+        "After you are eliminated, you can vote during all future day vote phases.",
+        "Your identity is never revealed to other players — not even at game over."
+      ],
+      "winCondition": "wolves_eliminated",
+      "ui": {
+        "colorToken": "--role-ghost",
+        "icon": "ghost.svg",
+        "revealBackground": "#4a5568"
+      }
     }
   ],
   "winConditions": {
@@ -574,6 +718,12 @@
       "description": "Infector submits infector_target_id (non-null = use infection this round) or null (skip). If infecting: wolf kill is cancelled this round; infection is queued. Skipped if Infector was roleblocked or infect_used == true."
     },
     {
+      "step": 4.5,
+      "role": "witch",
+      "action": "heal_or_kill",
+      "description": "Witch resolves after Infector but before Doctor. Heal sets is_protected=true on the target (stacks with Doctor). Kill sets target.is_alive=false immediately, cause=witch_kill; bypasses is_protected. Marks respective potion as used (witch_heal_used / witch_kill_used). Skipped if Witch is roleblocked."
+    },
+    {
       "step": 5,
       "role": "doctor",
       "action": "protect",
@@ -586,10 +736,22 @@
       "description": "Seer's inspect resolved (if not roleblocked). If target.is_framed_tonight == true, result is forced to 'werewolf' regardless of actual investigationResult. Otherwise returns target.investigationResult. Result stored in seer_knowledge."
     },
     {
+      "step": 0,
+      "role": "lunatic",
+      "action": "apply_curse",
+      "description": "Runs at the very start of every night. If lunatic_cursed_wolf_id is set (from a previous night's sacrifice), that wolf dies before any other actions — bypasses Doctor protection, roleblock, and all other effects. Clears lunatic_cursed_wolf_id after applying. Resolution order: step 0 in code (before step 1 roleblock)."
+    },
+    {
+      "step": 6.5,
+      "role": "lunatic",
+      "action": "redirect_kill",
+      "description": "Lunatic activated redirect this night. If wolves have a valid majority kill target AND Infector is not converting this round AND Lunatic is not roleblocked: Lunatic dies in place of the wolf's target (cause=lunatic_sacrifice, bypasses protection), the first wolf who voted for that target is marked as lunatic_cursed_wolf_id, and wolf_votes is cleared so step 7 finds no kill. If no valid kill exists, the ability is silently not consumed."
+    },
+    {
       "step": 7,
       "role": "werewolf",
       "action": "eliminate_group_or_infect",
-      "description": "If infector used this round: apply conversion — target.role = 'werewolf', target.team = 'werewolf'. No kill. If no infect: tally wolf votes. Majority wins; ties = no kill. Serial Killer and Arsonist are NOT immune to wolf kill by default. If target is_protected, kill is silently blocked."
+      "description": "If infector used this round: apply conversion — target.role = 'werewolf', target.team = 'werewolf'. No kill. If no infect: tally wolf votes. Majority wins; ties = no kill. Serial Killer and Arsonist are NOT immune to wolf kill by default. If target is_protected, kill is silently blocked. Wise shield checked here: if target.role == 'wise' and wise_shield_used == false and village_powers_cursed == false, kill is deflected and wise_shield_used set to true."
     },
     {
       "step": 8,
@@ -650,7 +812,12 @@
       "infector": "-4  — can grow wolf team; highest long-run wolf threat",
       "jester": "-1  — disrupts village vote discipline; net chaos harm to village",
       "arsonist": "-3  — independent mass-kill threat; can bypass Doctor",
-      "serial_killer": "-3  — independent kill every night; immune to wolf elimination"
+      "serial_killer": "-3  — independent kill every night; immune to wolf elimination",
+      "witch": "+2  — one-use heal + one-use kill; powerful burst but exhaustible",
+      "lunatic": "+1  — one-use wolf removal at cost of own life; net neutral to slightly positive",
+      "wise": "+1  — one-use wolf-kill deflection; offset by catastrophic curse risk if voted out",
+      "bodyguard": "+2  — permanent nightly protection with wolf-kill counterattack; self-sacrifice risk",
+      "ghost": "0  — lost alive-vote offset by gained dead-vote; identity permanently hidden"
     }
   },
   "dynamicTemplates": {
@@ -709,6 +876,7 @@
           "options": [
             "doctor",
             "hunter",
+            "bodyguard",
             "none"
           ]
         },
@@ -718,8 +886,7 @@
           "rerollable": true,
           "options": [
             "werewolf",
-            "alpha_wolf",
-            "none"
+            "alpha_wolf"
           ]
         },
         {
@@ -752,6 +919,7 @@
           "options": [
             "doctor",
             "hunter",
+            "bodyguard",
             "none"
           ]
         },
@@ -763,6 +931,8 @@
             "tracker",
             "mayor",
             "cupid",
+            "wise",
+            "ghost",
             "none"
           ]
         },
@@ -806,6 +976,8 @@
           "options": [
             "doctor",
             "hunter",
+            "witch",
+            "bodyguard",
             "none"
           ]
         },
@@ -827,6 +999,7 @@
             "jester",
             "serial_killer",
             "arsonist",
+            "lunatic",
             "none"
           ]
         },
@@ -892,7 +1065,10 @@
           "options": [
             "hunter",
             "mayor",
-            "cupid"
+            "cupid",
+            "witch",
+            "wise",
+            "bodyguard"
           ]
         },
         {
@@ -903,6 +1079,7 @@
             "jester",
             "serial_killer",
             "arsonist",
+            "lunatic",
             "none"
           ]
         },
@@ -989,6 +1166,7 @@
             "jester",
             "serial_killer",
             "arsonist",
+            "lunatic",
             "none"
           ]
         },

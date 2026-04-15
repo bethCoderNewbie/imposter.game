@@ -68,6 +68,6 @@ def _reveal_roles_on_game_over(G: MasterGameState) -> MasterGameState:
     for event in G.elimination_log:
         if event.role is None:
             player = G.players.get(event.player_id)
-            if player:
+            if player and player.role != "ghost":  # Ghost identity is never revealed
                 event.role = player.role
     return G

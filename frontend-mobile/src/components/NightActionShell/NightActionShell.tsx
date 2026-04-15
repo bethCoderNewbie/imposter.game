@@ -8,6 +8,9 @@ import TrackerUI from './TrackerUI'
 import SerialKillerUI from './SerialKillerUI'
 import CupidUI from './CupidUI'
 import ArsonistUI from './ArsonistUI'
+import WitchUI from './WitchUI'
+import LunaticUI from './LunaticUI'
+import BodyguardUI from './BodyguardUI'
 import VillagerDecoyUI from './VillagerDecoyUI'
 import './NightActionShell.css'
 
@@ -49,6 +52,12 @@ export default function NightActionShell({ gameState, myPlayer, sendIntent, late
           <CupidUI gameState={gameState} myPlayer={myPlayer} sendIntent={sendIntent} />
         ) : role === 'arsonist' ? (
           <ArsonistUI gameState={gameState} myPlayer={myPlayer} sendIntent={sendIntent} />
+        ) : role === 'witch' ? (
+          <WitchUI gameState={gameState} myPlayer={myPlayer} sendIntent={sendIntent} />
+        ) : role === 'lunatic' ? (
+          <LunaticUI myPlayer={myPlayer} sendIntent={sendIntent} />
+        ) : role === 'bodyguard' ? (
+          <BodyguardUI gameState={gameState} myPlayer={myPlayer} sendIntent={sendIntent} />
         ) : (
           <VillagerDecoyUI
             myPlayer={myPlayer}

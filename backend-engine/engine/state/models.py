@@ -84,6 +84,10 @@ class PlayerState(BaseModel):
     is_framed_tonight: bool = False     # server-only: reset each night
     doused_player_ids: list[str] = Field(default_factory=list)  # Arsonist only
     infect_used: bool = False           # server-only
+    witch_heal_used: bool = False       # server-only: stripped from non-witch views
+    witch_kill_used: bool = False       # server-only: stripped from non-witch views
+    lunatic_redirect_used: bool = False # server-only: stripped from non-lunatic views
+    wise_shield_used: bool = False      # server-only: one-use wolf-kill deflection
     lovers_partner_id: str | None = None  # linked players only
     puzzles_solved_count: int = 0       # own player only
     hints_received: list[str] = Field(default_factory=list)  # server-only
@@ -136,6 +140,16 @@ class NightActions(BaseModel):
     # Tracker
     tracker_target_id: str | None = None     # Tracker-only
     tracker_result: list[str] = Field(default_factory=list)  # Tracker-only
+
+    # Witch
+    witch_action: str | None = None           # server-only: "heal" | "kill"
+    witch_target_id: str | None = None        # server-only
+
+    # Bodyguard
+    bodyguard_target_id: str | None = None    # server-only
+
+    # Lunatic
+    lunatic_redirect: bool = False            # server-only: activated redirect this night
 
     # Computed at resolution step 1
     roleblocked_player_id: str | None = None  # server-only
@@ -195,6 +209,8 @@ class MasterGameState(BaseModel):
     tracker_knowledge: dict[str, list[str]] = Field(default_factory=dict)  # round_str -> [pids]
     role_registry: dict[str, dict[str, Any]] = Field(default_factory=dict)  # sent to clients
     post_match: PostMatch | None = None
+    lunatic_cursed_wolf_id: str | None = None  # server-only: wolf cursed by Lunatic sacrifice
+    village_powers_cursed: bool = False        # public: set when Wise is burned at the stake
 
     # Monotonic version counter — incremented on every state mutation
     state_id: int = 0

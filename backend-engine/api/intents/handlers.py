@@ -71,7 +71,11 @@ async def handle_start_game(G, intent, redis_client, cm) -> MasterGameState:
     # Assign roles
     player_count = len(G.players)
     target_range = DIFFICULTY_BALANCE_RANGE.get(G.config.difficulty_level, [-2, 2])
-    composition = build_composition(player_count, G.seed, target_range=target_range)
+    composition = build_composition(
+        player_count, G.seed,
+        target_range=target_range,
+        difficulty_level=G.config.difficulty_level,
+    )
     role_map = assign_roles(list(G.players.keys()), composition, G.seed)
 
     G = G.model_copy(deep=True)
@@ -265,6 +269,46 @@ async def handle_submit_night_action(G, intent, redis_client, cm) -> MasterGameS
             raise IntentError("SELF_TARGET", "Cannot track yourself.")
         na.tracker_target_id = target_id
 
+    elif role_id == "witch":
+        witch_action = intent.get("witch_action")
+        if witch_action not in ("heal", "kill", "skip"):
+            raise IntentError("INVALID_ACTION", "witch_action must be 'heal', 'kill', or 'skip'.")
+        if witch_action != "skip":
+            target_id = intent.get("target_id")
+            if not target_id or target_id not in G.players:
+                raise IntentError("INVALID_TARGET", "Invalid target.")
+            if not G.players[target_id].is_alive:
+                raise IntentError("INVALID_TARGET", "Cannot target a dead player.")
+            if witch_action == "heal":
+                if player.witch_heal_used:
+                    raise IntentError("POTION_SPENT", "Heal potion already used.")
+            elif witch_action == "kill":
+                if player.witch_kill_used:
+                    raise IntentError("POTION_SPENT", "Kill potion already used.")
+                if target_id == player_id:
+                    raise IntentError("SELF_TARGET", "Cannot use the kill potion on yourself.")
+            na.witch_action = witch_action
+            na.witch_target_id = target_id
+        # skip: no-op — night_action_submitted is set below
+
+    elif role_id == "bodyguard":
+        target_id = intent.get("target_id")
+        if not target_id or target_id not in G.players:
+            raise IntentError("INVALID_TARGET", "Invalid protection target.")
+        if not G.players[target_id].is_alive:
+            raise IntentError("INVALID_TARGET", "Cannot protect a dead player.")
+        na.bodyguard_target_id = target_id
+
+    elif role_id == "lunatic":
+        lunatic_action = intent.get("lunatic_action")
+        if lunatic_action not in ("redirect", "skip"):
+            raise IntentError("INVALID_ACTION", "lunatic_action must be 'redirect' or 'skip'.")
+        if lunatic_action == "redirect":
+            if player.lunatic_redirect_used:
+                raise IntentError("REDIRECT_USED", "Redirect already used this game.")
+            na.lunatic_redirect = True
+        # skip: no-op — night_action_submitted is set below
+
     # Mark as submitted and update aggregate count
     player.night_action_submitted = True
     na.actions_submitted_count += 1
@@ -279,7 +323,16 @@ async def handle_submit_night_action(G, intent, redis_client, cm) -> MasterGameS
 async def handle_submit_day_vote(G, intent, redis_client, cm) -> MasterGameState:
     _require_phase(G, Phase.DAY_VOTE)
     player_id = intent.get("player_id", "")
-    player = _require_alive(G, player_id)
+    player = G.players.get(player_id)
+    if player is None:
+        raise IntentError("PLAYER_NOT_FOUND", f"Player {player_id} not found.")
+    if player.role == "ghost":
+        if player.is_alive:
+            raise IntentError("GHOST_CANNOT_VOTE_ALIVE", "The Ghost cannot vote while alive.")
+        # Dead Ghost may vote — no alive requirement
+    else:
+        if not player.is_alive:
+            raise IntentError("DEAD_PLAYER_ACTION", "Dead players cannot submit actions.")
 
     target_id = intent.get("target_id")
     if not target_id or target_id not in G.players:

@@ -45,6 +45,8 @@ class ActionType(StrEnum):
     LINK_PLAYERS = "link_players"
     MULTI_CHOICE = "multi_choice"
     TRACK = "track"
+    HEAL_OR_KILL = "heal_or_kill"
+    REDIRECT_KILL = "redirect_kill"
 
 
 class EliminationCause(StrEnum):
@@ -54,6 +56,11 @@ class EliminationCause(StrEnum):
     SERIAL_KILLER = "serial_killer_kill"
     BROKEN_HEART = "broken_heart"
     HUNTER_REVENGE = "hunter_revenge"
+    WITCH_KILL = "witch_kill"
+    LUNATIC_SACRIFICE = "lunatic_sacrifice"
+    LUNATIC_CURSE = "lunatic_curse"
+    BODYGUARD_KILL = "bodyguard_kill"
+    BODYGUARD_SACRIFICE = "bodyguard_sacrifice"
 
 
 class WinCondition(StrEnum):

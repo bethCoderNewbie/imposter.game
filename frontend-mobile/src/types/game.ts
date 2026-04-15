@@ -38,6 +38,9 @@ export interface PlayerState {
   vote_target_id: string | null
   puzzles_solved_count?: number
   doused_player_ids?: string[]  // Arsonist only — own player strip
+  witch_heal_used?: boolean          // Witch only — own player strip
+  witch_kill_used?: boolean          // Witch only — own player strip
+  lunatic_redirect_used?: boolean    // Lunatic only — own player strip
   puzzle_state?: PuzzleState | null
 }
 
@@ -101,6 +104,7 @@ export interface StrippedGameState {
   winner_player_id: string | null
   seer_knowledge?: Record<string, InvestigationResult>
   tracker_knowledge?: Record<string, string[]>
+  village_powers_cursed?: boolean
   post_match?: PostMatch | null
   role_registry?: Record<string, Record<string, unknown>>
 }
@@ -191,6 +195,11 @@ export const ROLE_COLORS: Record<string, string> = {
   arsonist:    '#c05621',
   serial_killer: '#2d3748',
   framer:      'var(--role-wolf)',
+  witch:       '#553399',
+  lunatic:     '#2d3748',
+  wise:        '#b7791f',
+  bodyguard:   '#2b6cb0',
+  ghost:       '#4a5568',
 }
 
 export function getRoleColor(role: string): string {

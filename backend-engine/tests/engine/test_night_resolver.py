@@ -7,7 +7,7 @@ from __future__ import annotations
 import pytest
 
 from engine.resolver.night import resolve_night
-from engine.state.enums import InvestigationResult, Phase, Team
+from engine.state.enums import EliminationCause, InvestigationResult, Phase, Team
 from engine.state.models import MasterGameState, NightActions, PlayerState
 from tests.conftest import _eight_player_game, _five_player_game, _make_player
 
@@ -58,6 +58,37 @@ class TestWolfKill:
         # Doctor consecutive-protect is blocked in handler; in resolver, if it slips through,
         # the resolver checks last_protected. Wolf kill should succeed.
         assert not G_new.players["p3"].is_alive
+
+    def test_roleblock_clears_consecutive_protect_memory(self):
+        """Roleblocked doctor should have last_protected_player_id cleared so the
+        following night they are not falsely locked out of the same target."""
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        # Doctor (p4) protected p3 on night 1
+        G.players["p4"].last_protected_player_id = "p3"
+        # Night 2: doctor is roleblocked by wolf shaman
+        G.night_actions.roleblocked_player_id = "p4"
+        G.night_actions.doctor_target_id = "p3"
+        G.night_actions.wolf_votes = {"p1": "p3", "p2": "p3"}
+        G_new = resolve_night(G)
+        # Protection did not apply (roleblocked) → wolf kill succeeds
+        assert not G_new.players["p3"].is_alive
+        # But last_protected_player_id is cleared so night 3 is unrestricted
+        assert G_new.players["p4"].last_protected_player_id is None
+
+    def test_after_roleblock_doctor_can_protect_previous_target(self):
+        """After a roleblock night, doctor can protect the same player they last
+        protected, because the consecutive-protect memory was cleared."""
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        # Simulate: doctor was roleblocked last night → last_protected cleared
+        G.players["p4"].last_protected_player_id = None
+        # Night 3: doctor protects p3, wolves try to kill p3
+        G.night_actions.doctor_target_id = "p3"
+        G.night_actions.wolf_votes = {"p1": "p3", "p2": "p3"}
+        G_new = resolve_night(G)
+        # Protection applied — p3 survives
+        assert G_new.players["p3"].is_alive
 
 
 # ── Seer ──────────────────────────────────────────────────────────────────────
@@ -295,3 +326,292 @@ class TestWinConditions:
         G.night_actions.seer_target_id = "p1"
         G_new = resolve_night(G)
         assert G_new.night_actions.seer_result is None
+
+
+
+# ── Witch ──────────────────────────────────────────────────────────────────────
+
+class TestWitch:
+    def _witch_game(self):
+        """Eight-player game with p6 as the Witch."""
+        G, pids = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.players["p6"].role = "witch"
+        G.players["p6"].team = Team.VILLAGE
+        return G
+
+    def test_witch_heal_saves_wolf_target(self):
+        G = self._witch_game()
+        G.night_actions.wolf_votes = {"p1": "p7", "p2": "p7"}
+        G.night_actions.witch_action = "heal"
+        G.night_actions.witch_target_id = "p7"
+        G_new = resolve_night(G)
+        assert G_new.players["p7"].is_alive
+
+    def test_witch_kill_eliminates_target(self):
+        G = self._witch_game()
+        G.night_actions.witch_action = "kill"
+        G.night_actions.witch_target_id = "p7"
+        G_new = resolve_night(G)
+        assert not G_new.players["p7"].is_alive
+        causes = [e.cause for e in G_new.elimination_log]
+        assert EliminationCause.WITCH_KILL in causes
+
+    def test_witch_kill_bypasses_protection(self):
+        G = self._witch_game()
+        G.night_actions.doctor_target_id = "p7"   # doctor protects p7
+        G.night_actions.witch_action = "kill"
+        G.night_actions.witch_target_id = "p7"    # witch kills p7 anyway
+        G_new = resolve_night(G)
+        # Witch kill resolved before Doctor (step 4b < step 5) — p7 dead when
+        # Doctor runs, so protection is set but irrelevant; kill already logged.
+        assert not G_new.players["p7"].is_alive
+
+    def test_witch_heal_stacks_with_doctor_no_crash(self):
+        G = self._witch_game()
+        G.night_actions.wolf_votes = {"p1": "p7", "p2": "p7"}
+        G.night_actions.doctor_target_id = "p7"
+        G.night_actions.witch_action = "heal"
+        G.night_actions.witch_target_id = "p7"
+        G_new = resolve_night(G)
+        assert G_new.players["p7"].is_alive  # saved by at least one of them
+
+    def test_witch_roleblock_prevents_action(self):
+        G = self._witch_game()
+        G.night_actions.roleblocked_player_id = "p6"
+        G.night_actions.wolf_votes = {"p1": "p7", "p2": "p7"}
+        G.night_actions.witch_action = "heal"
+        G.night_actions.witch_target_id = "p7"
+        G_new = resolve_night(G)
+        assert not G_new.players["p7"].is_alive  # wolf kill succeeds; witch was blocked
+
+    def test_witch_marks_heal_potion_used(self):
+        G = self._witch_game()
+        G.night_actions.witch_action = "heal"
+        G.night_actions.witch_target_id = "p7"
+        G_new = resolve_night(G)
+        assert G_new.players["p6"].witch_heal_used is True
+        assert G_new.players["p6"].witch_kill_used is False
+
+    def test_witch_marks_kill_potion_used(self):
+        G = self._witch_game()
+        G.night_actions.witch_action = "kill"
+        G.night_actions.witch_target_id = "p7"
+        G_new = resolve_night(G)
+        assert G_new.players["p6"].witch_kill_used is True
+        assert G_new.players["p6"].witch_heal_used is False
+
+
+# ── Lunatic ────────────────────────────────────────────────────────────────────
+
+class TestLunatic:
+    def _lunatic_game(self):
+        """Eight-player game with p6 as Lunatic, p1+p2 as wolves."""
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.players["p6"].role = "lunatic"
+        G.players["p6"].team = "neutral"
+        return G
+
+    def test_redirect_lunatic_dies_in_place_of_target(self):
+        G = self._lunatic_game()
+        G.night_actions.wolf_votes = {"p1": "p7", "p2": "p7"}
+        G.night_actions.lunatic_redirect = True
+        G_new = resolve_night(G)
+        assert not G_new.players["p6"].is_alive            # lunatic died
+        assert G_new.players["p7"].is_alive                # original wolf target saved
+        causes = [e.cause for e in G_new.elimination_log]
+        assert EliminationCause.LUNATIC_SACRIFICE in causes
+
+    def test_redirect_curses_lead_wolf(self):
+        G = self._lunatic_game()
+        G.night_actions.wolf_votes = {"p1": "p7", "p2": "p7"}
+        G.night_actions.lunatic_redirect = True
+        G_new = resolve_night(G)
+        # First wolf who voted for p7 is cursed
+        assert G_new.lunatic_cursed_wolf_id in ("p1", "p2")
+
+    def test_cursed_wolf_dies_next_night(self):
+        G = self._lunatic_game()
+        G.night_actions.wolf_votes = {"p1": "p7", "p2": "p7"}
+        G.night_actions.lunatic_redirect = True
+        G_after_night1 = resolve_night(G)
+        cursed = G_after_night1.lunatic_cursed_wolf_id
+        assert cursed is not None
+
+        # Simulate night 2 — no other actions
+        G2 = G_after_night1.model_copy(deep=True)
+        G2.round = 2
+        from engine.state.models import NightActions
+        G2.night_actions = NightActions(actions_required_count=0)
+        G2_new = resolve_night(G2)
+        assert not G2_new.players[cursed].is_alive
+        causes = [e.cause for e in G2_new.elimination_log]
+        assert EliminationCause.LUNATIC_CURSE in causes
+
+    def test_redirect_no_op_when_wolves_have_no_majority(self):
+        G = self._lunatic_game()
+        G.night_actions.wolf_votes = {"p1": "p7", "p2": "p8"}  # tie
+        G.night_actions.lunatic_redirect = True
+        G_new = resolve_night(G)
+        assert G_new.players["p6"].is_alive   # lunatic lives — no kill to redirect
+        assert G_new.lunatic_cursed_wolf_id is None
+
+    def test_redirect_blocked_by_roleblock(self):
+        G = self._lunatic_game()
+        G.night_actions.wolf_votes = {"p1": "p7", "p2": "p7"}
+        G.night_actions.lunatic_redirect = True
+        G.night_actions.roleblocked_player_id = "p6"  # lunatic is roleblocked
+        G_new = resolve_night(G)
+        assert G_new.players["p6"].is_alive   # redirect failed
+        assert not G_new.players["p7"].is_alive  # wolf kill proceeds normally
+
+    def test_redirect_marks_redirect_used(self):
+        G = self._lunatic_game()
+        G.night_actions.wolf_votes = {"p1": "p7", "p2": "p7"}
+        G.night_actions.lunatic_redirect = True
+        G_new = resolve_night(G)
+        assert G_new.players["p6"].lunatic_redirect_used is True
+
+
+# ── Wise ───────────────────────────────────────────────────────────────────────
+
+class TestWise:
+    def _wise_game(self):
+        """Eight-player game with p6 as Wise."""
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.players["p6"].role = "wise"
+        return G
+
+    def test_wise_deflects_first_wolf_kill(self):
+        G = self._wise_game()
+        G.night_actions.wolf_votes = {"p1": "p6", "p2": "p6"}
+        G_new = resolve_night(G)
+        assert G_new.players["p6"].is_alive
+        assert G_new.players["p6"].wise_shield_used is True
+
+    def test_wise_dies_on_second_wolf_kill(self):
+        G = self._wise_game()
+        G.players["p6"].wise_shield_used = True  # shield already spent
+        G.night_actions.wolf_votes = {"p1": "p6", "p2": "p6"}
+        G_new = resolve_night(G)
+        assert not G_new.players["p6"].is_alive
+
+    def test_wise_shield_disabled_when_village_cursed(self):
+        G = self._wise_game()
+        G.village_powers_cursed = True
+        G.night_actions.wolf_votes = {"p1": "p6", "p2": "p6"}
+        G_new = resolve_night(G)
+        assert not G_new.players["p6"].is_alive  # shield doesn't fire
+
+    def test_wise_shield_does_not_block_serial_killer(self):
+        """Wise shield only deflects wolf kills — SK bypasses it."""
+        G = self._wise_game()
+        G.players["p5"].role = "serial_killer"
+        G.players["p5"].team = "neutral"
+        G.night_actions.serial_killer_target_id = "p6"
+        G_new = resolve_night(G)
+        assert not G_new.players["p6"].is_alive
+
+    def test_village_cursed_disables_doctor(self):
+        G = self._wise_game()
+        G.village_powers_cursed = True
+        G.night_actions.wolf_votes = {"p1": "p7", "p2": "p7"}
+        G.night_actions.doctor_target_id = "p7"
+        G_new = resolve_night(G)
+        assert not G_new.players["p7"].is_alive  # doctor blocked by curse
+
+    def test_village_cursed_disables_seer(self):
+        G = self._wise_game()
+        G.village_powers_cursed = True
+        G.night_actions.seer_target_id = "p1"
+        G_new = resolve_night(G)
+        assert G_new.night_actions.seer_result is None  # seer blocked by curse
+
+    def test_village_cursed_disables_tracker(self):
+        G = self._wise_game()
+        G.village_powers_cursed = True
+        G.night_actions.wolf_votes = {"p1": "p7", "p2": "p7"}
+        G.night_actions.tracker_target_id = "p7"
+        G_new = resolve_night(G)
+        assert G_new.night_actions.tracker_result == []  # tracker blocked by curse
+
+
+# ── Bodyguard ──────────────────────────────────────────────────────────────────
+
+class TestBodyguard:
+    def _bg_game(self, seed: str = "test-bg-0"):
+        """Eight-player game with p6 as Bodyguard. p5 becomes a plain villager."""
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.players["p6"].role = "bodyguard"
+        G.players["p6"].team = "village"
+        G.seed = seed
+        G.round = 1
+        return G
+
+    def test_guarded_player_always_survives(self):
+        """Protected target never dies — regardless of 50/50 outcome."""
+        G = self._bg_game("test-bg-0")
+        G.night_actions.wolf_votes = {"p1": "p7", "p2": "p7"}
+        G.night_actions.bodyguard_target_id = "p7"
+        G_new = resolve_night(G)
+        assert G_new.players["p7"].is_alive
+
+    def test_attacker_dies_outcome(self):
+        # seed 'test-bg-0' → random < 0.5 → attacker dies
+        G = self._bg_game("test-bg-0")
+        G.night_actions.wolf_votes = {"p1": "p7", "p2": "p7"}
+        G.night_actions.bodyguard_target_id = "p7"
+        G_new = resolve_night(G)
+        # First wolf who voted for p7 = p1 → p1 dies
+        assert not G_new.players["p1"].is_alive
+        assert G_new.players["p6"].is_alive   # bodyguard lives
+        causes = [e.cause for e in G_new.elimination_log]
+        assert EliminationCause.BODYGUARD_KILL in causes
+
+    def test_bodyguard_sacrifice_outcome(self):
+        # seed 'test-bg-2' → random >= 0.5 → bodyguard dies
+        G = self._bg_game("test-bg-2")
+        G.night_actions.wolf_votes = {"p1": "p7", "p2": "p7"}
+        G.night_actions.bodyguard_target_id = "p7"
+        G_new = resolve_night(G)
+        assert G_new.players["p7"].is_alive   # guarded player lives
+        assert not G_new.players["p6"].is_alive  # bodyguard died
+        causes = [e.cause for e in G_new.elimination_log]
+        assert EliminationCause.BODYGUARD_SACRIFICE in causes
+
+    def test_doctor_saves_bodyguard_from_sacrifice(self):
+        # seed 'test-bg-2' → bodyguard sacrifice outcome, BUT doctor protects bodyguard
+        G = self._bg_game("test-bg-2")
+        G.night_actions.wolf_votes = {"p1": "p7", "p2": "p7"}
+        G.night_actions.bodyguard_target_id = "p7"
+        G.night_actions.doctor_target_id = "p6"  # doctor protects the bodyguard
+        G_new = resolve_night(G)
+        assert G_new.players["p7"].is_alive   # guarded player lives
+        assert G_new.players["p6"].is_alive   # bodyguard also saved by doctor
+
+    def test_roleblock_disables_bodyguard(self):
+        G = self._bg_game("test-bg-0")
+        G.night_actions.wolf_votes = {"p1": "p7", "p2": "p7"}
+        G.night_actions.bodyguard_target_id = "p7"
+        G.night_actions.roleblocked_player_id = "p6"  # bodyguard blocked
+        G_new = resolve_night(G)
+        assert not G_new.players["p7"].is_alive  # wolf kill lands normally
+
+    def test_bodyguard_not_triggered_when_wolves_target_unguarded(self):
+        G = self._bg_game("test-bg-0")
+        G.night_actions.wolf_votes = {"p1": "p8", "p2": "p8"}  # wolves target p8
+        G.night_actions.bodyguard_target_id = "p7"              # bodyguard guards p7
+        G_new = resolve_night(G)
+        assert not G_new.players["p8"].is_alive  # p8 dies normally
+        assert G_new.players["p7"].is_alive       # guarded but not attacked
+
+    def test_village_cursed_disables_bodyguard(self):
+        G = self._bg_game("test-bg-0")
+        G.village_powers_cursed = True
+        G.night_actions.wolf_votes = {"p1": "p7", "p2": "p7"}
+        G.night_actions.bodyguard_target_id = "p7"
+        G_new = resolve_night(G)
+        assert not G_new.players["p7"].is_alive  # bodyguard blocked by curse

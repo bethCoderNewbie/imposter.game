@@ -27,6 +27,34 @@ DIFFICULTY_BALANCE_RANGE: dict[str, list[int]] = {
     "hard":     [-4, 0],
 }
 
+# Neutral roles injected on hard difficulty (jester excluded — village can exploit its win condition)
+_HARD_NEUTRAL_ROLES = ["serial_killer", "arsonist"]
+
+
+def _inject_hard_neutrals(
+    result: dict[str, int],
+    player_count: int,
+    rng: random.Random,
+) -> dict[str, int]:
+    """
+    Post-process composition for hard difficulty.
+    Guarantees ≥1 neutral (serial_killer/arsonist) for all hard games (5+),
+    ≥2 for 13+ players. Swaps villager slots to make room.
+    """
+    target = 2 if player_count >= 13 else 1
+    current = sum(result.get(r, 0) for r in _HARD_NEUTRAL_ROLES)
+    needed = target - current
+
+    for _ in range(needed):
+        if result.get("villager", 0) > 0:
+            neutral = rng.choice(_HARD_NEUTRAL_ROLES)
+            result["villager"] -= 1
+            if result["villager"] == 0:
+                del result["villager"]
+            result[neutral] = result.get(neutral, 0) + 1
+
+    return result
+
 
 def _find_template(player_count: int) -> dict[str, Any]:
     """Return the dynamic template matching the given player count."""
@@ -47,7 +75,12 @@ def _balance_weight(composition: dict[str, int]) -> int:
     )
 
 
-def build_composition(player_count: int, seed: str | None = None, target_range: list[int] | None = None) -> dict[str, int]:
+def build_composition(
+    player_count: int,
+    seed: str | None = None,
+    target_range: list[int] | None = None,
+    difficulty_level: str | None = None,
+) -> dict[str, int]:
     """
     Select roles for a game using the dynamic template system.
     Returns {role_id: count} summing to player_count.
@@ -118,6 +151,10 @@ def build_composition(player_count: int, seed: str | None = None, target_range: 
         # Accept reroll if it's closer to balance, regardless of range
         if abs(weight2) < abs(weight):
             result = result2
+
+    # Hard difficulty: guarantee neutral chaos roles
+    if difficulty_level == "hard":
+        result = _inject_hard_neutrals(result, player_count, rng)
 
     # Validate sum
     total = sum(result.values())

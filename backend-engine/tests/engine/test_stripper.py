@@ -357,3 +357,69 @@ class TestStripFabricatedFlag:
         payload = {"hint_id": "xyz", "text": "hint"}
         result = strip_fabricated_flag(payload)
         assert "is_fabricated" not in result
+
+
+# ── Ghost role hiding ──────────────────────────────────────────────────────────
+
+class TestGhostRoleHidden:
+    def _ghost_game(self):
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.players["p6"].role = "ghost"
+        G.players["p6"].team = Team.VILLAGE
+        return G
+
+    def test_ghost_role_hidden_from_alive_players(self):
+        """Other alive players see role=None for Ghost."""
+        G = self._ghost_game()
+        view = _view(G, "p3")  # seer (another player) views the state
+        assert view["players"]["p6"]["role"] is None
+        assert view["players"]["p6"]["team"] is None
+
+    def test_ghost_sees_own_role(self):
+        """The Ghost player can see their own role."""
+        G = self._ghost_game()
+        view = _view(G, "p6")
+        assert view["players"]["p6"]["role"] == "ghost"
+
+    def test_ghost_role_hidden_from_wolves(self):
+        """Wolf team view also hides Ghost identity."""
+        G = self._ghost_game()
+        view = _view(G, "p1")  # wolf views state
+        assert view["players"]["p6"]["role"] is None
+
+    def test_ghost_role_hidden_from_dead_spectators_at_game_over(self):
+        """At game_over, dead spectators still cannot see Ghost's role."""
+        G = self._ghost_game()
+        G = G.model_copy(deep=True)
+        G.players["p6"].is_alive = False
+        G.players["p7"].is_alive = False  # p7 is the dead spectator
+        G.phase = Phase.GAME_OVER
+        G.winner = "village"
+        view = _view(G, "p7")  # dead spectator
+        assert view["players"]["p6"]["role"] is None
+
+    def test_ghost_role_hidden_in_display_view(self):
+        """Display client (player_id=None) never sees Ghost's role."""
+        G = self._ghost_game()
+        view = _view(G, None)
+        assert view["players"]["p6"]["role"] is None
+
+    def test_ghost_elimination_log_role_stays_null_at_game_over(self):
+        """Ghost's role is never set in elimination_log even at game_over."""
+        from engine.state.models import EliminationEvent
+        from engine.state.enums import EliminationCause
+        G = self._ghost_game()
+        G = G.model_copy(deep=True)
+        G.players["p6"].is_alive = False
+        G.phase = Phase.GAME_OVER
+        G.winner = "village"
+        G.elimination_log.append(EliminationEvent(
+            round=1, phase="day", player_id="p6", cause=EliminationCause.VILLAGE_VOTE
+        ))
+        # Simulate _reveal_roles_on_game_over having been called
+        from engine.resolver._win import _reveal_roles_on_game_over
+        G = _reveal_roles_on_game_over(G)
+        # Ghost's event.role should remain None
+        ghost_event = next(e for e in G.elimination_log if e.player_id == "p6")
+        assert ghost_event.role is None

@@ -34,6 +34,10 @@ _ALWAYS_STRIP_PLAYER_FIELDS = frozenset({
     "hints_received",
     "infect_used",
     "permanent_id",
+    "witch_heal_used",
+    "witch_kill_used",
+    "lunatic_redirect_used",
+    "wise_shield_used",
 })
 
 _ALWAYS_STRIP_NIGHT_ACTION_FIELDS = frozenset({
@@ -46,6 +50,10 @@ _ALWAYS_STRIP_NIGHT_ACTION_FIELDS = frozenset({
     "framer_action",
     "framer_target_id",
     "cupid_link",
+    "witch_action",
+    "witch_target_id",
+    "lunatic_redirect",
+    "bodyguard_target_id",
 })
 
 
@@ -53,35 +61,42 @@ def player_view(G: MasterGameState, player_id: str | None) -> dict[str, Any]:
     """
     Return a stripped copy of game state appropriate for the given player.
     player_id=None means the Display client (all role data removed).
+    Ghost identity is always hidden from other players via _hide_ghost_from_others.
     """
-    state = G.model_dump(mode="json", exclude={"host_secret", "rematch_redirect"})
+    state = G.model_dump(mode="json", exclude={"host_secret", "rematch_redirect", "lunatic_cursed_wolf_id"})
     is_game_over = G.phase == Phase.GAME_OVER
 
     # Determine view type
     if player_id is None:
-        return _display_view(state, is_game_over)
+        s = _display_view(state, is_game_over)
+    else:
+        player = G.players.get(player_id)
+        if player is None:
+            # Unknown player — treat as display (safest fallback)
+            s = _display_view(state, is_game_over)
+        elif not player.is_alive:
+            s = _dead_spectator_view(state, player_id, is_game_over)
+        else:
+            team = player.team
+            role = player.role
+            if team == "werewolf":
+                s = _wolf_team_view(state, player_id, G, is_game_over)
+            elif role == "seer":
+                s = _seer_view(state, player_id, G, is_game_over)
+            elif role == "tracker":
+                s = _tracker_view(state, player_id, G, is_game_over)
+            elif role == "arsonist":
+                s = _arsonist_view(state, player_id, G, is_game_over)
+            elif role == "witch":
+                s = _witch_view(state, player_id, G, is_game_over)
+            elif role == "lunatic":
+                s = _lunatic_view(state, player_id, G, is_game_over)
+            else:
+                # village_nonseer, neutral_alive, ghost (alive), and all other roles
+                s = _baseline_alive_view(state, player_id, G, is_game_over)
 
-    player = G.players.get(player_id)
-    if player is None:
-        # Unknown player — treat as display (safest fallback)
-        return _display_view(state, is_game_over)
-
-    if not player.is_alive:
-        return _dead_spectator_view(state, player_id, is_game_over)
-
-    team = player.team
-    role = player.role
-
-    if team == "werewolf":
-        return _wolf_team_view(state, player_id, G, is_game_over)
-    if role == "seer":
-        return _seer_view(state, player_id, G, is_game_over)
-    if role == "tracker":
-        return _tracker_view(state, player_id, G, is_game_over)
-    if role == "arsonist":
-        return _arsonist_view(state, player_id, G, is_game_over)
-    # village_nonseer, neutral_alive, and all other roles
-    return _baseline_alive_view(state, player_id, G, is_game_over)
+    _hide_ghost_from_others(s, player_id)
+    return s
 
 
 def strip_fabricated_flag(fp: dict[str, Any]) -> dict[str, Any]:
@@ -209,6 +224,26 @@ def _arsonist_view(
     na = s.get("night_actions", {})
     na["arsonist_action"] = state.get("night_actions", {}).get("arsonist_action")
     na["arsonist_douse_target_id"] = state.get("night_actions", {}).get("arsonist_douse_target_id")
+    return s
+
+
+def _lunatic_view(
+    state: dict[str, Any], player_id: str, G: MasterGameState, is_game_over: bool
+) -> dict[str, Any]:
+    """Lunatic: sees own redirect-used flag so the UI can disable the spent button."""
+    s = _baseline_alive_view(state, player_id, G, is_game_over)
+    s["players"][player_id]["lunatic_redirect_used"] = state["players"][player_id].get("lunatic_redirect_used", False)
+    return s
+
+
+def _witch_view(
+    state: dict[str, Any], player_id: str, G: MasterGameState, is_game_over: bool
+) -> dict[str, Any]:
+    """Witch: sees own potion availability (witch_heal_used, witch_kill_used)."""
+    s = _baseline_alive_view(state, player_id, G, is_game_over)
+    # Restore own potion state so WitchUI can disable spent buttons
+    s["players"][player_id]["witch_heal_used"] = state["players"][player_id].get("witch_heal_used", False)
+    s["players"][player_id]["witch_kill_used"] = state["players"][player_id].get("witch_kill_used", False)
     return s
 
 
@@ -345,3 +380,15 @@ def _strip_puzzle_for_player(
         stripped["puzzle_data"].pop("correct_index", None)
 
     return stripped
+
+
+def _hide_ghost_from_others(s: dict[str, Any], viewer_id: str | None) -> None:
+    """
+    Null out role/team for any Ghost player in the players dict, EXCEPT for the
+    Ghost's own entry when they are the viewer. Called on every view to ensure
+    Ghost identity is never revealed — not during live play, not at game_over.
+    """
+    for pid, p in s.get("players", {}).items():
+        if p.get("role") == "ghost" and pid != viewer_id:
+            p["role"] = None
+            p["team"] = None
