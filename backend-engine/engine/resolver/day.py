@@ -83,15 +83,8 @@ def resolve_day_vote(G: MasterGameState) -> MasterGameState:
         G = check_win_condition(G, jester_voted_out_id=top_target)
         return G
 
-    # Hunter: trigger hunter_pending (blocked if village powers are cursed)
-    if target.role == "hunter" and not target.hunter_fired:
-        if not (G.village_powers_cursed and target.team == "village"):
-            G.hunter_queue.append(top_target)
-            G.phase = Phase.HUNTER_PENDING
-            G.timer_ends_at = None
-            return G
-
-    # Lovers death-chain
+    # Lovers death-chain — runs BEFORE hunter check so a Hunter-lover's partner is killed
+    partner_id: str | None = None
     if G.lovers_pair and top_target in G.lovers_pair:
         partner_id = G.lovers_pair[1] if G.lovers_pair[0] == top_target else G.lovers_pair[0]
         partner = G.players.get(partner_id)
@@ -103,13 +96,25 @@ def resolve_day_vote(G: MasterGameState) -> MasterGameState:
                 player_id=partner_id,
                 cause=EliminationCause.BROKEN_HEART,
             ))
-            # Broken-heart death may also trigger Hunter (blocked if village powers are cursed)
-            if partner.role == "hunter" and not partner.hunter_fired:
-                if not (G.village_powers_cursed and partner.team == "village"):
-                    G.hunter_queue.append(partner_id)
-                    G.phase = Phase.HUNTER_PENDING
-                    G.timer_ends_at = None
-                    return G
+
+    # Hunter check: both the voted-out player AND their just-killed lover-partner may be Hunters
+    hunter_triggered = False
+    for hunter_pid in (top_target, partner_id):
+        if not hunter_pid:
+            continue
+        h = G.players.get(hunter_pid)
+        if not h or h.hunter_fired or h.role != "hunter":
+            continue
+        if G.village_powers_cursed and h.team == "village":
+            continue
+        if hunter_pid not in G.hunter_queue:
+            G.hunter_queue.append(hunter_pid)
+        hunter_triggered = True
+
+    if hunter_triggered:
+        G.phase = Phase.HUNTER_PENDING
+        G.timer_ends_at = None
+        return G
 
     G = check_win_condition(G)
     return G

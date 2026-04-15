@@ -93,6 +93,10 @@ class PlayerState(BaseModel):
     hints_received: list[str] = Field(default_factory=list)  # server-only
     puzzle_state: PuzzleState | None = None  # own player only; correct_index stripped before broadcast
     permanent_id: str | None = None    # server-only: cross-game registry key, never broadcast
+    # Grid system fields (server-only during night phase)
+    grid_node_row: int | None = None       # server-only: current grid node row
+    grid_node_col: int | None = None       # server-only: current grid node column
+    grid_puzzle_state: PuzzleState | None = None  # active grid node puzzle; correct_index stripped
 
 
 class FalseHintPayload(BaseModel):
@@ -157,6 +161,24 @@ class NightActions(BaseModel):
     # Aggregate counts (public — display client sees these)
     actions_submitted_count: int = 0
     actions_required_count: int = 0
+
+    # Grid system — populated at NIGHT phase entry
+    grid_layout: list[list[int]] | None = None
+    # 5×5 tier grid. 1=green(5s), 2=yellow(10s), 3=red(20s). Public — no secrets in tier map.
+
+    grid_activity: list[dict[str, Any]] = Field(default_factory=list)
+    # [{row, col, quadrant, sequence_idx}] — anonymized completed-node log.
+    # quadrant: "top_left"|"top_right"|"bottom_left"|"bottom_right"
+    # Wolf view ONLY (stripped from all other views).
+
+    sonar_pings_used: int = 0
+    # Total Sonar Pings wolves fired this night. Public.
+
+    sonar_ping_results: list[dict[str, Any]] = Field(default_factory=list)
+    # [{quadrant, heat, tier_counts}] — results of wolf sonar pings. Wolf view ONLY.
+
+    night_action_change_count: dict[str, int] = Field(default_factory=dict)
+    # player_id -> total intent submissions this night. SERVER-ONLY — never sent to any client.
 
 
 

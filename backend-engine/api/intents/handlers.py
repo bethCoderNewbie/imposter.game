@@ -425,7 +425,7 @@ async def handle_submit_puzzle_answer(G, intent, redis_client, cm) -> MasterGame
                 if player.is_alive and RR.get(player.role or "", {}).get("wakeOrder", -1) == 0:
                     await cm.unicast(G.game_id, pid, {"type": "hint_reward", **false_hint})
         else:
-            from engine.puzzle_bank import generate_hint
+            from engine.hint_bank import generate_hint
             await cm.unicast(G.game_id, player_id, generate_hint(G, player_id))
 
     return G
@@ -538,4 +538,181 @@ async def handle_player_connected(G, intent, redis_client, cm) -> MasterGameStat
         G = G.model_copy(deep=True)
         G.players[player_id].is_connected = True
         # No explicit roster broadcast — the queue broadcasts updated state after return.
+    return G
+
+
+# ── Grid system handlers ──────────────────────────────────────────────────────
+
+async def handle_select_grid_node(G, intent, redis_client, cm) -> MasterGameState:
+    """
+    Villager taps a grid node to begin solving its puzzle.
+    Guards: NIGHT phase, alive, wakeOrder==0, no active grid_puzzle_state, valid coords,
+            node not already completed.
+    """
+    _require_phase(G, Phase.NIGHT)
+    player_id = intent.get("player_id", "")
+    player = _require_alive(G, player_id)
+
+    role_def = ROLE_REGISTRY.get(player.role or "", {})
+    if role_def.get("wakeOrder", 0) != 0:
+        raise IntentError("NOT_YOUR_TURN", "Only wakeOrder==0 players can use the grid.")
+
+    row = intent.get("row")
+    col = intent.get("col")
+    if not isinstance(row, int) or not isinstance(col, int) or not (0 <= row <= 4) or not (0 <= col <= 4):
+        raise IntentError("INVALID_GRID_COORDS", "row and col must be integers in [0, 4].")
+
+    G = G.model_copy(deep=True)
+    player = G.players[player_id]
+
+    if player.grid_puzzle_state and player.grid_puzzle_state.active:
+        raise IntentError("PUZZLE_ALREADY_ACTIVE", "Complete or abandon your current grid puzzle first.")
+
+    # Check node not already completed by any player
+    completed_nodes = {(e["row"], e["col"]) for e in G.night_actions.grid_activity}
+    if (row, col) in completed_nodes:
+        raise IntentError("NODE_OCCUPIED", "This node has already been completed.")
+
+    grid_layout = G.night_actions.grid_layout
+    if grid_layout is None:
+        raise IntentError("GRID_NOT_READY", "Grid layout not generated yet.")
+
+    tier = grid_layout[row][col]
+
+    import random
+    rng = random.Random(f"{G.seed}:{G.round}:{player_id}:{row}:{col}:grid_puzzle")
+    from engine.puzzle_bank import generate_grid_puzzle
+    player.grid_puzzle_state = generate_grid_puzzle(tier, rng)
+    player.grid_node_row = row
+    player.grid_node_col = col
+
+    # Track intent count for action_log hint
+    G.night_actions.night_action_change_count[player_id] = (
+        G.night_actions.night_action_change_count.get(player_id, 0) + 1
+    )
+
+    G.state_id += 1
+    return G
+
+
+async def handle_submit_grid_answer(G, intent, redis_client, cm) -> MasterGameState:
+    """
+    Villager submits their answer for the active grid node puzzle.
+    On correct: generates tier hint, records activity, fires grid_ripple to wolves.
+    On wrong: clears puzzle so player can try another node.
+    """
+    _require_phase(G, Phase.NIGHT)
+    player_id = intent.get("player_id", "")
+    player = _require_alive(G, player_id)
+
+    if player.grid_puzzle_state is None or not player.grid_puzzle_state.active:
+        raise IntentError("NO_ACTIVE_PUZZLE", "No active grid puzzle to answer.")
+
+    G = G.model_copy(deep=True)
+    player = G.players[player_id]
+    gps = player.grid_puzzle_state
+    row = player.grid_node_row
+    col = player.grid_node_col
+
+    answer_index = intent.get("answer_index")
+    answer_sequence = intent.get("answer_sequence")
+    correct_index = gps.puzzle_data.get("correct_index")
+    correct_sequence = gps.puzzle_data.get("sequence")
+
+    # Validate answer
+    if gps.puzzle_type == "sequence":
+        correct = answer_sequence == correct_sequence
+    else:
+        correct = isinstance(answer_index, int) and answer_index == correct_index
+
+    if correct and row is not None and col is not None:
+        from engine.puzzle_bank import node_to_quadrant
+        quadrant = node_to_quadrant(row, col)
+        tier = (G.night_actions.grid_layout or [[1] * 5] * 5)[row][col]
+
+        gps.active = False
+        gps.solved = True
+        gps.hint_pending = True
+
+        # Record anonymized activity for wolf radar
+        sequence_idx = len(G.night_actions.grid_activity)
+        G.night_actions.grid_activity.append({
+            "row": row,
+            "col": col,
+            "quadrant": quadrant,
+            "sequence_idx": sequence_idx,
+        })
+
+        # Clear position (player can navigate to another node)
+        player.grid_node_row = None
+        player.grid_node_col = None
+
+        # Deliver hint to player
+        from engine.hint_bank import generate_grid_hint
+        hint = generate_grid_hint(G, player_id, tier, row, col)
+        gps.hint_pending = False
+        await cm.unicast(G.game_id, player_id, hint)
+
+        # Fire grid_ripple side-channel to all wolves (radar animation)
+        ripple = {"type": "grid_ripple", "quadrant": quadrant, "tier": tier}
+        wolf_pids = [
+            pid for pid, p in G.players.items()
+            if p.is_alive and p.team == "werewolf"
+        ]
+        for wolf_pid in wolf_pids:
+            await cm.unicast(G.game_id, wolf_pid, ripple)
+
+    else:
+        # Wrong answer: clear puzzle, player can try another node
+        gps.active = False
+        gps.solved = False
+        player.grid_node_row = None
+        player.grid_node_col = None
+
+    G.state_id += 1
+    return G
+
+
+async def handle_sonar_ping(G, intent, redis_client, cm) -> MasterGameState:
+    """
+    Wolf fires a Sonar Ping at a quadrant to get activity heat and tier breakdown.
+    """
+    _require_phase(G, Phase.NIGHT)
+    player_id = intent.get("player_id", "")
+    player = _require_alive(G, player_id)
+
+    if player.team != "werewolf":
+        raise IntentError("NOT_WOLF", "Only wolf-team players can fire Sonar Pings.")
+
+    valid_quadrants = {"top_left", "top_right", "bottom_left", "bottom_right"}
+    quadrant = intent.get("quadrant", "")
+    if quadrant not in valid_quadrants:
+        raise IntentError("INVALID_QUADRANT", f"quadrant must be one of {sorted(valid_quadrants)}.")
+
+    G = G.model_copy(deep=True)
+
+    # Compute heat and tier breakdown for the selected quadrant
+    tier_counts: dict[str, int] = {"1": 0, "2": 0, "3": 0}
+    heat = 0
+    grid_layout = G.night_actions.grid_layout or [[1] * 5] * 5
+    for entry in G.night_actions.grid_activity:
+        if entry.get("quadrant") == quadrant:
+            heat += 1
+            node_tier = str(grid_layout[entry["row"]][entry["col"]])
+            if node_tier in tier_counts:
+                tier_counts[node_tier] += 1
+
+    G.night_actions.sonar_ping_results.append({
+        "quadrant": quadrant,
+        "heat": heat,
+        "tier_counts": tier_counts,
+    })
+    G.night_actions.sonar_pings_used += 1
+
+    # Track intent count
+    G.night_actions.night_action_change_count[player_id] = (
+        G.night_actions.night_action_change_count.get(player_id, 0) + 1
+    )
+
+    G.state_id += 1
     return G

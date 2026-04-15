@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import pytest
 
-from engine.puzzle_bank import generate_hint
+from engine.hint_bank import generate_hint
 from engine.setup import setup_game
 from engine.state.enums import EliminationCause, Phase, Team
 from engine.state.models import EliminationEvent, NightActions, PlayerState

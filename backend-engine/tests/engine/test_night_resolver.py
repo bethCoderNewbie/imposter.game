@@ -615,3 +615,449 @@ class TestBodyguard:
         G.night_actions.bodyguard_target_id = "p7"
         G_new = resolve_night(G)
         assert not G_new.players["p7"].is_alive  # bodyguard blocked by curse
+
+
+# ── Cupid / Lovers (expanded) ──────────────────────────────────────────────────
+
+class TestCupidLovers:
+    """Comprehensive coverage of the Cupid link and all lovers death-chain scenarios."""
+
+    def _linked_game(self, lover_a: str = "p6", lover_b: str = "p7"):
+        """Eight-player game with a pre-established lovers pair."""
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.lovers_pair = [lover_a, lover_b]
+        G.players[lover_a].lovers_partner_id = lover_b
+        G.players[lover_b].lovers_partner_id = lover_a
+        return G
+
+    # ── death-chain basics ────────────────────────────────────────────────────
+
+    def test_broken_heart_cause_logged(self):
+        """Elimination event for the surviving partner has cause BROKEN_HEART."""
+        G = self._linked_game("p6", "p7")
+        G.night_actions.wolf_votes = {"p1": "p6", "p2": "p6"}
+        G_new = resolve_night(G)
+        causes = [e.cause for e in G_new.elimination_log]
+        assert EliminationCause.BROKEN_HEART in causes
+
+    def test_chain_does_not_fire_when_both_die_simultaneously(self):
+        """If both lovers die in the same night (wolf + SK), no broken_heart event."""
+        G = self._linked_game("p6", "p7")
+        G.players["p5"].role = "serial_killer"
+        G.players["p5"].team = Team.NEUTRAL
+        G.night_actions.wolf_votes = {"p1": "p6", "p2": "p6"}   # wolves kill p6
+        G.night_actions.serial_killer_target_id = "p7"            # SK kills p7
+        G_new = resolve_night(G)
+        assert not G_new.players["p6"].is_alive
+        assert not G_new.players["p7"].is_alive
+        causes = [e.cause for e in G_new.elimination_log]
+        assert EliminationCause.BROKEN_HEART not in causes
+
+    def test_chain_does_not_fire_when_both_already_dead(self):
+        """No broken_heart if the surviving partner is also already dead."""
+        G = self._linked_game("p6", "p7")
+        G.players["p7"].is_alive = False  # p7 already dead before this night
+        G.night_actions.wolf_votes = {"p1": "p6", "p2": "p6"}
+        G_new = resolve_night(G)
+        causes = [e.cause for e in G_new.elimination_log]
+        assert EliminationCause.BROKEN_HEART not in causes
+
+    def test_death_chain_only_kills_direct_partner(self):
+        """Only the linked partner dies — unrelated players are unaffected."""
+        G = self._linked_game("p6", "p7")
+        G.night_actions.wolf_votes = {"p1": "p6", "p2": "p6"}
+        G_new = resolve_night(G)
+        assert G_new.players["p3"].is_alive  # seer — unlinked, survives
+        assert G_new.players["p8"].is_alive  # villager — survives
+
+    def test_lover_survives_if_wolf_target_is_protected(self):
+        """Doctor saves the wolf target — neither lover dies."""
+        G = self._linked_game("p6", "p7")
+        G.night_actions.wolf_votes = {"p1": "p6", "p2": "p6"}
+        G.night_actions.doctor_target_id = "p6"  # doctor protects p6
+        G_new = resolve_night(G)
+        assert G_new.players["p6"].is_alive   # doctor saved p6
+        assert G_new.players["p7"].is_alive   # no chain triggered
+
+    # ── Hunter partner queued after broken heart ──────────────────────────────
+
+    def test_lover_partner_hunter_queued_after_night_death(self):
+        """When Lover A dies at night, Lover B (Hunter) is queued for revenge."""
+        G = self._linked_game("p6", "p7")
+        G.players["p7"].role = "hunter"  # p7 is Hunter and Lover B
+        G.night_actions.wolf_votes = {"p1": "p6", "p2": "p6"}
+        G_new = resolve_night(G)
+        assert not G_new.players["p6"].is_alive   # wolf kill
+        assert not G_new.players["p7"].is_alive   # broken heart
+        assert "p7" in G_new.hunter_queue          # Hunter queued for revenge
+
+    # ── Wolf-team lovers ──────────────────────────────────────────────────────
+
+    def test_wolf_lover_dies_triggers_partner(self):
+        """A wolf in a lovers pair dying causes their partner to die."""
+        G = self._linked_game("p1", "p7")  # p1 is wolf, p7 is villager
+        G.players["p5"].role = "serial_killer"
+        G.players["p5"].team = Team.NEUTRAL
+        G.night_actions.serial_killer_target_id = "p1"  # SK kills wolf p1
+        G_new = resolve_night(G)
+        assert not G_new.players["p1"].is_alive   # SK kill
+        assert not G_new.players["p7"].is_alive   # broken heart
+
+    def test_two_wolves_linked_one_dies_other_follows(self):
+        """Cupid can link two wolves; if one dies the other dies from broken heart."""
+        G = self._linked_game("p1", "p2")  # both wolves
+        G.players["p5"].role = "serial_killer"
+        G.players["p5"].team = Team.NEUTRAL
+        G.night_actions.serial_killer_target_id = "p1"  # SK kills wolf p1
+        G_new = resolve_night(G)
+        assert not G_new.players["p1"].is_alive
+        assert not G_new.players["p2"].is_alive  # broken heart kills the other wolf
+
+    # ── Cupid link mechanics ──────────────────────────────────────────────────
+
+    def test_cupid_link_round1_establishes_lovers_pair(self):
+        """Cupid's round-1 link sets both lovers_pair and partners on both players."""
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.players["p5"].role = "cupid"
+        G.round = 1
+        G.night_actions.cupid_link = ["p6", "p7"]
+        G_new = resolve_night(G)
+        assert G_new.lovers_pair == ["p6", "p7"]
+        assert G_new.players["p6"].lovers_partner_id == "p7"
+        assert G_new.players["p7"].lovers_partner_id == "p6"
+
+    def test_cupid_link_round2_is_noop(self):
+        """Cupid submitting a link on round 2 has no effect on lovers_pair."""
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.players["p5"].role = "cupid"
+        G.round = 2
+        G.night_actions.cupid_link = ["p6", "p7"]
+        G_new = resolve_night(G)
+        assert G_new.lovers_pair is None   # round > 1: link silently ignored
+
+    def test_cupid_unblockable_by_wolf_shaman(self):
+        """Roleblocking Cupid does not prevent the lovers link from forming."""
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.players["p5"].role = "cupid"
+        G.round = 1
+        G.night_actions.roleblocked_player_id = "p5"   # Cupid is 'blocked'
+        G.night_actions.cupid_link = ["p6", "p7"]
+        G_new = resolve_night(G)
+        # Cupid is canBeBlocked=false — link must fire despite roleblock
+        assert G_new.lovers_pair == ["p6", "p7"]
+
+
+# ── Doctor (extended) ──────────────────────────────────────────────────────────
+
+class TestDoctorExtended:
+    def _doctor_game(self):
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        return G  # p4 = doctor in conftest
+
+    def test_doctor_can_protect_themselves(self):
+        G = self._doctor_game()
+        G.night_actions.wolf_votes = {"p1": "p4", "p2": "p4"}
+        G.night_actions.doctor_target_id = "p4"
+        G_new = resolve_night(G)
+        assert G_new.players["p4"].is_alive
+
+    def test_doctor_protection_does_not_stop_serial_killer(self):
+        G = self._doctor_game()
+        G.players["p5"].role = "serial_killer"
+        G.players["p5"].team = Team.NEUTRAL
+        G.night_actions.doctor_target_id = "p6"
+        G.night_actions.serial_killer_target_id = "p6"
+        G_new = resolve_night(G)
+        assert not G_new.players["p6"].is_alive
+
+    def test_doctor_protection_does_not_stop_arsonist_ignite(self):
+        G = self._doctor_game()
+        G.players["p5"].role = "arsonist"
+        G.players["p5"].team = Team.NEUTRAL
+        G.players["p5"].doused_player_ids = ["p6"]
+        G.night_actions.doctor_target_id = "p6"
+        G.night_actions.arsonist_action = "ignite"
+        G_new = resolve_night(G)
+        assert not G_new.players["p6"].is_alive
+
+    def test_doctor_non_consecutive_can_reprotect_same_target(self):
+        G = self._doctor_game()
+        G.players["p4"].last_protected_player_id = "p7"
+        G.night_actions.doctor_target_id = "p6"
+        G.night_actions.wolf_votes = {"p1": "p6", "p2": "p6"}
+        G_new = resolve_night(G)
+        assert G_new.players["p6"].is_alive
+
+    def test_doctor_consecutive_protect_rejected_by_resolver(self):
+        G = self._doctor_game()
+        G.players["p4"].last_protected_player_id = "p6"
+        G.night_actions.doctor_target_id = "p6"
+        G.night_actions.wolf_votes = {"p1": "p6", "p2": "p6"}
+        G_new = resolve_night(G)
+        assert not G_new.players["p6"].is_alive
+
+    def test_doctor_can_set_protection_on_wolf(self):
+        G = self._doctor_game()
+        G.night_actions.doctor_target_id = "p1"
+        G_new = resolve_night(G)
+        assert G_new.players["p1"].is_alive
+        assert G_new.players["p1"].is_protected
+
+    def test_doctor_protection_step_runs_before_wolf_kill(self):
+        G = self._doctor_game()
+        G.night_actions.doctor_target_id = "p6"
+        G.night_actions.wolf_votes = {"p1": "p6", "p2": "p6"}
+        G_new = resolve_night(G)
+        assert G_new.players["p6"].is_alive
+
+
+# ── Tracker (extended) ────────────────────────────────────────────────────────
+
+class TestTrackerExtended:
+    def _tracker_game(self):
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        return G  # p5 = tracker in conftest
+
+    def test_tracker_sees_seer_visit(self):
+        G = self._tracker_game()
+        G.night_actions.tracker_target_id = "p1"
+        G.night_actions.seer_target_id = "p1"
+        G_new = resolve_night(G)
+        assert "p3" in G_new.night_actions.tracker_result  # p3 = seer
+
+    def test_tracker_sees_doctor_visit(self):
+        G = self._tracker_game()
+        G.night_actions.tracker_target_id = "p6"
+        G.night_actions.doctor_target_id = "p6"
+        G_new = resolve_night(G)
+        assert "p4" in G_new.night_actions.tracker_result  # p4 = doctor
+
+    def test_tracker_sees_sk_visit(self):
+        G = self._tracker_game()
+        G.players["p6"].role = "serial_killer"
+        G.players["p6"].team = Team.NEUTRAL
+        G.night_actions.tracker_target_id = "p7"
+        G.night_actions.serial_killer_target_id = "p7"
+        G_new = resolve_night(G)
+        assert "p6" in G_new.night_actions.tracker_result
+
+    def test_tracker_sees_arsonist_douse(self):
+        G = self._tracker_game()
+        G.players["p6"].role = "arsonist"
+        G.players["p6"].team = Team.NEUTRAL
+        G.night_actions.tracker_target_id = "p7"
+        G.night_actions.arsonist_action = "douse"
+        G.night_actions.arsonist_douse_target_id = "p7"
+        G_new = resolve_night(G)
+        assert "p6" in G_new.night_actions.tracker_result
+
+    def test_tracker_sees_witch_visit(self):
+        G = self._tracker_game()
+        G.players["p6"].role = "witch"
+        G.players["p6"].team = Team.VILLAGE
+        G.night_actions.tracker_target_id = "p7"
+        G.night_actions.witch_action = "heal"
+        G.night_actions.witch_target_id = "p7"
+        G_new = resolve_night(G)
+        assert "p6" in G_new.night_actions.tracker_result
+
+    def test_tracker_does_not_see_bodyguard(self):
+        G = self._tracker_game()
+        G.players["p6"].role = "bodyguard"
+        G.players["p6"].team = Team.VILLAGE
+        G.night_actions.tracker_target_id = "p7"
+        G.night_actions.bodyguard_target_id = "p7"
+        G_new = resolve_night(G)
+        assert "p6" not in G_new.night_actions.tracker_result
+
+    def test_tracker_empty_when_nobody_visits(self):
+        G = self._tracker_game()
+        G.night_actions.tracker_target_id = "p8"
+        G_new = resolve_night(G)
+        assert G_new.night_actions.tracker_result == []
+
+    def test_tracker_roleblocked_result_is_empty_list(self):
+        G = self._tracker_game()
+        G.night_actions.roleblocked_player_id = "p5"
+        G.night_actions.tracker_target_id = "p1"
+        G.night_actions.wolf_votes = {"p1": "p6", "p2": "p6"}
+        G_new = resolve_night(G)
+        assert G_new.night_actions.tracker_result == []
+        assert G_new.tracker_knowledge.get(str(G.round), []) == []
+
+    def test_tracker_result_deduplicates_wolf_votes(self):
+        G = self._tracker_game()
+        G.night_actions.tracker_target_id = "p6"
+        G.night_actions.wolf_votes = {"p1": "p6", "p2": "p6"}
+        G_new = resolve_night(G)
+        result = G_new.night_actions.tracker_result
+        assert result.count("p1") == 1
+        assert result.count("p2") == 1
+
+    def test_tracker_knowledge_accumulated_by_round(self):
+        G = self._tracker_game()
+        G.round = 2
+        G.night_actions.tracker_target_id = "p1"
+        G.night_actions.seer_target_id = "p1"
+        G_new = resolve_night(G)
+        assert "2" in G_new.tracker_knowledge
+        assert "p3" in G_new.tracker_knowledge["2"]
+
+
+# ── Witch (extended) ────────────────────────────────────────────────────────��─
+
+class TestWitchExtended:
+    def _witch_game(self):
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.players["p6"].role = "witch"
+        G.players["p6"].team = Team.VILLAGE
+        return G
+
+    def test_witch_kill_triggers_lovers_death_chain(self):
+        G = self._witch_game()
+        G.lovers_pair = ["p7", "p8"]
+        G.players["p7"].lovers_partner_id = "p8"
+        G.players["p8"].lovers_partner_id = "p7"
+        G.night_actions.witch_action = "kill"
+        G.night_actions.witch_target_id = "p7"
+        G_new = resolve_night(G)
+        assert not G_new.players["p7"].is_alive
+        assert not G_new.players["p8"].is_alive
+        causes = [e.cause for e in G_new.elimination_log]
+        assert EliminationCause.BROKEN_HEART in causes
+
+    def test_witch_kill_triggers_hunter_queue(self):
+        from engine.state.enums import Phase
+        G = self._witch_game()
+        G.players["p7"].role = "hunter"
+        G.night_actions.witch_action = "kill"
+        G.night_actions.witch_target_id = "p7"
+        G_new = resolve_night(G)
+        assert not G_new.players["p7"].is_alive
+        assert "p7" in G_new.hunter_queue
+        assert G_new.phase == Phase.HUNTER_PENDING
+
+    def test_witch_heal_protects_against_wolf_kill(self):
+        G = self._witch_game()
+        G.night_actions.wolf_votes = {"p1": "p7", "p2": "p7"}
+        G.night_actions.witch_action = "heal"
+        G.night_actions.witch_target_id = "p7"
+        G_new = resolve_night(G)
+        assert G_new.players["p7"].is_alive
+
+    def test_witch_kill_bypasses_bodyguard_protection(self):
+        G = self._witch_game()
+        G.players["p7"].role = "bodyguard"
+        G.players["p7"].team = Team.VILLAGE
+        G.night_actions.bodyguard_target_id = "p8"
+        G.night_actions.witch_action = "kill"
+        G.night_actions.witch_target_id = "p8"
+        G_new = resolve_night(G)
+        assert not G_new.players["p8"].is_alive
+
+    def test_witch_can_heal_themselves(self):
+        G = self._witch_game()
+        G.night_actions.wolf_votes = {"p1": "p6", "p2": "p6"}
+        G.night_actions.witch_action = "heal"
+        G.night_actions.witch_target_id = "p6"
+        G_new = resolve_night(G)
+        assert G_new.players["p6"].is_alive
+
+    def test_witch_kill_bypasses_wise_shield(self):
+        G = self._witch_game()
+        G.players["p7"].role = "wise"
+        G.players["p7"].team = Team.VILLAGE
+        G.night_actions.witch_action = "kill"
+        G.night_actions.witch_target_id = "p7"
+        G_new = resolve_night(G)
+        assert not G_new.players["p7"].is_alive
+        assert not G_new.players["p7"].wise_shield_used
+
+    def test_witch_heal_and_doctor_both_protect_same_player(self):
+        G = self._witch_game()
+        G.night_actions.wolf_votes = {"p1": "p7", "p2": "p7"}
+        G.night_actions.witch_action = "heal"
+        G.night_actions.witch_target_id = "p7"
+        G.night_actions.doctor_target_id = "p7"
+        G_new = resolve_night(G)
+        assert G_new.players["p7"].is_alive
+
+    def test_witch_heal_used_flag_persists_across_rounds(self):
+        # Resolver does not gate on witch_heal_used (that is the handler job).
+        # This confirms the flag survives deep-copy into the next round.
+        G = self._witch_game()
+        G.night_actions.witch_action = "heal"
+        G.night_actions.witch_target_id = "p7"
+        G_after = resolve_night(G)
+        assert G_after.players["p6"].witch_heal_used is True
+        G2 = G_after.model_copy(deep=True)
+        G2.round = 2
+        from engine.state.models import NightActions
+        G2.night_actions = NightActions(actions_required_count=0)
+        G2_new = resolve_night(G2)
+        assert G2_new.players["p6"].witch_heal_used is True  # persists; handler enforces POTION_SPENT
+
+    def test_witch_skip_does_not_consume_potions(self):
+        G = self._witch_game()
+        G.night_actions.witch_action = None
+        G.night_actions.witch_target_id = None
+        G_new = resolve_night(G)
+        assert not G_new.players["p6"].witch_heal_used
+        assert not G_new.players["p6"].witch_kill_used
+
+
+# ── Alpha Wolf ────────────────────────────────────────────────────────────────
+
+class TestAlphaWolf:
+    def _alpha_wolf_game(self):
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.players["p1"].role = "alpha_wolf"
+        return G
+
+    def test_alpha_wolf_seer_sees_village(self):
+        G = self._alpha_wolf_game()
+        G.night_actions.seer_target_id = "p1"
+        G_new = resolve_night(G)
+        assert G_new.night_actions.seer_result == InvestigationResult.VILLAGE
+
+    def test_alpha_wolf_framed_seer_sees_wolf(self):
+        G = self._alpha_wolf_game()
+        G.players["p1"].is_framed_tonight = True
+        G.night_actions.seer_target_id = "p1"
+        G_new = resolve_night(G)
+        assert G_new.night_actions.seer_result == InvestigationResult.WOLF
+
+    def test_alpha_wolf_vote_counts_in_kill(self):
+        G = self._alpha_wolf_game()
+        G.night_actions.wolf_votes = {"p1": "p6"}
+        G_new = resolve_night(G)
+        assert not G_new.players["p6"].is_alive
+
+    def test_alpha_wolf_seer_knowledge_stores_village(self):
+        G = self._alpha_wolf_game()
+        G.night_actions.seer_target_id = "p1"
+        G_new = resolve_night(G)
+        assert G_new.seer_knowledge.get("p1") == "village"
+
+    def test_alpha_wolf_can_be_killed_by_sk(self):
+        G = self._alpha_wolf_game()
+        G.players["p6"].role = "serial_killer"
+        G.players["p6"].team = Team.NEUTRAL
+        G.night_actions.serial_killer_target_id = "p1"
+        G_new = resolve_night(G)
+        assert not G_new.players["p1"].is_alive
+
+    def test_regular_wolf_seer_sees_wolf(self):
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.night_actions.seer_target_id = "p1"
+        G_new = resolve_night(G)
+        assert G_new.night_actions.seer_result == InvestigationResult.WOLF

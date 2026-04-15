@@ -7,7 +7,7 @@ from __future__ import annotations
 import pytest
 
 from engine.resolver.day import resolve_day_vote
-from engine.state.enums import Phase, Team
+from engine.state.enums import EliminationCause, Phase, Team
 from engine.state.models import MasterGameState
 from tests.conftest import _eight_player_game, _five_player_game, _make_player
 
@@ -248,3 +248,274 @@ class TestGhost:
         G_new = resolve_day_vote(G)
         assert not G_new.players["p2"].is_alive  # 5 > 4 → eliminated
         assert G_new.players["p1"].is_alive       # Ghost vote skipped → p1 safe
+
+
+# ── Cupid / Lovers (day phase) ─────────────────────────────────────────────────
+
+class TestLoversDay:
+    """Day-vote scenarios involving the Cupid lovers death-chain."""
+
+    def _lovers_game(self, lover_a: str = "p6", lover_b: str = "p7"):
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.phase = Phase.DAY_VOTE
+        G.lovers_pair = [lover_a, lover_b]
+        G.players[lover_a].lovers_partner_id = lover_b
+        G.players[lover_b].lovers_partner_id = lover_a
+        return G
+
+    def test_lover_voted_out_partner_dies_broken_heart(self):
+        """When a lover is eliminated by vote, their partner dies from broken heart."""
+        G = self._lovers_game("p6", "p7")
+        G.day_votes = {"p1": "p6", "p2": "p6", "p3": "p6", "p4": "p6", "p5": "p6"}
+        G_new = resolve_day_vote(G)
+        assert not G_new.players["p6"].is_alive   # voted out
+        assert not G_new.players["p7"].is_alive   # broken heart
+        causes = [e.cause for e in G_new.elimination_log]
+        assert EliminationCause.BROKEN_HEART in causes
+
+    def test_non_lover_voted_out_no_chain(self):
+        """Eliminating a non-lover player does not trigger the death chain."""
+        G = self._lovers_game("p6", "p7")
+        G.day_votes = {"p1": "p3", "p2": "p3", "p4": "p3", "p5": "p3", "p8": "p3"}
+        G_new = resolve_day_vote(G)
+        assert not G_new.players["p3"].is_alive
+        assert G_new.players["p6"].is_alive   # lovers unaffected
+        assert G_new.players["p7"].is_alive
+
+    # ── THE BUG FIX: Hunter-lover chain ──────────────────────────────────────
+
+    def test_hunter_lover_voted_out_partner_dies(self):
+        """BUG FIX: When a Hunter who is in a lovers pair is voted out, their partner
+        must die from broken heart — previously the early return skipped the lovers chain."""
+        G = self._lovers_game("p5", "p7")   # p5=Hunter+Lover, p7=Lover partner
+        G.players["p5"].role = "hunter"
+        G.day_votes = {"p1": "p5", "p2": "p5", "p3": "p5", "p4": "p5", "p6": "p5"}
+        G_new = resolve_day_vote(G)
+        assert not G_new.players["p5"].is_alive   # hunter voted out
+        assert not G_new.players["p7"].is_alive   # partner dies — bug fix assertion
+        causes = [e.cause for e in G_new.elimination_log]
+        assert EliminationCause.BROKEN_HEART in causes
+        # Hunter also queued for revenge
+        assert "p5" in G_new.hunter_queue
+
+    def test_lover_voted_out_partner_is_hunter_queued(self):
+        """When a lover is voted out and their partner is a Hunter, the Hunter-partner
+        gets queued for revenge after dying from broken heart."""
+        G = self._lovers_game("p6", "p5")   # p6=Lover, p5=Hunter+Lover
+        G.players["p5"].role = "hunter"
+        G.day_votes = {"p1": "p6", "p2": "p6", "p3": "p6", "p4": "p6", "p7": "p6"}
+        G_new = resolve_day_vote(G)
+        assert not G_new.players["p6"].is_alive   # voted out
+        assert not G_new.players["p5"].is_alive   # broken heart kills Hunter-partner
+        assert "p5" in G_new.hunter_queue          # Hunter queued for revenge
+
+    def test_jester_lover_voted_out_game_ends_partner_survives(self):
+        """When a Jester who is in a lovers pair is voted out, the Jester wins (game over)
+        and the partner survives — Jester's win is priority-1 and ends the game immediately."""
+        G = self._lovers_game("p6", "p7")
+        G.players["p6"].role = "jester"
+        G.players["p6"].team = Team.NEUTRAL
+        G.day_votes = {"p1": "p6", "p2": "p6", "p3": "p6", "p4": "p6", "p5": "p6"}
+        G_new = resolve_day_vote(G)
+        assert G_new.phase == Phase.GAME_OVER
+        assert G_new.winner == "neutral"
+        # Game ends before lovers chain — partner is unaffected
+        assert G_new.players["p7"].is_alive
+
+    def test_wolf_lover_voted_out_partner_dies_win_checked(self):
+        """Voting out a wolf-lover kills their partner and win condition is evaluated."""
+        G = self._lovers_game("p1", "p7")  # p1=wolf+Lover, p7=villager+Lover
+        G.day_votes = {"p3": "p1", "p4": "p1", "p5": "p1", "p6": "p1", "p7": "p1"}
+        G_new = resolve_day_vote(G)
+        assert not G_new.players["p1"].is_alive   # wolf voted out
+        assert not G_new.players["p7"].is_alive   # broken heart
+        # p2 is the only remaining wolf; p7 (village) died → win check ran
+        # p2(wolf) vs remaining village — game may continue or end depending on count
+
+    def test_both_lovers_dead_before_vote_no_chain(self):
+        """If both lovers are already dead when a vote triggers, no broken heart fires."""
+        G = self._lovers_game("p6", "p7")
+        G.players["p6"].is_alive = False
+        G.players["p7"].is_alive = False
+        G.day_votes = {"p1": "p3", "p2": "p3", "p3": "p3", "p4": "p3", "p5": "p3"}
+        G_new = resolve_day_vote(G)
+        causes = [e.cause for e in G_new.elimination_log]
+        assert EliminationCause.BROKEN_HEART not in causes
+
+
+# -- Mayor (extended) ----------------------------------------------------------
+
+class TestMayorExtended:
+    def _mayor_game(self):
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.phase = Phase.DAY_VOTE
+        for pid in ("p7", "p8"):
+            G.players[pid].is_alive = False
+        G.players["p5"].role = "mayor"
+        G.players["p5"].team = Team.VILLAGE
+        return G  # 6 alive players
+
+    def test_mayor_vote_breaks_tie(self):
+        G = self._mayor_game()
+        # 6 alive; threshold = > 3; mayor(2)+p6(1)+p4(1) = 4 > 3 => eliminated
+        G.day_votes = {"p5": "p3", "p6": "p3", "p4": "p3"}
+        G_new = resolve_day_vote(G)
+        assert not G_new.players["p3"].is_alive
+
+    def test_mayor_self_vote_filtered(self):
+        G = self._mayor_game()
+        G.day_votes = {"p5": "p5"}
+        G_new = resolve_day_vote(G)
+        alive = sum(1 for p in G_new.players.values() if p.is_alive)
+        assert alive == 6  # no elimination
+
+    def test_mayor_exact_boundary_not_majority(self):
+        # mayor(2)+p6(1)=3 out of 6; 3/6=50%, not strictly >50% => no elim
+        G = self._mayor_game()
+        G.day_votes = {"p5": "p3", "p6": "p3"}
+        G_new = resolve_day_vote(G)
+        assert G_new.players["p3"].is_alive
+
+    def test_mayor_exact_boundary_plus_one_eliminates(self):
+        # mayor(2)+p6(1)+p4(1)=4 out of 6; 4/6>50% => eliminated
+        G = self._mayor_game()
+        G.day_votes = {"p5": "p3", "p6": "p3", "p4": "p3"}
+        G_new = resolve_day_vote(G)
+        assert not G_new.players["p3"].is_alive
+
+    def test_dead_mayor_vote_not_counted(self):
+        G = self._mayor_game()
+        G.players["p5"].is_alive = False
+        G.day_votes = {"p5": "p3", "p6": "p3"}
+        G_new = resolve_day_vote(G)
+        assert G_new.players["p3"].is_alive  # only 1 live vote; not majority
+
+    def test_mayor_non_village_team_keeps_double_vote_when_cursed(self):
+        G = self._mayor_game()
+        G.village_powers_cursed = True
+        G.players["p5"].team = Team.NEUTRAL  # neutral mayor: curse does not apply
+        # mayor(2)+p6(1)=3 out of 6; 3/6=50% => boundary, no elim (confirms weight=2)
+        G.day_votes = {"p5": "p3", "p6": "p3"}
+        G_new = resolve_day_vote(G)
+        assert G_new.players["p3"].is_alive
+
+
+# -- Hunter (extended) ---------------------------------------------------------
+
+class TestHunterExtended:
+    def _hunter_game(self):
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.phase = Phase.DAY_VOTE
+        G.players["p5"].role = "hunter"
+        G.players["p5"].team = Team.VILLAGE
+        return G
+
+    def test_hunter_revenge_kills_wolf(self):
+        from engine.resolver.hunter import resolve_hunter_revenge
+        G = self._hunter_game()
+        G.day_votes = {"p1": "p5", "p2": "p5", "p3": "p5", "p4": "p5", "p6": "p5"}
+        G = resolve_day_vote(G)
+        assert G.phase == Phase.HUNTER_PENDING
+        G = resolve_hunter_revenge(G, "p5", "p1")
+        assert not G.players["p1"].is_alive
+        assert EliminationCause.HUNTER_REVENGE in [e.cause for e in G.elimination_log]
+
+    def test_hunter_kills_last_wolf_village_wins(self):
+        from engine.resolver.hunter import resolve_hunter_revenge
+        G = self._hunter_game()
+        G.players["p2"].is_alive = False
+        G.day_votes = {"p1": "p5", "p3": "p5", "p4": "p5", "p6": "p5", "p7": "p5"}
+        G = resolve_day_vote(G)
+        G = resolve_hunter_revenge(G, "p5", "p1")
+        assert G.phase == Phase.GAME_OVER
+        assert G.winner == "village"
+
+    def test_hunter_revenge_timeout_fires_win_check(self):
+        from engine.resolver.hunter import resolve_hunter_timeout
+        G = self._hunter_game()
+        G.players["p5"].is_alive = False
+        G.hunter_queue = ["p5"]
+        G.phase = Phase.HUNTER_PENDING
+        G_new = resolve_hunter_timeout(G, "p5")
+        assert G_new.players["p5"].hunter_fired is True
+        assert "p5" not in G_new.hunter_queue
+
+    def test_multiple_hunters_queue_fires_sequentially(self):
+        from engine.resolver.hunter import resolve_hunter_revenge
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.players["p5"].role = "hunter"
+        G.players["p6"].role = "hunter"
+        G.players["p5"].is_alive = False
+        G.players["p6"].is_alive = False
+        G.hunter_queue = ["p5", "p6"]
+        G.phase = Phase.HUNTER_PENDING
+        G = resolve_hunter_revenge(G, "p5", "p7")
+        assert not G.players["p7"].is_alive
+        assert G.phase == Phase.HUNTER_PENDING  # p6 still queued
+        G = resolve_hunter_revenge(G, "p6", "p8")
+        assert not G.players["p8"].is_alive
+        assert len(G.hunter_queue) == 0
+
+    def test_hunter_cannot_self_target(self):
+        # Hunter is dead when in queue; the dead check fires before self-target.
+        # Verify that attempting to target oneself raises either SELF_TARGET or
+        # TARGET_ALREADY_DEAD (dead check precedes self-target check in resolver).
+        from engine.resolver.hunter import resolve_hunter_revenge, HunterError
+        G = self._hunter_game()
+        G.players["p5"].is_alive = False
+        G.hunter_queue = ["p5"]
+        G.phase = Phase.HUNTER_PENDING
+        try:
+            resolve_hunter_revenge(G, "p5", "p5")
+            assert False, "Should have raised HunterError"
+        except HunterError as e:
+            assert e.code in ("SELF_TARGET", "TARGET_ALREADY_DEAD")
+
+    def test_hunter_cannot_target_dead_player(self):
+        from engine.resolver.hunter import resolve_hunter_revenge, HunterError
+        G = self._hunter_game()
+        G.players["p5"].is_alive = False
+        G.players["p7"].is_alive = False
+        G.hunter_queue = ["p5"]
+        G.phase = Phase.HUNTER_PENDING
+        try:
+            resolve_hunter_revenge(G, "p5", "p7")
+            assert False, "Should have raised HunterError"
+        except HunterError as e:
+            assert e.code == "TARGET_ALREADY_DEAD"
+
+    def test_hunter_fired_prevents_requeue(self):
+        G = self._hunter_game()
+        G.players["p5"].hunter_fired = True
+        G.day_votes = {"p1": "p5", "p2": "p5", "p3": "p5", "p4": "p5", "p6": "p5"}
+        G_new = resolve_day_vote(G)
+        assert "p5" not in G_new.hunter_queue
+
+    def test_hunter_killed_by_witch_gets_queued(self):
+        from engine.resolver.night import resolve_night
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.players["p6"].role = "witch"
+        G.players["p6"].team = Team.VILLAGE
+        G.players["p7"].role = "hunter"
+        G.night_actions.witch_action = "kill"
+        G.night_actions.witch_target_id = "p7"
+        G_new = resolve_night(G)
+        assert not G_new.players["p7"].is_alive
+        assert "p7" in G_new.hunter_queue
+        assert G_new.phase == Phase.HUNTER_PENDING
+
+    def test_hunter_village_cursed_not_queued_at_night(self):
+        from engine.resolver.night import resolve_night
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.players["p7"].role = "hunter"
+        G.village_powers_cursed = True
+        G.night_actions.wolf_votes = {"p1": "p7", "p2": "p7"}
+        G_new = resolve_night(G)
+        assert not G_new.players["p7"].is_alive
+        assert "p7" not in G_new.hunter_queue

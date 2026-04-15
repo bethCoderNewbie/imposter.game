@@ -38,6 +38,9 @@ _ALWAYS_STRIP_PLAYER_FIELDS = frozenset({
     "witch_kill_used",
     "lunatic_redirect_used",
     "wise_shield_used",
+    # Grid system — server-only position tracking
+    "grid_node_row",
+    "grid_node_col",
 })
 
 _ALWAYS_STRIP_NIGHT_ACTION_FIELDS = frozenset({
@@ -54,6 +57,10 @@ _ALWAYS_STRIP_NIGHT_ACTION_FIELDS = frozenset({
     "witch_target_id",
     "lunatic_redirect",
     "bodyguard_target_id",
+    # Grid system — wolf-only and server-only fields
+    "grid_activity",          # wolf view only; restored by _build_na_for_view
+    "sonar_ping_results",     # wolf view only; restored by _build_na_for_view
+    "night_action_change_count",  # server-only; never sent to any client
 })
 
 
@@ -123,13 +130,9 @@ def _display_view(state: dict[str, Any], is_game_over: bool) -> dict[str, Any]:
         p["puzzles_solved_count"] = 0
         p["vote_target_id"] = None
         p["puzzle_state"] = None
+        p["grid_puzzle_state"] = None
 
-    # Strip night_actions entirely — keep only aggregate counts
-    na = s.get("night_actions", {})
-    s["night_actions"] = {
-        "actions_submitted_count": na.get("actions_submitted_count", 0),
-        "actions_required_count": na.get("actions_required_count", 0),
-    }
+    s["night_actions"] = _build_na_for_view(s.get("night_actions", {}), "display")
 
     s["seer_knowledge"] = {}
     s["tracker_knowledge"] = {}
@@ -166,15 +169,10 @@ def _wolf_team_view(
             )
         else:
             p["puzzle_state"] = None
+        # Wolves don't use the grid (no grid_puzzle_state for wolf team)
+        p["grid_puzzle_state"] = None
 
-    # Night actions: wolf team sees wolf_votes only (plus aggregate counts)
-    na = s.get("night_actions", {})
-    s["night_actions"] = {
-        "wolf_votes": na.get("wolf_votes", {}),
-        "actions_submitted_count": na.get("actions_submitted_count", 0),
-        "actions_required_count": na.get("actions_required_count", 0),
-    }
-    _strip_night_action_always(s)
+    s["night_actions"] = _build_na_for_view(s.get("night_actions", {}), "wolf")
 
     s["seer_knowledge"] = {}
     s["tracker_knowledge"] = {}
@@ -272,15 +270,15 @@ def _baseline_alive_view(
             p["puzzle_state"] = _strip_puzzle_for_player(
                 _ps.model_dump(mode="json") if _ps else None, player_id, G
             )
+            _gps = G.players[player_id].grid_puzzle_state
+            p["grid_puzzle_state"] = _strip_puzzle_for_player(
+                _gps.model_dump(mode="json") if _gps else None, player_id, G
+            )
         else:
             p["puzzle_state"] = None
+            p["grid_puzzle_state"] = None
 
-    # Night actions: only aggregate counts
-    na = state.get("night_actions", {})
-    s["night_actions"] = {
-        "actions_submitted_count": na.get("actions_submitted_count", 0),
-        "actions_required_count": na.get("actions_required_count", 0),
-    }
+    s["night_actions"] = _build_na_for_view(state.get("night_actions", {}), "baseline")
 
     s["seer_knowledge"] = {}
     s["tracker_knowledge"] = {}
@@ -307,12 +305,9 @@ def _dead_spectator_view(
         p["night_action_submitted"] = None
         p["puzzles_solved_count"] = 0
         p["puzzle_state"] = None
+        p["grid_puzzle_state"] = None
 
-    # night_actions: entirely removed during live play
-    s["night_actions"] = {
-        "actions_submitted_count": state.get("night_actions", {}).get("actions_submitted_count", 0),
-        "actions_required_count": state.get("night_actions", {}).get("actions_required_count", 0),
-    }
+    s["night_actions"] = _build_na_for_view(state.get("night_actions", {}), "dead")
 
     if is_game_over:
         # Reveal accumulated seer_knowledge and tracker_knowledge
@@ -336,18 +331,48 @@ def _strip_player_fields(p: dict[str, Any], fields: frozenset[str]) -> None:
         p.pop(field, None)
 
 
-def _strip_night_action_always(s: dict[str, Any]) -> None:
-    """Remove always-stripped fields from the night_actions dict."""
-    na = s.get("night_actions", {})
-    for field in _ALWAYS_STRIP_NIGHT_ACTION_FIELDS:
-        na.pop(field, None)
-
 
 def _hide_elimination_log_details(s: dict[str, Any]) -> None:
     """Null out role and saved_by_doctor in elimination_log during live play."""
     for event in s.get("elimination_log", []):
         event["role"] = None
         event["saved_by_doctor"] = False
+
+
+def _build_na_for_view(na_raw: dict, view: str) -> dict:
+    """
+    Assemble the night_actions dict for a specific view type.
+    Always-stripped fields are excluded; view-specific fields are included here.
+    Add new NightActions fields in this single function — not in each view function.
+
+    view values: "display" | "wolf" | "baseline" | "dead" | "seer" | "tracker" | "arsonist"
+    """
+    # Fields public to all live views
+    base: dict = {
+        "actions_submitted_count": na_raw.get("actions_submitted_count", 0),
+        "actions_required_count": na_raw.get("actions_required_count", 0),
+        "sonar_pings_used": na_raw.get("sonar_pings_used", 0),
+        "grid_layout": na_raw.get("grid_layout"),
+    }
+
+    if view == "wolf":
+        base["wolf_votes"] = na_raw.get("wolf_votes", {})
+        base["grid_activity"] = na_raw.get("grid_activity", [])
+        base["sonar_ping_results"] = na_raw.get("sonar_ping_results", [])
+
+    if view == "seer":
+        base["seer_target_id"] = na_raw.get("seer_target_id")
+        base["seer_result"] = na_raw.get("seer_result")
+
+    if view == "tracker":
+        base["tracker_target_id"] = na_raw.get("tracker_target_id")
+        base["tracker_result"] = na_raw.get("tracker_result", [])
+
+    if view == "arsonist":
+        base["arsonist_action"] = na_raw.get("arsonist_action")
+        base["arsonist_douse_target_id"] = na_raw.get("arsonist_douse_target_id")
+
+    return base
 
 
 def _strip_puzzle_for_player(

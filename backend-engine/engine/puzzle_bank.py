@@ -12,7 +12,6 @@ from __future__ import annotations
 import pathlib
 import random
 import re
-import secrets
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -51,15 +50,6 @@ BANK_BY_CATEGORY: dict[str, list[int]]
 BANK, BANK_BY_CATEGORY = _parse_bank(_PUZZLES_MD.read_text(encoding="utf-8"))
 
 _SEQUENCE_COLORS = ["red", "blue", "green", "yellow"]
-
-# Roles whose absence/presence yields a high-value hint
-_HIGH_IMPACT_ABSENT_ROLES = ["alpha_wolf", "framer", "infector", "serial_killer", "arsonist"]
-# Guaranteed baseline roles — not worth hinting about presence
-_BASELINE_ROLES = {"villager", "werewolf", "seer"}
-# Elimination causes that indicate a non-wolf kill (for non_wolf_kill hint category)
-_NON_WOLF_CAUSES = {"arsonist_ignite", "serial_killer_kill", "broken_heart", "hunter_revenge"}
-# Round threshold: rounds < this are vague, rounds >= this are specific
-_VAGUE_ROUND_THRESHOLD = 3
 
 
 # ── Puzzle generation ─────────────────────────────────────────────────────────
@@ -195,107 +185,55 @@ def _make_sequence_puzzle(rng: random.Random) -> "PuzzleState":
     )
 
 
-# ── Hint generation ───────────────────────────────────────────────────────────
+# Hint generation has moved to engine/hint_bank.py.
+# Import from there: from engine.hint_bank import generate_hint, generate_grid_hint
 
-def generate_hint(G: "MasterGameState", player_id: str) -> dict:
+
+# ── Grid system ───────────────────────────────────────────────────────────────
+
+def generate_grid_layout(seed: str, round_number: int) -> list[list[int]]:
     """
-    Generate a real HintPayload for a player who solved their Archive puzzle.
-    Seeded by (game seed : round : player_id) so simultaneous solvers can get
-    different hints even in the same round.
-
-    Rounds 1–2 (< _VAGUE_ROUND_THRESHOLD): composition hints are vague — direction
-    without naming specifics (role names, exact counts).
-    Round 3+: hints are specific (exact counts, role names).
-
-    Categories: wolf_count (always), no_role_present, role_present, neutral_exists,
-    non_wolf_kill (round 2+), lovers_exist (if Cupid linked a pair).
-    seer_blocked_last_night is omitted — roleblocked_player_id is not set until
-    night resolution runs, which happens after puzzle delivery.
+    Generate a 5×5 tier grid for a night round. Deterministic given (seed, round).
+    Distribution: exactly 1 red (tier 3), 6 yellow (tier 2), 18 green (tier 1).
+    Returns a list of 5 rows, each a list of 5 tier integers.
     """
-    rng = random.Random(f"{G.seed}:{G.round}:{player_id}:hint")
-    is_vague = G.round < _VAGUE_ROUND_THRESHOLD
+    rng = random.Random(f"{seed}:{round_number}:grid_layout")
+    cells = [1] * 18 + [2] * 6 + [3] * 1  # 25 cells total
+    rng.shuffle(cells)
+    return [cells[i * 5:(i + 1) * 5] for i in range(5)]
 
-    composition: dict[str, int] = {}
-    for player in G.players.values():
-        if player.role:
-            composition[player.role] = composition.get(player.role, 0) + 1
 
-    pool: list[dict] = []
+def generate_grid_puzzle(tier: int, rng: random.Random) -> "PuzzleState":
+    """
+    Generate a PuzzleState appropriate for a node of the given tier.
 
-    # wolf_count — always available
-    wolf_count = sum(1 for p in G.players.values() if p.team == "werewolf")
-    if is_vague:
-        low = max(1, wolf_count - 1)
-        high = wolf_count + 1
-        wolf_text = f"The Archives suggest between {low} and {high} Wolves are present in this game."
-    else:
-        plural = wolf_count != 1
-        wolf_text = (
-            f"There {'are' if plural else 'is'} {wolf_count} "
-            f"{'Wolves' if plural else 'Wolf'} total in this game."
-        )
-    pool.append({"category": "wolf_count", "text": wolf_text, "expires_after_round": None})
+    Tier 1 (green, 5s):  Simple math puzzle.
+    Tier 2 (yellow, 10s): Logic puzzle (multiple choice from BANK).
+    Tier 3 (red, 20s):   Logic puzzle with full time window.
+    """
+    if tier == 1:
+        puzzle = _make_math_puzzle(rng, round_number=1)  # round_number=1 → simple operations
+        return puzzle.model_copy(update={"time_limit_seconds": 5})
+    if tier == 2:
+        puzzle = _make_logic_puzzle(rng)
+        return puzzle.model_copy(update={"time_limit_seconds": 10})
+    # Tier 3
+    puzzle = _make_logic_puzzle(rng)
+    return puzzle.model_copy(update={"time_limit_seconds": 20})
 
-    # no_role_present — pick one absent high-impact role
-    # rng.choice always called to preserve RNG sequence even when vague
-    absent = [r for r in _HIGH_IMPACT_ABSENT_ROLES if r not in composition]
-    if absent:
-        role_name = rng.choice(absent)
-        if is_vague:
-            no_role_text = "The Archives hint that a certain powerful role is absent from this game."
-        else:
-            no_role_text = f"There is NO {role_name.replace('_', ' ').title()} in this game."
-        pool.append({"category": "no_role_present", "text": no_role_text, "expires_after_round": None})
 
-    # role_present — pick one present non-baseline role
-    # rng.choice always called to preserve RNG sequence even when vague
-    present_special = [r for r in composition if r not in _BASELINE_ROLES]
-    if present_special:
-        role_name = rng.choice(present_special)
-        if is_vague:
-            role_text = "The Archives suggest at least one special role is in play beyond the basics."
-        else:
-            role_text = f"There IS a {role_name.replace('_', ' ').title()} in this game."
-        pool.append({"category": "role_present", "text": role_text, "expires_after_round": None})
-
-    # neutral_exists — only if a living neutral player exists
-    if any(p.is_alive and p.team == "neutral" for p in G.players.values()):
-        pool.append({
-            "category": "neutral_exists",
-            "text": "At least one Neutral player is alive in this game.",
-            "expires_after_round": G.round + 1,
-        })
-
-    # non_wolf_kill — behavioral, round 2+
-    # Fires when last night had at least one kill not caused by wolves
-    if G.round >= 2:
-        last_night_non_wolf = [
-            e for e in G.elimination_log
-            if e.round == G.round - 1
-            and e.phase == "night"
-            and e.cause in _NON_WOLF_CAUSES
-        ]
-        if last_night_non_wolf:
-            pool.append({
-                "category": "non_wolf_kill",
-                "text": "The last night's death was not the wolves' doing.",
-                "expires_after_round": G.round + 1,
-            })
-
-    # lovers_exist — if Cupid linked a pair this game
-    if G.lovers_pair:
-        if is_vague:
-            lovers_text = "Two souls in this village share an unbreakable bond."
-        else:
-            lovers_text = "Two players are bound together — if one falls, the other follows."
-        pool.append({"category": "lovers_exist", "text": lovers_text, "expires_after_round": None})
-
-    chosen = rng.choice(pool)
-    return {
-        "type": "hint_reward",
-        "hint_id": secrets.token_urlsafe(12),
-        "category": chosen["category"],
-        "text": chosen["text"],
-        "round": G.round,
-        "expires_after_round": chosen["expires_after_round"],
-    }
+def node_to_quadrant(row: int, col: int) -> str:
+    """
+    Map a (row, col) in the 5×5 grid to one of four quadrant names.
+    Rows 0–1 = top; rows 2–4 = bottom.
+    Cols 0–1 = left; cols 2–4 = right.
+    """
+    top = row <= 1
+    left = col <= 1
+    if top and left:
+        return "top_left"
+    if top:
+        return "top_right"
+    if left:
+        return "bottom_left"
+    return "bottom_right"

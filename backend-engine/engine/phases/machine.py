@@ -90,16 +90,29 @@ def transition_phase(G: MasterGameState, new_phase: Phase) -> MasterGameState:
             actions_required_count=required,
         )
         # Generate a distinct Archive puzzle per wakeOrder==0 player (logic/math/sequence)
-        from engine.puzzle_bank import generate_night_puzzle
+        from engine.puzzle_bank import generate_night_puzzle, generate_grid_layout
         for pid, player in G.players.items():
             if not player.is_alive:
                 player.puzzle_state = None
+                player.grid_node_row = None
+                player.grid_node_col = None
+                player.grid_puzzle_state = None
                 continue
             role_def = ROLE_REGISTRY.get(player.role or "", {})
             if role_def.get("wakeOrder", 0) == 0:
                 player.puzzle_state = generate_night_puzzle(G, pid)
             else:
                 player.puzzle_state = None
+            player.grid_node_row = None
+            player.grid_node_col = None
+            player.grid_puzzle_state = None
+
+        # Generate a fresh 5×5 grid layout for the night
+        G.night_actions.grid_layout = generate_grid_layout(G.seed, G.round)
+        G.night_actions.grid_activity = []
+        G.night_actions.sonar_pings_used = 0
+        G.night_actions.sonar_ping_results = []
+        G.night_actions.night_action_change_count = {}
 
     elif new_phase == Phase.DAY:
         # Clear day votes for fresh discussion phase
