@@ -1,7 +1,7 @@
 .hunter-pending {
+  min-height: 100vh; /* height: 100% resolves to 0 — parent Fragment has no defined height */
   display: flex;
   flex-direction: column;
-  height: 100%;
   background: linear-gradient(to right, #434343 0%, black 100%);
 }
 
@@ -11,4 +11,9 @@
   color: #fc8181;
   font-size: 0.9rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Match NightActionShell padding so the confirm button clears the sound panel */
+.hunter-pending .action-ui {
+  padding: 0 1.5rem calc(var(--sound-panel-clearance, 80px) + var(--mobile-safe-bottom, 0px));
 }
