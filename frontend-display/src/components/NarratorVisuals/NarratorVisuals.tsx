@@ -37,7 +37,7 @@ export default function NarratorVisuals({ visible }: Props) {
           width="50%"
           x="25%"
           y="25%"
-          href="/images/host.jpeg"
+          href="/images/host.png"
           clipPath="url(#narrator-clip)"
           preserveAspectRatio="xMidYMid slice"
         />
