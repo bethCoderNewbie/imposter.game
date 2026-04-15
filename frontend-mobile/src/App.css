@@ -1,3 +1,9 @@
+/* Lobby phase — gradient background on body */
+html.phase-lobby body,
+.create-match {
+  background-image: linear-gradient(60deg, #29323c 0%, #485563 100%);
+}
+
 .app-loading,
 .app-status {
   position: fixed;

@@ -1,4 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import {
+  type LucideIcon,
+  Waves, Moon, Ghost, Zap, AlertCircle, Heart, AlertTriangle,
+  Sparkles, MessageCircle, Smile, ThumbsUp, Users,
+  Music, Wind, Cloud, PersonStanding, Bed, VolumeX, RotateCcw,
+} from 'lucide-react'
 import { useGameState } from './hooks/useGameState'
 import { useNarrator } from './hooks/useNarrator'
 import CreateMatchScreen from './components/CreateMatchScreen/CreateMatchScreen'
@@ -11,6 +17,29 @@ import NarratorSubtitle from './components/NarratorSubtitle/NarratorSubtitle'
 import NarratorVisuals from './components/NarratorVisuals/NarratorVisuals'
 import type { StrippedGameState } from './types/game'
 import './App.css'
+
+// Lucide icon map for the 19 sound IDs — defined at module level (stable reference)
+const SOUND_ICONS: Record<string, LucideIcon> = {
+  howl:       Waves,
+  wolfcry:    Moon,
+  spooky:     Ghost,
+  boom:       Zap,
+  siren:      AlertCircle,
+  ambulance:  Heart,
+  warning:    AlertTriangle,
+  surprise:   Sparkles,
+  gasp:       MessageCircle,
+  laugh:      Smile,
+  clap:       ThumbsUp,
+  people:     Users,
+  fail:       Music,
+  burp:       Wind,
+  fart:       Cloud,
+  walk:       PersonStanding,
+  snoring:    Bed,
+  shush:      VolumeX,
+  flashback:  RotateCcw,
+}
 
 // PRD-003 §4 — substrate class swap on root element (never via component JSX)
 const PHASE_TO_CLASS: Record<string, string> = {
@@ -45,29 +74,28 @@ export default function App() {
   // Pending scream timeout — cancelled if night ends before it fires (PRD-012 §2.3)
   const screamTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Brief toast shown when a player triggers a sound from the mobile sound board
-  const [soundToast, setSoundToast] = useState<{ emoji: string; playerName: string } | null>(null)
+  const [soundToast, setSoundToast] = useState<{ soundId: string; playerName: string; playerId: string | null } | null>(null)
   const soundToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Ref so handleSoundTriggered can read current gameState without being re-created on every state change
+  const gameStateRef = useRef<StrippedGameState | null>(null)
 
   const { narratorText, handleNarrate } = useNarrator()
 
   // Handle a fun sound triggered by a player on mobile
-  const SOUND_EMOJIS: Record<string, string> = {
-    howl: '🐺', wolfcry: '🌕', spooky: '👻', boom: '💥',
-    siren: '🚨', ambulance: '🚑', warning: '⚠️', surprise: '🎉',
-    gasp: '😱', laugh: '😂', clap: '👏', people: '👥',
-    fail: '🎺', burp: '🤢', fart: '💨', walk: '🚶',
-    snoring: '😴', shush: '🤫', flashback: '⏪',
-  }
   const handleSoundTriggered = useCallback((soundId: string, playerName: string) => {
     if (!audioUnlocked) return
     const audio = new Audio(`${import.meta.env.BASE_URL}audio/sounds/${soundId}.mp3`)
     audio.volume = 0.75
     audio.play().catch(() => {})
+    // Lookup player_id by display_name for card highlight
+    const playerId = gameStateRef.current
+      ? (Object.values(gameStateRef.current.players).find(p => p.display_name === playerName)?.player_id ?? null)
+      : null
     // Show toast for 2.5s
     if (soundToastTimerRef.current) clearTimeout(soundToastTimerRef.current)
-    setSoundToast({ emoji: SOUND_EMOJIS[soundId] ?? '🔊', playerName })
+    setSoundToast({ soundId, playerName, playerId })
     soundToastTimerRef.current = setTimeout(() => setSoundToast(null), 2500)
-  }, [audioUnlocked]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [audioUnlocked])
 
   // Schedule a scream SFX with a random 3–30s delay after the first wolf kill vote
   const handleWolfKillQueued = useCallback(() => {
@@ -119,6 +147,8 @@ export default function App() {
     onWolfKillQueued: handleWolfKillQueued,
     onSoundTriggered: handleSoundTriggered,
   })
+  // Keep ref in sync so handleSoundTriggered can read latest state without re-creation
+  gameStateRef.current = gameState ?? null
 
   // PRD-003 §4 rule: substrate class set here, not inside components
   useEffect(() => {
@@ -218,7 +248,7 @@ export default function App() {
     }
 
     if (phase === 'day' || phase === 'day_vote' || phase === 'hunter_pending') {
-      return <DayScreen gameState={gameState} frozenVotes={frozenVotes} audioUnlocked={audioUnlocked} />
+      return <DayScreen gameState={gameState} frozenVotes={frozenVotes} audioUnlocked={audioUnlocked} soundPlayerId={soundToast?.playerId ?? null} />
     }
 
     if (phase === 'game_over') {
@@ -251,12 +281,15 @@ export default function App() {
       {renderContent()}
       {audioUnlocked && <NarratorVisuals visible={!!narratorText} />}
       {audioUnlocked && <NarratorSubtitle text={narratorText} />}
-      {soundToast && (
-        <div className="sound-toast">
-          <span className="sound-toast__emoji">{soundToast.emoji}</span>
-          <span className="sound-toast__name">{soundToast.playerName}</span>
-        </div>
-      )}
+      {soundToast && (() => {
+        const Icon = SOUND_ICONS[soundToast.soundId] ?? Waves
+        return (
+          <div className="sound-toast">
+            <span className="sound-toast__icon"><Icon size={28} strokeWidth={1.8} /></span>
+            <span className="sound-toast__name">{soundToast.playerName}</span>
+          </div>
+        )
+      })()}
     </>
   )
 }

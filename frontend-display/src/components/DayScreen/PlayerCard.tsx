@@ -8,14 +8,20 @@ interface Props {
   voteCount: number
   hasMajority: boolean
   index: number
+  isSoundActive: boolean
 }
 
-export default function PlayerCard({ player, voteCount, hasMajority, index }: Props) {
+export default function PlayerCard({ player, voteCount, hasMajority, index, isSoundActive }: Props) {
   const isDead = !player.is_alive
 
   return (
     <div
-      className={`player-card ${isDead ? 'player-card--dead' : ''} ${hasMajority ? 'player-card--majority' : ''}`}
+      className={[
+        'player-card',
+        isDead ? 'player-card--dead' : '',
+        hasMajority ? 'player-card--majority' : '',
+        isSoundActive ? 'player-card--sound-active' : '',
+      ].filter(Boolean).join(' ')}
       data-player-id={player.player_id}
       style={{ '--i': index } as React.CSSProperties}
     >

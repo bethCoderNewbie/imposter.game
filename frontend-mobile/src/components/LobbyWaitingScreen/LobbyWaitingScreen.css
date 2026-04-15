@@ -4,6 +4,7 @@
   flex-direction: column;
   padding: 2rem 1.5rem calc(2rem + var(--mobile-safe-bottom));
   gap: 1.5rem;
+  background-image: linear-gradient(to right, #434343 0%, black 100%);
 }
 
 .lobby-waiting__header {

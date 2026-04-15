@@ -6,8 +6,8 @@
   justify-content: center;
   padding: 2rem 1.5rem calc(var(--sound-panel-clearance) + var(--mobile-safe-bottom));
   gap: 2rem;
-  background-color: var(--night-bg-deep);
-  transition: background-color 0.15s ease-out;
+  background: url('/images/night-forest.jpg') center / cover no-repeat var(--night-bg-deep);
+  transition: background 0.15s ease-out;
 }
 
 /* Role content — visible only while held */

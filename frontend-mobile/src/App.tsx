@@ -126,6 +126,13 @@ export default function App() {
     onRedirect: handleRedirect,
   })
 
+  // Toggle html.phase-lobby for background gradient
+  useEffect(() => {
+    const isLobby = gameState?.phase === 'lobby'
+    document.documentElement.classList.toggle('phase-lobby', isLobby)
+    return () => document.documentElement.classList.remove('phase-lobby')
+  }, [gameState?.phase])
+
   // Clear hint when night phase ends
   useEffect(() => {
     if (gameState?.phase !== 'night') setLatestHint(null)

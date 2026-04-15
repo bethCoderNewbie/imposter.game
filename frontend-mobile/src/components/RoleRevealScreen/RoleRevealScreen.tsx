@@ -1,6 +1,5 @@
 import { useState, useRef } from 'react'
 import { useHaptics } from '../../hooks/useHaptics'
-import { getRoleColor } from '../../types/game'
 import type { PlayerState, StrippedGameState } from '../../types/game'
 import './RoleRevealScreen.css'
 
@@ -22,7 +21,7 @@ export default function RoleRevealScreen({ myPlayer, gameState, sendIntent }: Pr
   const role = myPlayer.role ?? 'villager'
   const roleDef = gameState.role_registry?.[role]
   const abilities = (roleDef?.abilities as string[] | undefined) ?? []
-  const bgColor = getRoleColor(role)
+
 
   function handlePointerDown() {
     setIsRevealing(true)
@@ -49,7 +48,6 @@ export default function RoleRevealScreen({ myPlayer, gameState, sendIntent }: Pr
   return (
     <div
       className="role-reveal"
-      style={isRevealing ? { backgroundColor: bgColor } : undefined}
     >
       {/* Role content — only in DOM while held (ADR-003 §5) */}
       {isRevealing && (

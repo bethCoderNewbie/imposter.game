@@ -3,7 +3,7 @@
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background-image: linear-gradient(to top, #dbdcd7 0%, #dddcd7 24%, #e2c9cc 30%, #e7627d 46%, #b8235a 59%, #801357 71%, #3d1635 84%, #1c1a27 100%);
+  background-image: linear-gradient(60deg, #29323c 0%, #485563 100%);
   color: #fff;
 }
 
@@ -31,20 +31,36 @@
 .create-match__btn {
   width: 100%;
   max-width: 24rem;
-  padding: 1rem 3rem;
   font-size: 1.5rem;
   font-weight: 600;
-  background: #fff;
-  color: #0a0a0a;
-  border: none;
-  border-radius: 0.75rem;
   cursor: pointer;
-  transition: opacity 0.15s;
 }
 
 .create-match__btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.btn-grad {
+  background-image: linear-gradient(to right, #1F1C2C 0%, #928DAB 51%, #1F1C2C 100%);
+  margin: 10px;
+  padding: 15px 45px;
+  text-align: center;
+  text-transform: uppercase;
+  transition: 0.5s;
+  background-size: 200% auto;
+  color: white;
+  box-shadow: 0 0 20px #eee;
+  border-radius: 10px;
+  display: block;
+  outline: none;
+  border: none;
+}
+
+.btn-grad:hover {
+  background-position: right center;
+  color: #fff;
+  text-decoration: none;
 }
 
 .create-match__error {

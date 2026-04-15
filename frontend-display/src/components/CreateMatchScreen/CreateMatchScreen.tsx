@@ -148,7 +148,7 @@ export default function CreateMatchScreen({ onCreated, onResumed }: Props) {
         {error && <p className="create-match__error">{error}</p>}
 
         <button
-          className="create-match__btn"
+          className="create-match__btn btn-grad"
           disabled={loading}
           onClick={handleCreate}
         >
@@ -156,7 +156,7 @@ export default function CreateMatchScreen({ onCreated, onResumed }: Props) {
         </button>
 
         <button
-          className="create-match__btn"
+          className="create-match__btn btn-grad"
           onClick={() => { setShowResume(v => !v); setResumeError(null) }}
         >
           {showResume ? 'Cancel' : 'Resume Match'}
@@ -174,7 +174,7 @@ export default function CreateMatchScreen({ onCreated, onResumed }: Props) {
               onKeyDown={e => { if (e.key === 'Enter') handleResume() }}
             />
             <button
-              className="create-match__btn"
+              className="create-match__btn btn-grad"
               disabled={!resumeId.trim()}
               onClick={handleResume}
             >
