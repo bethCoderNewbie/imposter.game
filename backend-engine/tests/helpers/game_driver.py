@@ -95,16 +95,19 @@ def drive_night(
     night_acts: dict[str, dict[str, Any]],
 ) -> dict[str, Any]:
     """
-    Submit a dict of {player_id: intent} for the night phase.
-    Drains display_ws until DAY / GAME_OVER / HUNTER_PENDING.
-    Returns the first matching broadcast.
+    Submit a dict of {player_id: intent} for the night phase, then fire a
+    phase_timeout to resolve night (auto-advance on all-actions-done is disabled;
+    only the timer advances the phase in production).
 
     Only waking-role players need entries in night_acts (wakeOrder > 0).
-    The last submission triggers auto-advance inline.
     """
     for pid, intent in night_acts.items():
         player = next(p for p in players if p["player_id"] == pid)
         send_player_intent(client, game_id, player, intent)
+
+    # Simulate timer expiry — same path the real timer takes in production.
+    host = players[0]
+    send_player_intent(client, game_id, host, {"type": "phase_timeout", "phase": "night"})
 
     return consume_until(
         display_ws,

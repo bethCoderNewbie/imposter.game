@@ -1,5 +1,6 @@
 import React from 'react'
 import PlayerAvatar from '../PlayerAvatar/PlayerAvatar'
+import { getCauseIcon } from '../../utils/elimination'
 import type { PlayerState } from '../../types/game'
 import './PlayerCard.css'
 
@@ -9,9 +10,10 @@ interface Props {
   hasMajority: boolean
   index: number
   isSoundActive: boolean
+  eliminationCause: string | null
 }
 
-export default function PlayerCard({ player, voteCount, hasMajority, index, isSoundActive }: Props) {
+export default function PlayerCard({ player, voteCount, hasMajority, index, isSoundActive, eliminationCause }: Props) {
   const isDead = !player.is_alive
 
   return (
@@ -28,8 +30,14 @@ export default function PlayerCard({ player, voteCount, hasMajority, index, isSo
       <div className="player-card__avatar-wrap">
         <PlayerAvatar player={player} />
 
-        {/* Tombstone overlay for eliminated players */}
-        {isDead && (
+        {/* Cause icon or tombstone fallback for eliminated players */}
+        {isDead && eliminationCause && (() => {
+          const icon = getCauseIcon(eliminationCause)
+          return icon.type === 'image'
+            ? <img className="player-card__cause-icon" src={icon.src} alt={icon.alt} />
+            : <span className="player-card__cause-icon player-card__cause-icon--emoji" aria-hidden="true">{icon.char}</span>
+        })()}
+        {isDead && !eliminationCause && (
           <div className="player-card__tombstone" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
               <path d="M6 21V10a6 6 0 1 1 12 0v11" />

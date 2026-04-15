@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import PlayerAvatar from '../PlayerAvatar/PlayerAvatar'
+import { getCauseIcon } from '../../utils/elimination'
 import type { StrippedGameState } from '../../types/game'
 import './GameOverScreen.css'
 
@@ -72,6 +73,9 @@ export default function GameOverScreen({ gameState, audioUnlocked, gameId, hostS
 
   const players = Object.values(gameState.players)
   const timeline = gameState.post_match?.timeline ?? []
+  const causeByPlayer = Object.fromEntries(
+    gameState.elimination_log.map(e => [e.player_id, e.cause])
+  )
 
   return (
     <div className="game-over">
@@ -103,6 +107,12 @@ export default function GameOverScreen({ gameState, audioUnlocked, gameId, hostS
             {player.role && (
               <span className="game-over__role-badge">{player.role}</span>
             )}
+            {!player.is_alive && causeByPlayer[player.player_id] && (() => {
+              const icon = getCauseIcon(causeByPlayer[player.player_id])
+              return icon.type === 'image'
+                ? <img className="game-over__cause-icon" src={icon.src} alt={icon.alt} />
+                : <span className="game-over__cause-icon game-over__cause-icon--emoji" aria-hidden="true">{icon.char}</span>
+            })()}
           </div>
         ))}
       </div>

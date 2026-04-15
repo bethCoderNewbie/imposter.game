@@ -70,6 +70,9 @@ export default function DayScreen({ gameState, frozenVotes, audioUnlocked, sound
   const majorityThreshold = livingCount > 0 ? livingCount / 2 : Infinity
 
   const hexUnit = computeHexUnit(players.length)
+  const causeByPlayer = Object.fromEntries(
+    gameState.elimination_log.map(e => [e.player_id, e.cause])
+  )
 
   return (
     <div className="day-screen">
@@ -116,6 +119,7 @@ export default function DayScreen({ gameState, frozenVotes, audioUnlocked, sound
             hasMajority={(voteCounts[player.player_id] ?? 0) > majorityThreshold}
             index={index}
             isSoundActive={soundPlayerId === player.player_id}
+            eliminationCause={causeByPlayer[player.player_id] ?? null}
           />
         ))}
 

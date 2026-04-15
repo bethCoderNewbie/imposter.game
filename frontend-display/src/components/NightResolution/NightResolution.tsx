@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import PlayerAvatar from '../PlayerAvatar/PlayerAvatar'
+import { getCauseIcon } from '../../utils/elimination'
 import type { StrippedGameState } from '../../types/game'
 import './NightResolution.css'
 
@@ -8,7 +9,7 @@ interface Props {
   onComplete: () => void
 }
 
-const DURATION_MS = 4000
+const DURATION_MS = 10000
 
 export default function NightResolution({ gameState, onComplete }: Props) {
   const roosterRef = useRef<HTMLAudioElement>(null)
@@ -45,7 +46,12 @@ export default function NightResolution({ gameState, onComplete }: Props) {
             style={{ animationDelay: `${600 + i * 400}ms` }}
           >
             <PlayerAvatar player={player} size={96} />
-            <div className="night-resolution__claw-mark" aria-hidden="true">✕</div>
+            {(() => {
+              const icon = getCauseIcon(event.cause)
+              return icon.type === 'image'
+                ? <img className="night-resolution__cause-icon" src={icon.src} alt={icon.alt} />
+                : <div className="night-resolution__cause-icon night-resolution__cause-icon--emoji" aria-hidden="true">{icon.char}</div>
+            })()}
             <p className="night-resolution__player-name">{player.display_name}</p>
           </div>
         )

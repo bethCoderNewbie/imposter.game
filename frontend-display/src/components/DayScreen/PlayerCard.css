@@ -59,6 +59,28 @@
   opacity: 0.6;
 }
 
+/* Cause icon — positioned top-left of avatar circle */
+.player-card__cause-icon {
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  width: clamp(32px, 4.5vmin, 56px);
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 0 6px rgba(229, 62, 62, 0.8));
+  z-index: 1;
+}
+
+.player-card__cause-icon--emoji {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: clamp(32px, 4.5vmin, 56px);
+  height: clamp(32px, 4.5vmin, 56px);
+  font-size: clamp(20px, 3vmin, 40px);
+  line-height: 1;
+}
+
 /* Tombstone SVG — clipped to hex shape alongside the avatar */
 .player-card__tombstone {
   position: absolute;

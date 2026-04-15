@@ -269,27 +269,9 @@ async def handle_submit_night_action(G, intent, redis_client, cm) -> MasterGameS
     player.night_action_submitted = True
     na.actions_submitted_count += 1
 
-    # Auto-advance check
-    if should_auto_advance(G):
-        cancel_phase_timer(G.game_id)
-        elim_count_before = len(G.elimination_log)
-        G = resolve_night(G)
-        # Broadcast results while still in NIGHT phase so role-specific UIs
-        # (Seer, Tracker) can display their outcome before the phase transitions.
-        G.state_id += 1
-        await cm.broadcast(G.game_id, G)
-        if G.phase not in (Phase.GAME_OVER, Phase.HUNTER_PENDING):
-            G = transition_phase(G, Phase.DAY)
-            if get_settings().narrator_enabled:
-                _specs: list = [("night_close", None, None), ("day_open", None, None)]
-                if len(G.elimination_log) > elim_count_before:
-                    last_elim = G.elimination_log[-1]
-                    elim_player = G.players.get(last_elim.player_id)
-                    _specs.append(("player_eliminated", elim_player.display_name if elim_player else None, None))
-                asyncio.create_task(narrate_sequence(_specs, G, cm, G.game_id))
-        from api.game_queue import get_or_create_queue
-        queue = get_or_create_queue(G.game_id)
-        await _maybe_start_timer(G, G.game_id, queue)
+    # Night phase advances only via the timer (phase_timeout intent).
+    # Auto-advance on all-actions-done is intentionally disabled so the timer
+    # always runs to completion — players cannot observe submission timing.
 
     return G
 

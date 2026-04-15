@@ -56,6 +56,19 @@
   letter-spacing: 0.04em;
 }
 
+/* Elimination cause icon in player grid */
+.game-over__cause-icon {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 4px rgba(255, 80, 80, 0.7));
+}
+
+.game-over__cause-icon--emoji {
+  font-size: 22px;
+  line-height: 1;
+}
+
 /* Elimination timeline */
 .game-over__timeline {
   width: 100%;
