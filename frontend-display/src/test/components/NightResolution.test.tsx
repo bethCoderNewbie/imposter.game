@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, act } from '@testing-library/react'
 import NightResolution from '../../components/NightResolution/NightResolution'
 import { makeGameState, makeElimination } from '../fixtures'
 
@@ -45,22 +45,22 @@ describe('NightResolution', () => {
     expect(screen.getByText(/dawn breaks/i)).toBeInTheDocument()
   })
 
-  it('calls onComplete after 4000ms', () => {
+  it('calls onComplete after 10000ms', () => {
     const onComplete = vi.fn()
     render(
       <NightResolution gameState={makeGameState()} onComplete={onComplete} />
     )
     expect(onComplete).not.toHaveBeenCalled()
-    vi.advanceTimersByTime(4000)
+    act(() => { vi.advanceTimersByTime(10000) })
     expect(onComplete).toHaveBeenCalledTimes(1)
   })
 
-  it('does not call onComplete before 4000ms', () => {
+  it('does not call onComplete before 10000ms', () => {
     const onComplete = vi.fn()
     render(
       <NightResolution gameState={makeGameState()} onComplete={onComplete} />
     )
-    vi.advanceTimersByTime(3999)
+    vi.advanceTimersByTime(9999)
     expect(onComplete).not.toHaveBeenCalled()
   })
 

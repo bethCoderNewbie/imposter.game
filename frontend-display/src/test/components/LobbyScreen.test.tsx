@@ -36,13 +36,16 @@ describe('LobbyScreen', () => {
 
   it('shows joined count', () => {
     render(<LobbyScreen gameState={makeGameState()} />)
-    // 5 players in store, player_count = 8 in config
-    expect(screen.getByText(/5 \/ 8 joined/i)).toBeInTheDocument()
+    // 5 connected players in store → "5 active / 5 joined"
+    expect(screen.getByText(/5 active \/ 5 joined/i)).toBeInTheDocument()
   })
 
-  it('renders a PlayerAvatar for each player', () => {
+  it('renders a PlayerAvatar for each player in the parade', () => {
     const { container } = render(<LobbyScreen gameState={makeGameState()} />)
-    expect(container.querySelectorAll('.player-avatar')).toHaveLength(5)
+    // Parade shows connected players only; roster panel shows all (doubles count).
+    // Scope to the parade container.
+    const parade = container.querySelector('.lobby-screen__avatars')!
+    expect(parade.querySelectorAll('.player-avatar')).toHaveLength(5)
   })
 
   it('disables Start button and shows needs-more text when fewer than 5 players', () => {

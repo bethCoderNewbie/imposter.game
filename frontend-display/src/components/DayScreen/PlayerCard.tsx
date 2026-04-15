@@ -30,8 +30,9 @@ export default function PlayerCard({ player, voteCount, hasMajority, index, isSo
       <div className="player-card__avatar-wrap">
         <PlayerAvatar player={player} />
 
-        {/* Tombstone fallback — inside avatar-wrap so it inherits the dead filter */}
-        {isDead && !eliminationCause && (
+        {/* Tombstone — shown when no cause, or when cause is masked (non-vote kill).
+            Stays inside avatar-wrap so it inherits the dead grayscale filter.     */}
+        {isDead && (!eliminationCause || getCauseIcon(eliminationCause, false).type === 'tombstone') && (
           <div className="player-card__tombstone" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
               <path d="M6 21V10a6 6 0 1 1 12 0v11" />
@@ -43,9 +44,11 @@ export default function PlayerCard({ player, voteCount, hasMajority, index, isSo
         )}
       </div>
 
-      {/* Cause icon — outside avatar-wrap so grayscale filter doesn't desaturate it */}
+      {/* Cause icon — outside avatar-wrap so grayscale filter doesn't desaturate it.
+          Only renders for village_vote (rope) since all kills are masked to tombstone. */}
       {isDead && eliminationCause && (() => {
-        const icon = getCauseIcon(eliminationCause)
+        const icon = getCauseIcon(eliminationCause, false)
+        if (icon.type === 'tombstone') return null
         return icon.type === 'image'
           ? <img className="player-card__cause-icon" src={icon.src} alt={icon.alt} />
           : <span className="player-card__cause-icon player-card__cause-icon--emoji" aria-hidden="true">{icon.char}</span>

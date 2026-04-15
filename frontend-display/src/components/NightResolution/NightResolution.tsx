@@ -50,7 +50,9 @@ export default function NightResolution({ gameState, onComplete }: Props) {
               const icon = getCauseIcon(event.cause)
               return icon.type === 'image'
                 ? <img className="night-resolution__cause-icon" src={icon.src} alt={icon.alt} />
-                : <div className="night-resolution__cause-icon night-resolution__cause-icon--emoji" aria-hidden="true">{icon.char}</div>
+                : icon.type === 'emoji'
+                  ? <div className="night-resolution__cause-icon night-resolution__cause-icon--emoji" aria-hidden="true">{icon.char}</div>
+                  : null
             })()}
             <p className="night-resolution__player-name">{player.display_name}</p>
           </div>

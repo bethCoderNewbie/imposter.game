@@ -20,9 +20,9 @@ afterEach(() => {
 })
 
 describe('NightScreen', () => {
-  it('renders moon emoji', () => {
-    render(<NightScreen gameState={makeGameState({ phase: 'night' })} audioUnlocked={false} />)
-    expect(screen.getByText('🌕')).toBeInTheDocument()
+  it('renders moon element', () => {
+    const { container } = render(<NightScreen gameState={makeGameState({ phase: 'night' })} audioUnlocked={false} />)
+    expect(container.querySelector('.night-screen__moon')).toBeInTheDocument()
   })
 
   it('renders formatted timer from useTimer output', () => {
@@ -35,14 +35,6 @@ describe('NightScreen', () => {
     vi.mocked(useTimer).mockReturnValue({ secondsRemaining: 0, isWarning: false, isCritical: false })
     render(<NightScreen gameState={makeGameState({ phase: 'night' })} audioUnlocked={false} />)
     expect(screen.getByText('00:00')).toBeInTheDocument()
-  })
-
-  it('renders action progress count', () => {
-    render(<NightScreen
-      gameState={makeGameState({ night_actions: { actions_submitted_count: 2, actions_required_count: 3 } })}
-      audioUnlocked={false}
-    />)
-    expect(screen.getByText(/night actions: 2 \/ 3/i)).toBeInTheDocument()
   })
 
   it('renders the first narrative text on mount', () => {

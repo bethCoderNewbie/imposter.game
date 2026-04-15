@@ -111,7 +111,9 @@ export default function GameOverScreen({ gameState, audioUnlocked, gameId, hostS
               const icon = getCauseIcon(causeByPlayer[player.player_id])
               return icon.type === 'image'
                 ? <img className="game-over__cause-icon" src={icon.src} alt={icon.alt} />
-                : <span className="game-over__cause-icon game-over__cause-icon--emoji" aria-hidden="true">{icon.char}</span>
+                : icon.type === 'emoji'
+                  ? <span className="game-over__cause-icon game-over__cause-icon--emoji" aria-hidden="true">{icon.char}</span>
+                  : null
             })()}
           </div>
         ))}

@@ -45,7 +45,9 @@ export default function VoteElimination({ gameState, onComplete }: Props) {
               const icon = getCauseIcon(event.cause)
               return icon.type === 'image'
                 ? <img className="vote-elimination__cause-icon" src={icon.src} alt={icon.alt} />
-                : <div className="vote-elimination__cause-icon vote-elimination__cause-icon--emoji" aria-hidden="true">{icon.char}</div>
+                : icon.type === 'emoji'
+                  ? <div className="vote-elimination__cause-icon vote-elimination__cause-icon--emoji" aria-hidden="true">{icon.char}</div>
+                  : null
             })()}
             <p className="vote-elimination__player-name">{player.display_name}</p>
           </div>
