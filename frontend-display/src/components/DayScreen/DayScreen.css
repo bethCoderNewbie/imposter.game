@@ -14,7 +14,7 @@
   position: absolute;
   inset: 0;
   overflow: hidden;
-  background: url("http://www.testomic.com/public/codepen-assets/img/paralax/background.jpg") center / cover no-repeat;
+  background: url("/images/background.jpg") center / cover no-repeat;
   z-index: 0;
 }
 
@@ -26,7 +26,7 @@
 .day-parallax__foreground {
   height: 50%;
   bottom: 0;
-  background: url("http://www.testomic.com/public/codepen-assets/img/paralax/foreground.png") repeat-x;
+  background: url("/images/foreground.png") repeat-x;
   background-size: 25% 100%;
   animation: day-parallax-slide 30s linear infinite;
 }
@@ -34,7 +34,7 @@
 .day-parallax__hills {
   height: 40%;
   bottom: 15%;
-  background: url("http://www.testomic.com/public/codepen-assets/img/paralax/hills.png") repeat-x;
+  background: url("/images/hills.png") repeat-x;
   background-size: 25% 100%;
   animation: day-parallax-slide 60s linear infinite;
 }
@@ -42,7 +42,7 @@
 .day-parallax__rocks1 {
   height: 35%;
   bottom: 25%;
-  background: url("http://www.testomic.com/public/codepen-assets/img/paralax/rocks1.png") repeat-x;
+  background: url("/images/rocks1.png") repeat-x;
   background-size: 25% 100%;
   animation: day-parallax-slide 120s linear infinite;
 }
@@ -50,7 +50,7 @@
 .day-parallax__rocks2 {
   height: 40%;
   bottom: 15%;
-  background: url("http://www.testomic.com/public/codepen-assets/img/paralax/rocks2.png") repeat-x;
+  background: url("/images/rocks2.png") repeat-x;
   background-size: 25% 100%;
   animation: day-parallax-slide 240s linear infinite;
 }
