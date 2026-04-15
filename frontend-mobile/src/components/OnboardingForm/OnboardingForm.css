@@ -10,6 +10,30 @@
   margin: 0 auto;
 }
 
+/* iOS in-app browser warning banner */
+.onboarding__safari-banner {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  background: rgba(246, 173, 85, 0.12);
+  border: 1px solid rgba(246, 173, 85, 0.35);
+  font-size: 0.78rem;
+  color: rgba(246, 173, 85, 0.9);
+}
+
+.onboarding__safari-link {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: rgba(246, 173, 85, 1);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
 .onboarding__rejoin {
   width: 100%;
   display: flex;
@@ -192,19 +216,39 @@
 
 .onboarding__cta {
   width: 100%;
-  padding: 1rem;
-  border-radius: 12px;
-  border: none;
-  background: #fff;
-  color: #000;
   font-size: 1rem;
   font-weight: 700;
   cursor: pointer;
-  transition: opacity 0.15s;
   margin-top: 0.5rem;
 }
 
 .onboarding__cta:disabled {
   opacity: 0.3;
   cursor: not-allowed;
+}
+
+.btn-grad {
+  background-image: linear-gradient(to right, #DC2424 0%, #4A569D 51%, #DC2424 100%);
+  margin: 10px;
+  padding: 15px 45px;
+  text-align: center;
+  text-transform: uppercase;
+  transition: 0.5s;
+  background-size: 200% auto;
+  color: white;
+  box-shadow: 0 0 20px #eee;
+  border-radius: 10px;
+  display: block;
+  outline: none;
+  border: none;
+}
+
+.btn-grad:hover {
+  background-position: right center;
+  color: #fff;
+  text-decoration: none;
+}
+
+.btn-grad--create {
+  background-image: linear-gradient(to right, #1D2B64 0%, #F8CDDA 51%, #1D2B64 100%);
 }

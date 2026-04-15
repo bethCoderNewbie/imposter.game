@@ -111,6 +111,22 @@ async def join_game(game_id: str, body: JoinGameRequest, redis=Depends(_get_redi
             (p for p in G.players.values() if p.permanent_id == body.permanent_id),
             None,
         )
+
+        # Cross-browser fallback for iOS in-app browser → Safari switches:
+        # The QR camera opens a temporary browser with isolated localStorage. When the
+        # player reopens in Safari they have a new permanent_id but the same display_name.
+        # Match by name against a disconnected slot — only safe because is_connected=False
+        # means no active socket claims that slot.
+        if existing is None:
+            existing = next(
+                (
+                    p for p in G.players.values()
+                    if p.display_name.strip().lower() == player_rec.display_name.strip().lower()
+                    and not p.is_connected
+                ),
+                None,
+            )
+
         if existing:
             new_token = await issue_session_token(redis, game_id, existing.player_id)
             G = G.model_copy(deep=True)

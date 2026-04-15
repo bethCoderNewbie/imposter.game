@@ -42,9 +42,23 @@ function resizeImage(file: File, maxPx = 256): Promise<Blob> {
   })
 }
 
+/** Returns true when running inside an iOS in-app browser (WKWebView / SFSafariViewController).
+ *  These contexts have isolated localStorage — switching to Safari loses the session.  */
+function isIosInAppBrowser(): boolean {
+  const ua = navigator.userAgent
+  const isIos = /iphone|ipad|ipod/i.test(ua)
+  if (!isIos) return false
+  // Safari on iOS includes "Safari/" in its UA; in-app browsers typically don't
+  const hasSafari = /safari/i.test(ua)
+  const hasChrome = /crios/i.test(ua)   // Chrome for iOS
+  const hasFirefox = /fxios/i.test(ua)  // Firefox for iOS
+  return !(hasSafari || hasChrome || hasFirefox)
+}
+
 export default function OnboardingForm({ prefillCode, permanentId, onJoined, savedSession, onRejoin }: Props) {
   const [name, setName] = useState('')
   const [code, setCode] = useState(prefillCode.toUpperCase())
+  const inAppBrowser = isIosInAppBrowser()
   const [avatarId, setAvatarId] = useState('avatar_01')
   const [photoUrl, setPhotoUrl] = useState<string | null>(() => localStorage.getItem(PHOTO_URL_KEY))
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
@@ -116,6 +130,7 @@ export default function OnboardingForm({ prefillCode, permanentId, onJoined, sav
   }
 
   const canJoin = name.trim().length > 0 && code.trim().length > 0
+  const canCreate = name.trim().length > 0
 
   async function handleJoin() {
     if (!canJoin || loading) return
@@ -189,10 +204,61 @@ export default function OnboardingForm({ prefillCode, permanentId, onJoined, sav
     }
   }
 
+  async function handleCreate() {
+    if (!canCreate || loading) return
+    setLoading(true)
+    setError(null)
+    try {
+      let pid = resolvedPermanentId
+      if (!pid) {
+        const reg = await fetch('/api/players/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ display_name: name.trim() }),
+        })
+        if (!reg.ok) { setError('Could not register your name. Try again.'); return }
+        pid = ((await reg.json()) as { permanent_id: string }).permanent_id
+      }
+
+      const created = await fetch('/api/games', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      if (!created.ok) { setError('Could not create a game. Try again.'); return }
+      const { game_id } = (await created.json()) as { game_id: string }
+
+      const joined = await fetch(`/api/games/${game_id}/join`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ permanent_id: pid, avatar_id: avatarId, photo_url: photoUrl }),
+      })
+      if (!joined.ok) { setError('Could not join the created game. Try again.'); return }
+      const data = (await joined.json()) as { game_id: string; player_id: string; session_token: string }
+      onJoined({ game_id: data.game_id, player_id: data.player_id, session_token: data.session_token, permanent_id: pid! })
+    } catch {
+      setError('Network error. Is the server running?')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const displayPhoto = photoPreview ?? photoUrl
 
   return (
-    <div className="onboarding">
+    <div className="onboarding create-match">
+      {/* iOS in-app browser warning — QR camera opens a temporary context with
+          isolated localStorage. Switching to Safari later loses the session.   */}
+      {inAppBrowser && (
+        <div className="onboarding__safari-banner">
+          <span>⚠️ Open in Safari to keep your session if you switch apps.</span>
+          <a
+            className="onboarding__safari-link"
+            href={window.location.href}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open in Safari
+          </a>
+        </div>
+      )}
+
       {savedSession && onRejoin && (
         <div className="onboarding__rejoin">
           <span className="onboarding__rejoin-label">Game in progress: <strong>{savedSession.game_id}</strong></span>
@@ -297,11 +363,20 @@ export default function OnboardingForm({ prefillCode, permanentId, onJoined, sav
 
       <button
         type="button"
-        className="onboarding__cta"
+        className="onboarding__cta btn-grad"
         disabled={!canJoin || loading || photoUploading}
         onClick={handleJoin}
       >
         {loading ? 'Joining…' : 'Join Game'}
+      </button>
+
+      <button
+        type="button"
+        className="onboarding__cta btn-grad btn-grad--create"
+        disabled={!canCreate || loading || photoUploading}
+        onClick={handleCreate}
+      >
+        {loading ? 'Creating…' : 'Create New Match'}
       </button>
     </div>
   )
