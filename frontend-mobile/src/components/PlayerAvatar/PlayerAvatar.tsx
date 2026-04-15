@@ -1,9 +1,14 @@
 import { getAvatarColor, getInitials } from '../../types/game'
-import type { PlayerState } from '../../types/game'
 import './PlayerAvatar.css'
 
+interface AvatarPlayer {
+  avatar_id: string
+  display_name: string
+  photo_url?: string | null
+}
+
 interface Props {
-  player: PlayerState
+  player: AvatarPlayer
   size?: number
   className?: string
   style?: React.CSSProperties

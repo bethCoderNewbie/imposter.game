@@ -118,7 +118,7 @@ export default function App() {
       .finally(() => setBootstrapping(false))
   }, [])
 
-  const { gameState, sendIntent, status } = useGameState({
+  const { gameState, roster, sendIntent, status } = useGameState({
     gameId: session?.game_id ?? null,
     playerId: session?.player_id ?? '',
     sessionToken: session?.session_token,
@@ -240,6 +240,7 @@ export default function App() {
     phaseContent = (
       <LobbyWaitingScreen
         gameState={gameState}
+        roster={roster}
         myPlayerId={session.player_id}
         sendIntent={sendIntent}
         onLeave={handleLeave}

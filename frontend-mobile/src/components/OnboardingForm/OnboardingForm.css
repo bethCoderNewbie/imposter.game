@@ -248,7 +248,3 @@
   color: #fff;
   text-decoration: none;
 }
-
-.btn-grad--create {
-  background-image: linear-gradient(to right, #1D2B64 0%, #F8CDDA 51%, #1D2B64 100%);
-}

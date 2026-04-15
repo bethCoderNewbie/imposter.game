@@ -140,7 +140,20 @@ export interface RedirectMessage {
   players: Record<string, { new_player_id: string; new_session_token: string }>
 }
 
-export type ServerMessage = SyncMessage | UpdateMessage | ErrorMessage | HintPayload | RedirectMessage
+export interface PlayerRosterEntry {
+  player_id: string
+  display_name: string
+  avatar_id: string
+  photo_url?: string | null
+  is_connected: boolean
+}
+
+export interface MatchDataMessage {
+  type: 'match_data'
+  players: PlayerRosterEntry[]
+}
+
+export type ServerMessage = SyncMessage | UpdateMessage | ErrorMessage | HintPayload | RedirectMessage | MatchDataMessage
 
 export const AVATAR_COLORS: Record<string, string> = {
   avatar_01: '#e57373',

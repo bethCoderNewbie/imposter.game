@@ -130,7 +130,6 @@ export default function OnboardingForm({ prefillCode, permanentId, onJoined, sav
   }
 
   const canJoin = name.trim().length > 0 && code.trim().length > 0
-  const canCreate = name.trim().length > 0
 
   async function handleJoin() {
     if (!canJoin || loading) return
@@ -196,41 +195,6 @@ export default function OnboardingForm({ prefillCode, permanentId, onJoined, sav
       }
 
       const data = (await res.json()) as { game_id: string; player_id: string; session_token: string }
-      onJoined({ game_id: data.game_id, player_id: data.player_id, session_token: data.session_token, permanent_id: pid! })
-    } catch {
-      setError('Network error. Is the server running?')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function handleCreate() {
-    if (!canCreate || loading) return
-    setLoading(true)
-    setError(null)
-    try {
-      let pid = resolvedPermanentId
-      if (!pid) {
-        const reg = await fetch('/api/players/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ display_name: name.trim() }),
-        })
-        if (!reg.ok) { setError('Could not register your name. Try again.'); return }
-        pid = ((await reg.json()) as { permanent_id: string }).permanent_id
-      }
-
-      const created = await fetch('/api/games', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
-      if (!created.ok) { setError('Could not create a game. Try again.'); return }
-      const { game_id } = (await created.json()) as { game_id: string }
-
-      const joined = await fetch(`/api/games/${game_id}/join`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ permanent_id: pid, avatar_id: avatarId, photo_url: photoUrl }),
-      })
-      if (!joined.ok) { setError('Could not join the created game. Try again.'); return }
-      const data = (await joined.json()) as { game_id: string; player_id: string; session_token: string }
       onJoined({ game_id: data.game_id, player_id: data.player_id, session_token: data.session_token, permanent_id: pid! })
     } catch {
       setError('Network error. Is the server running?')
@@ -370,14 +334,6 @@ export default function OnboardingForm({ prefillCode, permanentId, onJoined, sav
         {loading ? 'Joining…' : 'Join Game'}
       </button>
 
-      <button
-        type="button"
-        className="onboarding__cta btn-grad btn-grad--create"
-        disabled={!canCreate || loading || photoUploading}
-        onClick={handleCreate}
-      >
-        {loading ? 'Creating…' : 'Create New Match'}
-      </button>
     </div>
   )
 }

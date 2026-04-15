@@ -97,7 +97,7 @@ export default function DayScreen({ gameState, frozenVotes, audioUnlocked, sound
         <PhaseTimer
           timerEndsAt={gameState.timer_ends_at}
           className="day-screen__timer"
-          enableCountdownBeep={isVoting}
+          enableCountdownBeep={true}
           audioUnlocked={audioUnlocked}
         />
       </div>

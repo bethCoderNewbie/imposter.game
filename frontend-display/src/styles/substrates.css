@@ -30,6 +30,11 @@ html.phase-night-resolution {
   background-image: linear-gradient(to top, #dbdcd7 0%, #dddcd7 24%, #e2c9cc 30%, #e7627d 46%, #b8235a 59%, #801357 71%, #3d1635 84%, #1c1a27 100%);
 }
 
+/* ── Vote Elimination substrate ────────────────────────────────────────────── */
+html.phase-vote-elimination {
+  background-image: linear-gradient(to top, #f0d080 0%, #d09020 20%, #a03010 45%, #601010 65%, #2a0808 85%, #140404 100%);
+}
+
 /* ── Day substrate ─────────────────────────────────────────────────────────── */
 html.phase-day {
   background-color: #C0B3A0;

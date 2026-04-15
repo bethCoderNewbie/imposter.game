@@ -11,6 +11,7 @@ import CreateMatchScreen from './components/CreateMatchScreen/CreateMatchScreen'
 import LobbyScreen from './components/LobbyScreen/LobbyScreen'
 import NightScreen from './components/NightScreen/NightScreen'
 import NightResolution from './components/NightResolution/NightResolution'
+import VoteElimination from './components/VoteElimination/VoteElimination'
 import DayScreen from './components/DayScreen/DayScreen'
 import GameOverScreen from './components/GameOverScreen/GameOverScreen'
 import NarratorSubtitle from './components/NarratorSubtitle/NarratorSubtitle'
@@ -70,6 +71,9 @@ export default function App() {
   const [resolutionState, setResolutionState] = useState<StrippedGameState | null>(null)
   // Freeze votes at the moment day_vote closes (for VoteWeb reveal-all-at-once)
   const [frozenVotes, setFrozenVotes] = useState<Record<string, string> | null>(null)
+  // Show VoteElimination interstitial on day_vote close
+  const [showVoteElimination, setShowVoteElimination] = useState(false)
+  const [voteEliminationState, setVoteEliminationState] = useState<StrippedGameState | null>(null)
   const prevPhaseRef = useRef<string | null>(null)
   // Pending scream timeout — cancelled if night ends before it fires (PRD-012 §2.3)
   const screamTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -97,10 +101,10 @@ export default function App() {
     soundToastTimerRef.current = setTimeout(() => setSoundToast(null), 2500)
   }, [audioUnlocked])
 
-  // Schedule a scream SFX with a random 3–30s delay after the first wolf kill vote
+  // Schedule a scream SFX 10s after the first wolf kill vote
   const handleWolfKillQueued = useCallback(() => {
     if (!audioUnlocked) return
-    const delay = Math.random() * (30000 - 3000) + 3000
+    const delay = 10000
     screamTimeoutRef.current = setTimeout(() => {
       const audio = new Audio(`${import.meta.env.BASE_URL}audio/scream.mp3`)
       audio.volume = 0.7
@@ -124,6 +128,8 @@ export default function App() {
     setFrozenVotes(null)
     setShowResolution(false)
     setResolutionState(null)
+    setShowVoteElimination(false)
+    setVoteEliminationState(null)
     prevPhaseRef.current = null
   }, [gameId])
 
@@ -174,9 +180,12 @@ export default function App() {
       }
     }
 
-    // Freeze day_vote votes for VoteWeb reveal when voting closes
+    // Freeze day_vote votes and show VoteElimination interstitial when voting closes
     if (prev === 'day_vote' && curr !== 'day_vote') {
       setFrozenVotes({ ...gameState.day_votes })
+      setVoteEliminationState(gameState)
+      setShowVoteElimination(true)
+      document.documentElement.className = 'phase-vote-elimination'
     }
 
     prevPhaseRef.current = curr
@@ -206,7 +215,23 @@ export default function App() {
       return <CreateMatchScreen onCreated={handleCreated} onResumed={handleResumed} />
     }
 
-    // ── Night Resolution interstitial (4 s, non-skippable) ──────────────────────
+    // ── Vote Elimination interstitial (10 s elimination / 5 s tie) ──────────────
+    if (showVoteElimination && voteEliminationState) {
+      return (
+        <VoteElimination
+          gameState={voteEliminationState}
+          onComplete={() => {
+            setShowVoteElimination(false)
+            setVoteEliminationState(null)
+            if (gameState) {
+              document.documentElement.className = PHASE_TO_CLASS[gameState.phase] ?? ''
+            }
+          }}
+        />
+      )
+    }
+
+    // ── Night Resolution interstitial (10 s, non-skippable) ─────────────────────
     if (showResolution && resolutionState) {
       return (
         <NightResolution

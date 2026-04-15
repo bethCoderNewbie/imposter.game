@@ -1,16 +1,17 @@
 import PlayerAvatar from '../PlayerAvatar/PlayerAvatar'
-import type { StrippedGameState } from '../../types/game'
+import type { StrippedGameState, PlayerRosterEntry } from '../../types/game'
 import './LobbyWaitingScreen.css'
 
 interface Props {
   gameState: StrippedGameState
+  roster: PlayerRosterEntry[]
   myPlayerId: string
   sendIntent: (payload: Record<string, unknown>) => void
   onLeave: () => void
 }
 
-export default function LobbyWaitingScreen({ gameState, myPlayerId, sendIntent, onLeave }: Props) {
-  const players = Object.values(gameState.players)
+export default function LobbyWaitingScreen({ gameState, roster, myPlayerId, sendIntent, onLeave }: Props) {
+  const players = roster.filter(p => p.is_connected)
   const isHost = gameState.host_player_id === myPlayerId
   const canStart = players.length >= 5
 
