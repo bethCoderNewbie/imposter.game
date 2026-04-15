@@ -47,7 +47,7 @@ export default function NightResolution({ gameState, onComplete }: Props) {
           >
             <PlayerAvatar player={player} size={96} />
             {(() => {
-              const icon = getCauseIcon(event.cause)
+              const icon = getCauseIcon(event.cause, false)
               return icon.type === 'image'
                 ? <img className="night-resolution__cause-icon" src={icon.src} alt={icon.alt} />
                 : icon.type === 'emoji'
