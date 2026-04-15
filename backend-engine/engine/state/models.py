@@ -69,6 +69,7 @@ class PlayerState(BaseModel):
     player_id: str
     display_name: str
     avatar_id: str = "default_01"
+    photo_url: str | None = None
     is_connected: bool = True
     role: str | None = None          # populated after role_deal
     team: Team | None = None         # populated after role_deal

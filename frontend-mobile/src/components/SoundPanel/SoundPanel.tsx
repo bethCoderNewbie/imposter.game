@@ -1,9 +1,9 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import type { ComponentType } from 'react'
 import {
   Dog, MoonStar, Ghost, Bomb, Siren, HeartPulse,
   TriangleAlert, PartyPopper, Wind, Laugh, ThumbsUp, UsersRound,
-  Music, Waves, Tornado, Footprints,
+  Music, Waves, Tornado, Footprints, BedDouble, VolumeX, Rewind,
 } from 'lucide-react'
 import type { LucideProps } from 'lucide-react'
 import './SoundPanel.css'
@@ -38,19 +38,40 @@ const SOUNDS: SoundDef[] = [
   { id: 'burp',      icon: Waves,         label: 'Burp',   color: '#86efac' },
   { id: 'fart',      icon: Tornado,       label: 'Fart',   color: '#d4d4d8' },
   { id: 'walk',      icon: Footprints,    label: 'Walk',   color: '#7dd3fc' },
+  { id: 'snoring',   icon: BedDouble,     label: 'Snore',  color: '#94a3b8' },
+  { id: 'shush',     icon: VolumeX,       label: 'Shush',  color: '#fb7185' },
+  { id: 'flashback', icon: Rewind,        label: 'Flash',  color: '#f59e0b' },
 ]
 
 const COOLDOWN_MS = 4000
 
 export default function SoundPanel({ sendIntent, playerName }: Props) {
   const [cooldown, setCooldown] = useState(false)
+  const audioCtxRef = useRef<AudioContext | null>(null)
+
+  function playLocalBeep() {
+    audioCtxRef.current ??= new AudioContext()
+    const ctx = audioCtxRef.current
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.type = 'sine'
+    osc.frequency.value = 440
+    const now = ctx.currentTime
+    gain.gain.setValueAtTime(0.25, now)
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04)
+    osc.start(now)
+    osc.stop(now + 0.04)
+  }
 
   const handleSound = useCallback((soundId: string) => {
     if (cooldown) return
+    playLocalBeep()
     sendIntent({ type: 'trigger_sound', sound_id: soundId, player_name: playerName })
     setCooldown(true)
     setTimeout(() => setCooldown(false), COOLDOWN_MS)
-  }, [cooldown, sendIntent, playerName])
+  }, [cooldown, sendIntent, playerName]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="sound-panel" role="toolbar" aria-label="Sound board">

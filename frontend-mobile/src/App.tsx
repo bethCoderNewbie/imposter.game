@@ -142,17 +142,31 @@ export default function App() {
     setSession(s)
   }
 
+  // Leave lobby — keep session in localStorage so player can rejoin if accidental
+  function handleLeave() {
+    setSession(null)
+  }
+
+  // Game over "New Game" — fully clears so no stale rejoin card appears
+  function handleNewGame() {
+    clearSession()
+    setSession(null)
+  }
+
   if (bootstrapping) {
     return <div className="app-loading">Loading…</div>
   }
 
   // ── No session → Onboarding ──────────────────────────────────────────────────
   if (!session) {
+    const storedSession = loadSession()
     return (
       <OnboardingForm
         prefillCode={URL_GAME_CODE}
         permanentId={loadPermanentId()}
         onJoined={handleJoined}
+        savedSession={storedSession}
+        onRejoin={storedSession ? () => setSession(storedSession) : undefined}
       />
     )
   }
@@ -177,6 +191,7 @@ export default function App() {
       <GameOverScreen
         gameState={gameState}
         myPlayerId={session.player_id}
+        onLeave={handleNewGame}
       />
     )
   } else if (phase === 'hunter_pending') {
@@ -200,6 +215,7 @@ export default function App() {
         gameState={gameState}
         myPlayerId={session.player_id}
         sendIntent={sendIntent}
+        onLeave={handleLeave}
       />
     )
   } else if (phase === 'role_deal') {

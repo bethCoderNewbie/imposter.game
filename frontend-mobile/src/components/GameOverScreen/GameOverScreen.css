@@ -2,7 +2,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 1.5rem 1rem 2rem;
+  padding: 1.5rem 1rem calc(var(--sound-panel-clearance) + var(--mobile-safe-bottom));
   gap: 1.25rem;
   background: var(--bg-day, #f3e7e9);
   min-height: 100%;
@@ -93,4 +93,22 @@
 .game-over__log-cause {
   color: #e53e3e;
   font-size: 0.8rem;
+}
+
+.game-over__new-game-btn {
+  width: 100%;
+  padding: 0.875rem;
+  border-radius: 12px;
+  border: 2px solid rgba(74, 53, 96, 0.35);
+  background: transparent;
+  color: #4a3560;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.game-over__new-game-btn:active {
+  background: rgba(74, 53, 96, 0.1);
+  border-color: rgba(74, 53, 96, 0.6);
 }

@@ -6,9 +6,10 @@ interface Props {
   gameState: StrippedGameState
   myPlayerId: string
   sendIntent: (payload: Record<string, unknown>) => void
+  onLeave: () => void
 }
 
-export default function LobbyWaitingScreen({ gameState, myPlayerId, sendIntent }: Props) {
+export default function LobbyWaitingScreen({ gameState, myPlayerId, sendIntent, onLeave }: Props) {
   const players = Object.values(gameState.players)
   const isHost = gameState.host_player_id === myPlayerId
   const canStart = players.length >= 5
@@ -53,6 +54,10 @@ export default function LobbyWaitingScreen({ gameState, myPlayerId, sendIntent }
       {!isHost && (
         <p className="lobby-waiting__waiting">Waiting for host to start…</p>
       )}
+
+      <button className="lobby-waiting__leave-btn" onClick={onLeave}>
+        Leave lobby
+      </button>
     </div>
   )
 }

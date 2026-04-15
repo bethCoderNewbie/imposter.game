@@ -24,6 +24,7 @@ _ALLOWED_SOUNDS = {
     "ambulance", "boom", "burp", "clap", "fail", "fart",
     "gasp", "howl", "laugh", "people", "siren", "spooky",
     "surprise", "walk", "warning", "wolfcry",
+    "snoring", "shush", "flashback",
 }
 
 

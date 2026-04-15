@@ -74,13 +74,18 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # Ensure photos directory exists (Docker volume may not pre-create it)
+    Path("/app/photos").mkdir(parents=True, exist_ok=True)
+
     # Routers
     from api.lobby.routes import router as lobby_router
     from api.players.routes import router as players_router
+    from api.photos.routes import router as photos_router
     from api.ws.endpoint import router as ws_router
 
     app.include_router(lobby_router)
     app.include_router(players_router)
+    app.include_router(photos_router)
     app.include_router(ws_router)
 
     @app.get("/health", tags=["ops"])

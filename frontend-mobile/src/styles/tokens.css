@@ -26,4 +26,5 @@
   /* Mobile-specific */
   --mobile-safe-bottom:  env(safe-area-inset-bottom, 0px);
   --mobile-safe-top:     env(safe-area-inset-top, 0px);
+  --sound-panel-clearance: 120px;
 }

@@ -3,7 +3,7 @@
   display: flex;
   flex-direction: column;
   background-image: linear-gradient(to top, #dad4ec 0%, #dad4ec 1%, #f3e7e9 100%);
-  padding: calc(1.5rem + var(--mobile-safe-top)) 1.5rem calc(2rem + var(--mobile-safe-bottom));
+  padding: calc(1.5rem + var(--mobile-safe-top)) 1.5rem calc(var(--sound-panel-clearance) + var(--mobile-safe-bottom));
   gap: 1.25rem;
 }
 

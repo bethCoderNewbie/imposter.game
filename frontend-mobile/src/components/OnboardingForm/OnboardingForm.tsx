@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { AVATAR_COLORS } from '../../types/game'
 import './OnboardingForm.css'
 
@@ -13,17 +13,45 @@ interface Props {
   prefillCode: string
   permanentId: string | null
   onJoined: (session: JoinedSession) => void
+  savedSession?: { game_id: string } | null
+  onRejoin?: () => void
 }
 
 const AVATAR_IDS = Object.keys(AVATAR_COLORS) // avatar_01 … avatar_08
 const PERMANENT_ID_KEY = 'ww_permanent_id'
+const PHOTO_URL_KEY = 'ww_photo_url'
 
-export default function OnboardingForm({ prefillCode, permanentId, onJoined }: Props) {
+/** Resize a File to at most maxPx × maxPx and return as a JPEG Blob. */
+function resizeImage(file: File, maxPx = 256): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      const ratio = Math.min(maxPx / img.width, maxPx / img.height, 1)
+      const w = Math.round(img.width * ratio)
+      const h = Math.round(img.height * ratio)
+      const canvas = document.createElement('canvas')
+      canvas.width = w
+      canvas.height = h
+      canvas.getContext('2d')!.drawImage(img, 0, 0, w, h)
+      URL.revokeObjectURL(url)
+      canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('toBlob failed')), 'image/jpeg', 0.82)
+    }
+    img.onerror = reject
+    img.src = url
+  })
+}
+
+export default function OnboardingForm({ prefillCode, permanentId, onJoined, savedSession, onRejoin }: Props) {
   const [name, setName] = useState('')
   const [code, setCode] = useState(prefillCode.toUpperCase())
   const [avatarId, setAvatarId] = useState('avatar_01')
+  const [photoUrl, setPhotoUrl] = useState<string | null>(() => localStorage.getItem(PHOTO_URL_KEY))
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [photoUploading, setPhotoUploading] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // resolvedPermanentId is only set if the GET confirms the player exists in the DB.
   // A stale localStorage entry (e.g. after a DB wipe) keeps permanentId non-null
@@ -49,6 +77,43 @@ export default function OnboardingForm({ prefillCode, permanentId, onJoined }: P
       })
       .catch(() => {})
   }, [permanentId])
+
+  async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setPhotoUploading(true)
+    setError(null)
+    try {
+      const blob = await resizeImage(file)
+      const preview = URL.createObjectURL(blob)
+      setPhotoPreview(preview)
+
+      const form = new FormData()
+      form.append('file', blob, 'avatar.jpg')
+      const res = await fetch('/api/photos/upload', { method: 'POST', body: form })
+      if (!res.ok) {
+        setError('Photo upload failed. Try again or skip.')
+        setPhotoPreview(null)
+        return
+      }
+      const { photo_url } = (await res.json()) as { photo_url: string }
+      setPhotoUrl(photo_url)
+      localStorage.setItem(PHOTO_URL_KEY, photo_url)
+    } catch {
+      setError('Could not process photo.')
+      setPhotoPreview(null)
+    } finally {
+      setPhotoUploading(false)
+      // Reset file input so the same file can be re-selected if needed
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  function handleClearPhoto() {
+    setPhotoUrl(null)
+    setPhotoPreview(null)
+    localStorage.removeItem(PHOTO_URL_KEY)
+  }
 
   const canJoin = name.trim().length > 0 && code.trim().length > 0
 
@@ -101,7 +166,7 @@ export default function OnboardingForm({ prefillCode, permanentId, onJoined }: P
       const res = await fetch(`/api/games/${code.trim()}/join`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ permanent_id: pid, avatar_id: avatarId }),
+        body: JSON.stringify({ permanent_id: pid, avatar_id: avatarId, photo_url: photoUrl }),
       })
 
       if (res.status === 409) {
@@ -124,8 +189,19 @@ export default function OnboardingForm({ prefillCode, permanentId, onJoined }: P
     }
   }
 
+  const displayPhoto = photoPreview ?? photoUrl
+
   return (
     <div className="onboarding">
+      {savedSession && onRejoin && (
+        <div className="onboarding__rejoin">
+          <span className="onboarding__rejoin-label">Game in progress: <strong>{savedSession.game_id}</strong></span>
+          <button type="button" className="onboarding__rejoin-btn" onClick={onRejoin}>
+            Rejoin
+          </button>
+        </div>
+      )}
+
       <h1 className="onboarding__title">Werewolf</h1>
 
       {/* Name input — pre-filled and editable for returning players */}
@@ -144,22 +220,63 @@ export default function OnboardingForm({ prefillCode, permanentId, onJoined }: P
         />
       </div>
 
-      {/* Avatar picker — 8 preset color circles */}
+      {/* Photo upload — replaces the color circle when a photo is set */}
       <div className="onboarding__field">
-        <label>Choose your color</label>
-        <div className="onboarding__avatars">
-          {AVATAR_IDS.map(id => (
+        <label>Your photo</label>
+        <div className="onboarding__photo-row">
+          {displayPhoto ? (
+            <div className="onboarding__photo-preview-wrap">
+              <img src={displayPhoto} alt="Your avatar" className="onboarding__photo-preview" />
+              <button type="button" className="onboarding__photo-clear" onClick={handleClearPhoto} aria-label="Remove photo">✕</button>
+            </div>
+          ) : (
             <button
-              key={id}
               type="button"
-              className={`onboarding__avatar-btn ${avatarId === id ? 'onboarding__avatar-btn--selected' : ''}`}
-              style={{ backgroundColor: AVATAR_COLORS[id] }}
-              onClick={() => setAvatarId(id)}
-              aria-label={id}
-            />
-          ))}
+              className="onboarding__photo-btn"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={photoUploading}
+            >
+              {photoUploading ? 'Uploading…' : '📷 Upload Photo'}
+            </button>
+          )}
+          {displayPhoto && (
+            <button
+              type="button"
+              className="onboarding__photo-change"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={photoUploading}
+            >
+              Change
+            </button>
+          )}
         </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="onboarding__photo-input"
+          onChange={handlePhotoChange}
+        />
       </div>
+
+      {/* Color picker — used as fallback when no photo uploaded */}
+      {!displayPhoto && (
+        <div className="onboarding__field">
+          <label>Or choose a color</label>
+          <div className="onboarding__avatars">
+            {AVATAR_IDS.map(id => (
+              <button
+                key={id}
+                type="button"
+                className={`onboarding__avatar-btn ${avatarId === id ? 'onboarding__avatar-btn--selected' : ''}`}
+                style={{ backgroundColor: AVATAR_COLORS[id] }}
+                onClick={() => setAvatarId(id)}
+                aria-label={id}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Game code input */}
       <div className="onboarding__field">
@@ -181,7 +298,7 @@ export default function OnboardingForm({ prefillCode, permanentId, onJoined }: P
       <button
         type="button"
         className="onboarding__cta"
-        disabled={!canJoin || loading}
+        disabled={!canJoin || loading || photoUploading}
         onClick={handleJoin}
       >
         {loading ? 'Joining…' : 'Join Game'}

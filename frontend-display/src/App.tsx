@@ -55,10 +55,11 @@ export default function App() {
     siren: '🚨', ambulance: '🚑', warning: '⚠️', surprise: '🎉',
     gasp: '😱', laugh: '😂', clap: '👏', people: '👥',
     fail: '🎺', burp: '🤢', fart: '💨', walk: '🚶',
+    snoring: '😴', shush: '🤫', flashback: '⏪',
   }
   const handleSoundTriggered = useCallback((soundId: string, playerName: string) => {
     if (!audioUnlocked) return
-    const audio = new Audio(`/audio/sounds/${soundId}.mp3`)
+    const audio = new Audio(`${import.meta.env.BASE_URL}audio/sounds/${soundId}.mp3`)
     audio.volume = 0.75
     audio.play().catch(() => {})
     // Show toast for 2.5s
@@ -72,7 +73,7 @@ export default function App() {
     if (!audioUnlocked) return
     const delay = Math.random() * (30000 - 3000) + 3000
     screamTimeoutRef.current = setTimeout(() => {
-      const audio = new Audio('/audio/scream.mp3')
+      const audio = new Audio(`${import.meta.env.BASE_URL}audio/scream.mp3`)
       audio.volume = 0.7
       audio.play().catch(() => {})
     }, delay)

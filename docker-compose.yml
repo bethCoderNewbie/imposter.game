@@ -75,6 +75,8 @@ services:
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:3b}
       KOKORO_URL: "http://tts:8880"
       NARRATOR_VOICE: ${NARRATOR_VOICE:-af_bella}
+    volumes:
+      - photos_data:/app/photos
     depends_on:
       redis:
         condition: service_started
@@ -116,3 +118,4 @@ services:
 
 volumes:
   ollama_models:   # persists downloaded models across compose restarts
+  photos_data:     # persists player avatar photos across container restarts

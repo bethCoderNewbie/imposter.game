@@ -14,6 +14,23 @@ export default function PlayerAvatar({ player, size, className = '', style }: Pr
   const initials = getInitials(player.display_name)
   const sizeStyle = size ? { width: size, height: size, fontSize: size * 0.38 } : {}
 
+  if (player.photo_url) {
+    return (
+      <div
+        role="img"
+        aria-label={player.display_name}
+        className={`player-avatar ${className}`}
+        style={{ ...sizeStyle, ...style }}
+      >
+        <img
+          src={player.photo_url}
+          alt={player.display_name}
+          className="player-avatar__photo"
+        />
+      </div>
+    )
+  }
+
   return (
     <div
       role="img"

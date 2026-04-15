@@ -91,3 +91,19 @@
   color: rgba(255,255,255,0.4);
   font-size: 0.9rem;
 }
+
+.lobby-waiting__leave-btn {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.25);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  text-align: center;
+  width: 100%;
+  transition: color 0.15s;
+}
+
+.lobby-waiting__leave-btn:active {
+  color: rgba(255,255,255,0.6);
+}

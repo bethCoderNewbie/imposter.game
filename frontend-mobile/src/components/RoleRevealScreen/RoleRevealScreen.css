@@ -4,7 +4,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 2rem 1.5rem calc(3rem + var(--mobile-safe-bottom));
+  padding: 2rem 1.5rem calc(var(--sound-panel-clearance) + var(--mobile-safe-bottom));
   gap: 2rem;
   background-color: var(--night-bg-deep);
   transition: background-color 0.15s ease-out;
@@ -56,7 +56,7 @@
 /* Hold button */
 .role-reveal__hold-btn {
   position: fixed;
-  bottom: calc(3rem + var(--mobile-safe-bottom));
+  bottom: calc(var(--sound-panel-clearance) + var(--mobile-safe-bottom));
   left: 1.5rem;
   right: 1.5rem;
   padding: 1.25rem;

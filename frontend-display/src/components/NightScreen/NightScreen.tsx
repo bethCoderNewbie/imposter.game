@@ -40,12 +40,10 @@ export default function NightScreen({ gameState, audioUnlocked }: Props) {
     }
   }, [audioUnlocked])
 
-  const { actions_submitted_count, actions_required_count } = gameState.night_actions
-
   return (
     <div className="night-screen">
       {/* Preloaded audio — plays on phase enter */}
-      <audio ref={ambientRef} src="/audio/night-ambient.mp3" loop preload="auto" />
+      <audio ref={ambientRef} src={`${import.meta.env.BASE_URL}audio/night-ambient.mp3`} loop preload="auto" />
 
       {/* Moon illustration */}
       <div className="night-screen__moon" aria-hidden="true">🌕</div>
@@ -57,11 +55,6 @@ export default function NightScreen({ gameState, audioUnlocked }: Props) {
       <p className="night-screen__narrative" key={narrativeIdx}>
         {NARRATIVES[narrativeIdx]}
       </p>
-
-      {/* Action progress — PRD-002 §2.3 */}
-      <div className="night-screen__progress">
-        Night actions: {actions_submitted_count} / {actions_required_count}
-      </div>
     </div>
   )
 }

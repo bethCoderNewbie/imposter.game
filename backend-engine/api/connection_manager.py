@@ -98,6 +98,7 @@ class ConnectionManager:
                     "player_id": p.player_id,
                     "display_name": p.display_name,
                     "avatar_id": p.avatar_id,
+                    "photo_url": p.photo_url,
                     "is_connected": p.is_connected,
                 }
                 for p in players

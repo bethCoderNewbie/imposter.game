@@ -36,6 +36,7 @@ class CreateGameRequest(BaseModel):
 class JoinGameRequest(BaseModel):
     permanent_id: str
     avatar_id: str = "default_01"
+    photo_url: str | None = None
 
 
 class RejoinGameRequest(BaseModel):
@@ -130,6 +131,7 @@ async def join_game(game_id: str, body: JoinGameRequest, redis=Depends(_get_redi
         player_id=player_id,
         display_name=player_rec.display_name,
         avatar_id=body.avatar_id,
+        photo_url=body.photo_url,
         permanent_id=body.permanent_id,
     )
 
@@ -280,6 +282,7 @@ async def rematch_game(game_id: str, body: RematchRequest, redis=Depends(_get_re
             player_id=new_pid,
             display_name=ps.display_name,
             avatar_id=ps.avatar_id,
+            photo_url=ps.photo_url,
             permanent_id=ps.permanent_id,
         )
         new_G.players[new_pid].session_token = new_token

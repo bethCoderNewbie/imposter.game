@@ -30,6 +30,7 @@ export interface PlayerState {
   player_id: string
   display_name: string
   avatar_id: string
+  photo_url?: string | null
   is_connected: boolean
   role: string | null
   team: Team | null
@@ -131,6 +132,7 @@ export interface PlayerRosterEntry {
   player_id: string
   display_name: string
   avatar_id: string
+  photo_url?: string | null
   is_connected: boolean
 }
 
