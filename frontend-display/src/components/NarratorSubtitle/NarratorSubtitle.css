@@ -1,7 +1,7 @@
 .narrator-subtitle {
   position: fixed;
   bottom: 8%;
-  left: 2%;
+  left: calc(2% + 58px); /* clears the 50px avatar + 8px gap */
   background: rgba(0, 0, 0, 0.78);
   color: #f5f0e8;
   padding: 0.55em 1.3em;

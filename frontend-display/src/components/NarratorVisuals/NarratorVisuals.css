@@ -1,39 +1,41 @@
 #visuals {
   position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  bottom: 8%;
+  left: 2%;
+  height: 50px;
+  width: 50px;
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   grid-template-rows: repeat(2, 1fr);
   background: url('/images/host.jpeg') center / cover no-repeat;
-  z-index: 50;
+  border-radius: 6px;
+  overflow: hidden;
+  z-index: 100;
   pointer-events: none;
-  animation: visuals-fade-in 0.4s ease-out;
+  animation: visuals-fade-in 0.35s ease-in;
 }
 
-/* Landscape: 90vh square */
+/* Cells — empty for now, available for future per-quadrant content */
+.visuals__cell {
+  /* placeholder */
+}
+
+/* Override orientation queries to keep the avatar at 50px */
 @media (orientation: landscape) {
   #visuals {
-    height: 90vh;
-    width: 90vh;
+    height: 50px;
+    width: 50px;
   }
 }
 
-/* Portrait: 90vw square */
 @media (orientation: portrait) {
   #visuals {
-    height: 90vw;
-    width: 90vw;
+    height: 50px;
+    width: 50px;
   }
-}
-
-/* Individual grid cells — empty for now, available for future overlay content */
-.visuals__cell {
-  /* placeholder for per-quadrant content (e.g. player photos, role icons) */
 }
 
 @keyframes visuals-fade-in {
-  from { opacity: 0; transform: translate(-50%, -50%) scale(0.97); }
-  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
