@@ -50,3 +50,61 @@
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+/* ── New enhancement keyframes ──────────────────────────────────────────────── */
+
+/* Moon glow pulse (NightScreen) */
+@keyframes moon-pulse {
+  0%,  100% { box-shadow: 0 0 20px 6px rgba(253,245,150,0.8), 0 0 60px 20px rgba(253,220,80,0.4), 0 0 120px 40px rgba(200,160,20,0.2); }
+  50%        { box-shadow: 0 0 30px 10px rgba(253,245,150,0.9), 0 0 80px 30px rgba(253,220,80,0.5), 0 0 160px 60px rgba(200,160,20,0.25); }
+}
+
+/* Starfield twinkle (substrates.css phase-night::before) */
+@keyframes star-twinkle {
+  0%   { opacity: 0.5; }
+  50%  { opacity: 1.0; }
+  100% { opacity: 0.65; }
+}
+
+/* Critical timer shake (PhaseTimer) */
+@keyframes timer-shake {
+  0%,  100% { transform: translateX(0); }
+  15%        { transform: translateX(-4px) rotate(-0.5deg); }
+  30%        { transform: translateX(4px)  rotate(0.5deg); }
+  45%        { transform: translateX(-3px); }
+  60%        { transform: translateX(3px); }
+  75%        { transform: translateX(-2px); }
+}
+
+/* Vote leader "wanted" border rotation (PlayerCard) */
+@keyframes wanted-border-rotate {
+  0%   { background-position: 0%   50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0%   50%; }
+}
+
+/* Voting phase card shimmer (PlayerCard/DayScreen) */
+@keyframes card-shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+
+/* GameOver falling particles */
+@keyframes particle-fall {
+  0%   { opacity: 0;   transform: translateY(0)   rotate(0deg); }
+  10%  { opacity: 0.9; }
+  90%  { opacity: 0.7; }
+  100% { opacity: 0;   transform: translateY(110vh) rotate(360deg); }
+}
+
+/* Lobby campfire glow pulse */
+@keyframes fire-glow {
+  0%   { transform: translateX(-50%) scaleX(0.8); opacity: 0.4; }
+  100% { transform: translateX(-50%) scaleX(1.2); opacity: 0.8; }
+}
+
+/* Lobby room code breathing */
+@keyframes room-code-breathe {
+  0%,  100% { opacity: 0.85; }
+  50%        { opacity: 1.0; text-shadow: 0 0 18px rgba(255,255,255,0.25); }
+}

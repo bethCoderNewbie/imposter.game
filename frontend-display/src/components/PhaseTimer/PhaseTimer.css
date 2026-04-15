@@ -2,6 +2,14 @@
   font-size: clamp(2rem, 5.6vmin, 4rem);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.05em;
+  display: inline-block; /* required for transform animation to apply */
 }
 .phase-timer.timer--warning  { color: var(--timer-warning,  #f6c90e); }
-.phase-timer.timer--critical { color: var(--timer-critical, #e53e3e); }
+.phase-timer.timer--critical {
+  color: var(--timer-critical, #e53e3e);
+  animation: timer-shake 0.5s ease-in-out infinite;
+  text-shadow:
+    0 0 8px  rgba(252, 129, 129, 0.9),
+    0 0 20px rgba(229,  62,  62, 0.6),
+    0 0 40px rgba(229,  62,  62, 0.3);
+}

@@ -8,13 +8,22 @@
   animation: night-enter 2s ease-in-out forwards;
 }
 
-/* Moon — top center */
+/* Moon — top center: styled div with radial gradient + glow (replaces emoji) */
 .night-screen__moon {
   position: fixed;
-  top: 1.1vmin;
+  top: 1.5vmin;
   left: 50%;
   transform: translateX(-50%);
-  font-size: clamp(36px, 5vmin, 64px);
+  width: clamp(48px, 7vmin, 90px);
+  height: clamp(48px, 7vmin, 90px);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fffde7 0%, #f9e87a 40%, #e8c84a 100%);
+  box-shadow:
+    0 0 20px  6px rgba(253, 245, 150, 0.8),
+    0 0 60px 20px rgba(253, 220,  80, 0.4),
+    0 0 120px 40px rgba(200, 160,  20, 0.2);
+  animation: moon-pulse 6s ease-in-out infinite;
+  will-change: box-shadow;
 }
 
 /* Countdown timer — PRD-003 §2.2 */
@@ -45,6 +54,7 @@
   text-align: center;
   animation: fade-in 0.6s ease-in-out forwards;
   font-style: italic;
+  font-family: var(--font-horror);
 }
 
 /* Action progress — bottom-left — PRD-003 §6 */

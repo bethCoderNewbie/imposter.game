@@ -65,6 +65,15 @@ export default function VoteWeb({ votes }: Props) {
       className="vote-web"
       style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
     >
+      <defs>
+        <filter id="vote-glow" x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
       {lines.map((line, i) => (
         <line
           key={i}
@@ -72,9 +81,10 @@ export default function VoteWeb({ votes }: Props) {
           y1={line.y1}
           x2={line.x2}
           y2={line.y2}
-          stroke="rgba(229, 62, 62, 0.7)"
+          stroke="rgba(255, 80, 80, 0.9)"
           strokeWidth={line.strokeWidth}
           strokeLinecap="round"
+          filter="url(#vote-glow)"
           className="vote-web__line"
           style={{ animationDelay: `${line.delay}ms` }}
         />

@@ -7,6 +7,61 @@ html.phase-night {
   background: radial-gradient(ellipse at 50% 20%, #141b2e 0%, #0a0e1a 60%, #060810 100%);
 }
 
+/* Starfield — single 1×1px element whose box-shadows become ~40 stars (1920×1080 design space) */
+html.phase-night::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  width: 1px;
+  height: 1px;
+  box-shadow:
+    120px  80px 0 1px rgba(255,255,255,0.9),
+    340px 200px 0 0px rgba(255,255,255,0.5),
+    580px  45px 0 1px rgba(255,255,255,0.8),
+    760px 130px 0 0px rgba(255,255,255,0.6),
+    920px  60px 0 1px rgba(255,255,255,0.7),
+   1100px  90px 0 0px rgba(255,255,255,0.4),
+   1320px  30px 0 1px rgba(255,255,255,0.9),
+   1500px 170px 0 0px rgba(255,255,255,0.6),
+   1700px  50px 0 1px rgba(255,255,255,0.5),
+   1820px 110px 0 0px rgba(255,255,255,0.7),
+    200px 300px 0 0px rgba(255,255,255,0.3),
+    440px 250px 0 1px rgba(255,255,255,0.7),
+    680px 320px 0 0px rgba(255,255,255,0.5),
+    880px 280px 0 1px rgba(255,255,255,0.8),
+   1050px 310px 0 0px rgba(255,255,255,0.4),
+   1240px 270px 0 1px rgba(255,255,255,0.6),
+   1450px 340px 0 0px rgba(255,255,255,0.5),
+   1650px 295px 0 1px rgba(255,255,255,0.7),
+   1870px 260px 0 0px rgba(255,255,255,0.4),
+    150px 450px 0 0px rgba(255,255,255,0.4),
+    380px 410px 0 1px rgba(255,255,255,0.6),
+    620px 480px 0 0px rgba(255,255,255,0.3),
+    830px 430px 0 1px rgba(255,255,255,0.5),
+   1010px 460px 0 0px rgba(255,255,255,0.7),
+   1200px 420px 0 1px rgba(255,255,255,0.4),
+   1400px 490px 0 0px rgba(255,255,255,0.6),
+   1600px 445px 0 1px rgba(255,255,255,0.8),
+   1780px 470px 0 0px rgba(255,255,255,0.3),
+    260px 600px 0 0px rgba(255,255,255,0.4),
+    490px 650px 0 1px rgba(255,255,255,0.6),
+    710px 610px 0 0px rgba(255,255,255,0.3),
+    960px 670px 0 1px rgba(255,255,255,0.5),
+   1150px 630px 0 0px rgba(255,255,255,0.7),
+   1350px 660px 0 1px rgba(255,255,255,0.4),
+   1560px 615px 0 0px rgba(255,255,255,0.6),
+   1760px 645px 0 1px rgba(255,255,255,0.5),
+     90px 750px 0 0px rgba(255,255,255,0.3),
+    320px 780px 0 1px rgba(255,255,255,0.5),
+    560px 720px 0 0px rgba(255,255,255,0.7),
+    800px 800px 0 1px rgba(255,255,255,0.4),
+   1020px 760px 0 0px rgba(255,255,255,0.6),
+   1230px 820px 0 1px rgba(255,255,255,0.3);
+  animation: star-twinkle 4s ease-in-out infinite alternate;
+}
+
 html.phase-night::after {
   content: '';
   position: fixed;

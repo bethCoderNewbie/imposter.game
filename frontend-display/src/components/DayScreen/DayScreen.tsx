@@ -38,7 +38,7 @@ export default function DayScreen({ gameState, frozenVotes, audioUnlocked }: Pro
       </div>
 
       {/* Player grid — relative so VoteWeb SVG can overlay it */}
-      <div className="day-screen__grid" id="player-grid">
+      <div className={`day-screen__grid${isVoting ? ' day-screen__grid--voting' : ''}`} id="player-grid">
         {players.map(player => (
           <PlayerCard
             key={player.player_id}

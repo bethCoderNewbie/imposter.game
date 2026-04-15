@@ -3,6 +3,7 @@
   flex-direction: column;
   align-items: center;
   gap: 0.8vmin;
+  position: relative; /* required for ::before/::after pseudo-elements */
 }
 
 .player-card__avatar-wrap {
@@ -11,8 +12,9 @@
 
 /* Dead state: grayscale filter (PRD-002 §2.5) */
 .player-card--dead .player-avatar {
-  filter: grayscale(1);
-  transition: filter 0.5s ease-in-out;
+  filter: grayscale(1) sepia(0.3) brightness(0.5);
+  transition: filter 0.8s ease-in-out;
+  opacity: 0.65;
 }
 
 /* Tombstone overlay */
@@ -50,6 +52,42 @@
   animation: vote-majority-pulse 3s ease-in-out infinite;
 }
 
+/* Wanted poster rotating-border on majority card */
+.player-card--majority::before {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border-radius: 8px;
+  background: linear-gradient(
+    135deg,
+    rgba(237, 201, 75, 0.0)  0%,
+    rgba(237, 201, 75, 0.9) 30%,
+    rgba(229,  62,  62, 0.8) 50%,
+    rgba(237, 201, 75, 0.9) 70%,
+    rgba(237, 201, 75, 0.0) 100%
+  );
+  background-size: 200% 200%;
+  animation: wanted-border-rotate 2s linear infinite;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* WANTED label above majority card */
+.player-card--majority::after {
+  content: 'WANTED';
+  position: absolute;
+  top: -2.0em;
+  left: 50%;
+  transform: translateX(-50%) rotate(-3deg);
+  font-size: clamp(7px, 1.0vmin, 13px);
+  font-family: var(--font-horror);
+  color: var(--village-primary);
+  letter-spacing: 0.15em;
+  text-shadow: 0 0 6px rgba(237, 201, 75, 0.8);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 /* Player name — PRD-003 §2.2 */
 .player-card__name {
   font-size: clamp(14px, 2.0vmin, 26px);
@@ -64,4 +102,11 @@
 
 .player-card--dead .player-card__name {
   color: rgba(70, 50, 80, 0.4);
+}
+
+/* Shimmer on living non-majority cards during voting phase */
+.day-screen__grid--voting .player-card:not(.player-card--dead):not(.player-card--majority) .player-card__avatar-wrap {
+  background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,0.07) 50%, transparent 70%);
+  background-size: 200% 100%;
+  animation: card-shimmer 2.5s linear infinite;
 }

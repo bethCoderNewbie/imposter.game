@@ -63,4 +63,5 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.1em;
+  font-family: var(--font-horror);
 }

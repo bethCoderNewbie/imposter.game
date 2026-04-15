@@ -87,6 +87,13 @@ export default function GameOverScreen({ gameState, audioUnlocked, gameId, hostS
         {isVillageWin ? 'THE VILLAGE SURVIVES' : 'THE WOLVES DEVOUR THE VILLAGE'}
       </h1>
 
+      {/* Falling particles — gold confetti (village) or crimson mist (wolf) */}
+      <div className={`game-over__particles ${isVillageWin ? 'game-over__particles--village' : 'game-over__particles--wolf'}`} aria-hidden="true">
+        {Array.from({ length: 12 }).map((_, i) => (
+          <span key={i} className="game-over__particle" />
+        ))}
+      </div>
+
       {/* Player reveal grid with role badges */}
       <div className="game-over__players">
         {players.map(player => (

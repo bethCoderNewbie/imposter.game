@@ -16,6 +16,7 @@
   text-align: center;
   animation: reveal-flicker 1.2s cubic-bezier(0.5, 1, 0.89, 1) forwards;
   font-style: italic;
+  font-family: var(--font-horror);
 }
 
 /* Death reveal block — slides in with claw animation (PRD-002 §2.4) */
@@ -39,10 +40,14 @@
   top: -4px;
   left: -4px;
   font-size: clamp(64px, 9vmin, 120px);
-  color: rgba(229, 62, 62, 0.7);
+  color: var(--wolf-primary);
   line-height: 1;
   animation: claw-slide-in 1.2s ease-out both;
   animation-delay: inherit;
+  text-shadow:
+    0 0 10px rgba(229, 62,  62, 1.0),
+    0 0 30px rgba(229, 62,  62, 0.7),
+    0 0 60px rgba(150,  0,   0, 0.4);
 }
 
 .night-resolution__player-name {

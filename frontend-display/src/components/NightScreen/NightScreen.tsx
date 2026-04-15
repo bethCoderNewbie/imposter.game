@@ -45,8 +45,8 @@ export default function NightScreen({ gameState, audioUnlocked }: Props) {
       {/* Preloaded audio — plays on phase enter */}
       <audio ref={ambientRef} src={`${import.meta.env.BASE_URL}audio/night-ambient.mp3`} loop preload="auto" />
 
-      {/* Moon illustration */}
-      <div className="night-screen__moon" aria-hidden="true">🌕</div>
+      {/* Moon illustration — styled div with CSS radial gradient + glow (replaces emoji) */}
+      <div className="night-screen__moon" aria-hidden="true" />
 
       {/* Countdown timer — PRD-003 §2.2 */}
       <PhaseTimer timerEndsAt={gameState.timer_ends_at} className="night-screen__timer" />

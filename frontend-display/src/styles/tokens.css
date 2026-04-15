@@ -29,4 +29,7 @@
   --glass-bg:            linear-gradient(-20deg, #0a1923 0%, #1a1529 100%);
   --glass-border:        rgba(255, 255, 255, 0.15);
   --glass-blur:          blur(24px);
+
+  /* Horror display font — headings & narrative text only; never use for timers/codes */
+  --font-horror: 'Special Elite', 'Courier New', monospace;
 }
