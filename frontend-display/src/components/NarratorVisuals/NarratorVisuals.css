@@ -3,8 +3,8 @@
   bottom: 6%;
   left: 2%;
   /* Viewport-relative size — adapts to screen resolution */
-  height: 8vmin;
-  width: 8vmin;
+  height: 16vmin;
+  width: 16vmin;
   z-index: 100;
   pointer-events: none;
   animation: visuals-fade-in 0.35s ease-in;

@@ -2,9 +2,9 @@
   position: fixed;
   bottom: 6%;
   /* Start just past the 8vmin avatar + 2% left + 8px gap */
-  left: calc(2% + 8vmin + 8px);
+  left: calc(2% + 16vmin + 8px);
   /* Fill the remaining screen width with a small right margin */
-  width: calc(96% - 8vmin - 8px);
+  width: calc(96% - 16vmin - 8px);
   background: rgba(0, 0, 0, 0.78);
   color: #f5f0e8;
   padding: 0.55em 1.3em;
