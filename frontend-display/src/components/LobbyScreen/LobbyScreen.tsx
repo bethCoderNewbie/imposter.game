@@ -88,66 +88,69 @@ export default function LobbyScreen({ gameState, hostSecret, gameId }: Props) {
         {playerCount} active / {roster.length} joined
       </div>
 
-      {/* Center: QR code + join URL + room code */}
-      <div className="lobby-screen__join">
-        <QRCodeSVG
-          value={joinUrl}
-          size={300}
-          bgColor="#000000"
-          fgColor="#ffffff"
-          level="M"
-          className="lobby-screen__qr"
+      {/* Left column: QR code + join info + config panel */}
+      <div className="lobby-screen__left">
+        <div className="lobby-screen__join">
+          <QRCodeSVG
+            value={joinUrl}
+            size={200}
+            bgColor="#000000"
+            fgColor="#ffffff"
+            level="M"
+            className="lobby-screen__qr"
+          />
+          <p className="lobby-screen__url">{HOST_BASE.replace(/^https?:\/\//, '')}/?g=</p>
+          <p className="lobby-screen__code">{gameState.game_id}</p>
+        </div>
+        <LobbyConfigPanel
+          config={gameState.config}
+          hostSecret={hostSecret}
+          gameId={gameId}
         />
-        <p className="lobby-screen__url">{HOST_BASE.replace(/^https?:\/\//, '')}/?g=</p>
-        <p className="lobby-screen__code">{gameState.game_id}</p>
       </div>
 
-      {/* Campfire + avatar parade (connected players only) */}
-      <div className="lobby-screen__parade">
-        <div className="lobby-screen__campfire">🔥</div>
-        <div className="lobby-screen__avatars">
-          {connectedPlayers.map((p: PlayerRosterEntry) => (
-            <PlayerAvatar
-              key={p.player_id}
-              player={p}
-              className={newIds.has(p.player_id) ? 'avatar-pop-in' : ''}
-            />
-          ))}
+      {/* Right column: campfire + avatar parade + player roster */}
+      <div className="lobby-screen__right">
+        {/* Campfire + avatar parade (connected players only) */}
+        <div className="lobby-screen__parade">
+          <div className="lobby-screen__campfire">🔥</div>
+          <div className="lobby-screen__avatars">
+            {connectedPlayers.map((p: PlayerRosterEntry) => (
+              <PlayerAvatar
+                key={p.player_id}
+                player={p}
+                className={newIds.has(p.player_id) ? 'avatar-pop-in' : ''}
+              />
+            ))}
+          </div>
         </div>
+
+        {/* Player roster — all entries with connection status + host kick controls */}
+        {roster.length > 0 && (
+          <div className="lobby-screen__roster">
+            {roster.map((p: PlayerRosterEntry) => (
+              <div
+                key={p.player_id}
+                className={`lobby-screen__roster-row${p.is_connected ? '' : ' lobby-screen__roster-row--offline'}`}
+              >
+                <span className={`lobby-screen__dot${p.is_connected ? ' lobby-screen__dot--on' : ''}`} />
+                <PlayerAvatar player={p} size={28} />
+                <span className="lobby-screen__roster-name">{p.display_name}</span>
+                {!p.is_connected && hostSecret && (
+                  <button
+                    className="lobby-screen__kick-btn"
+                    disabled={kickingIds.has(p.player_id)}
+                    onClick={() => handleKick(p.player_id)}
+                    aria-label={`Remove ${p.display_name}`}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
-
-      {/* Player roster — all entries with connection status + host kick controls */}
-      {roster.length > 0 && (
-        <div className="lobby-screen__roster">
-          {roster.map((p: PlayerRosterEntry) => (
-            <div
-              key={p.player_id}
-              className={`lobby-screen__roster-row${p.is_connected ? '' : ' lobby-screen__roster-row--offline'}`}
-            >
-              <span className={`lobby-screen__dot${p.is_connected ? ' lobby-screen__dot--on' : ''}`} />
-              <PlayerAvatar player={p} size={28} />
-              <span className="lobby-screen__roster-name">{p.display_name}</span>
-              {!p.is_connected && hostSecret && (
-                <button
-                  className="lobby-screen__kick-btn"
-                  disabled={kickingIds.has(p.player_id)}
-                  onClick={() => handleKick(p.player_id)}
-                  aria-label={`Remove ${p.display_name}`}
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Config panel: difficulty + timers — PRD-005 */}
-      <LobbyConfigPanel
-        config={gameState.config}
-        hostSecret={hostSecret}
-        gameId={gameId}
-      />
 
       {/* Bottom: status + optional Start button */}
       <div className="lobby-screen__status">
