@@ -16,6 +16,7 @@ import DayScreen from './components/DayScreen/DayScreen'
 import GameOverScreen from './components/GameOverScreen/GameOverScreen'
 import NarratorSubtitle from './components/NarratorSubtitle/NarratorSubtitle'
 import NarratorVisuals from './components/NarratorVisuals/NarratorVisuals'
+import HostControls from './components/HostControls/HostControls'
 import type { StrippedGameState } from './types/game'
 import './App.css'
 
@@ -146,7 +147,7 @@ export default function App() {
     // hostSecret stays null — resumed/spectator flow
   }
 
-  const { gameState, status } = useGameState({
+  const { gameState, sendIntent, status } = useGameState({
     gameId,
     playerId: 'display',
     onNarrate: handleNarrate,
@@ -269,11 +270,17 @@ export default function App() {
     }
 
     if (phase === 'night') {
-      return <NightScreen gameState={gameState} audioUnlocked={audioUnlocked} />
+      return <>
+        <NightScreen gameState={gameState} audioUnlocked={audioUnlocked} />
+        {hostSecret && <HostControls gameState={gameState} sendIntent={sendIntent} />}
+      </>
     }
 
     if (phase === 'day' || phase === 'day_vote' || phase === 'hunter_pending') {
-      return <DayScreen gameState={gameState} frozenVotes={frozenVotes} audioUnlocked={audioUnlocked} soundPlayerId={soundToast?.playerId ?? null} />
+      return <>
+        <DayScreen gameState={gameState} frozenVotes={frozenVotes} audioUnlocked={audioUnlocked} soundPlayerId={soundToast?.playerId ?? null} />
+        {hostSecret && <HostControls gameState={gameState} sendIntent={sendIntent} />}
+      </>
     }
 
     if (phase === 'game_over') {

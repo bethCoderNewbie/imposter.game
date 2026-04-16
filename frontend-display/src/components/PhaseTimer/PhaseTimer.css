@@ -4,6 +4,8 @@
   letter-spacing: 0.05em;
   display: inline-block; /* required for transform animation to apply */
 }
+.phase-timer.timer--paused   { opacity: 0.55; }
+.phase-timer__paused-label   { font-size: 0.45em; letter-spacing: 0.1em; vertical-align: middle; opacity: 0.8; }
 .phase-timer.timer--warning  { color: var(--timer-warning,  #f6c90e); }
 .phase-timer.timer--critical {
   color: var(--timer-critical, #e53e3e);

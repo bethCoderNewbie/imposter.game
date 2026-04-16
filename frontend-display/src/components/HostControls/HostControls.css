@@ -1,0 +1,38 @@
+.host-controls {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  display: flex;
+  gap: 0.5rem;
+  z-index: 100;
+}
+
+.host-controls__btn {
+  padding: 0.5rem 1rem;
+  background: rgba(0, 0, 0, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 0.5rem;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.host-controls__btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.host-controls__btn:active {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.host-controls__btn--skip {
+  border-color: rgba(255, 90, 90, 0.45);
+}
+
+.host-controls__btn--skip:hover {
+  border-color: rgba(255, 90, 90, 0.8);
+}

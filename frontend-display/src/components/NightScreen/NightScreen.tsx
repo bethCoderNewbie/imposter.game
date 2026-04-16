@@ -55,7 +55,14 @@ export default function NightScreen({ gameState, audioUnlocked }: Props) {
       <div className="night-screen__moon" aria-hidden="true" />
 
       {/* Countdown timer — PRD-003 §2.2 */}
-      <PhaseTimer timerEndsAt={gameState.timer_ends_at} className="night-screen__timer" audioUnlocked={audioUnlocked} enableCountdownBeep={true} />
+      <PhaseTimer
+        timerEndsAt={gameState.timer_ends_at}
+        timerPaused={gameState.timer_paused}
+        timerRemainingSeconds={gameState.timer_remaining_seconds}
+        className="night-screen__timer"
+        audioUnlocked={audioUnlocked}
+        enableCountdownBeep={true}
+      />
 
       {/* Atmospheric narrative carousel — PRD-002 §2.3 */}
       <p className="night-screen__narrative" key={narrativeIdx}>

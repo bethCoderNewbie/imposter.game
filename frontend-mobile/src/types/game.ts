@@ -42,6 +42,8 @@ export interface PlayerState {
   witch_kill_used?: boolean          // Witch only — own player strip
   lunatic_redirect_used?: boolean    // Lunatic only — own player strip
   puzzle_state?: PuzzleState | null
+  grid_puzzle_state?: PuzzleState | null
+  under_attack?: boolean   // own player only — true while a wolf is charging their quadrant
 }
 
 export interface PuzzleState {
@@ -53,6 +55,19 @@ export interface PuzzleState {
   hint_pending?: boolean
 }
 
+export interface SonarPingResult {
+  quadrant: 'top_left' | 'top_right' | 'bottom_left' | 'bottom_right'
+  heat: number
+  tier_counts: Record<string, number>
+}
+
+export interface GridActivityEntry {
+  row: number
+  col: number
+  quadrant: 'top_left' | 'top_right' | 'bottom_left' | 'bottom_right'
+  sequence_idx: number
+}
+
 export interface NightActions {
   actions_submitted_count: number
   actions_required_count: number
@@ -62,6 +77,11 @@ export interface NightActions {
   tracker_target_id?: string | null
   tracker_result?: string[]
   decoy_reveal_delay_ms?: number
+  // Grid system
+  grid_layout?: number[][] | null        // 5×5 tier grid (1/2/3). Public.
+  grid_activity?: GridActivityEntry[]    // Wolf view only — anonymized activity log
+  sonar_pings_used?: number             // Public
+  sonar_ping_results?: SonarPingResult[] // Wolf view only
 }
 
 export interface EliminationEvent {
@@ -95,6 +115,8 @@ export interface StrippedGameState {
   round: number
   host_player_id: string
   timer_ends_at: string | null
+  timer_paused?: boolean
+  timer_remaining_seconds?: number | null
   config: GameConfig
   players: Record<string, PlayerState>
   night_actions: NightActions
@@ -136,6 +158,7 @@ export interface HintPayload {
   text: string
   round: number
   expires_after_round: number | null
+  source: 'archive' | 'grid'
 }
 
 export interface RedirectMessage {
@@ -157,7 +180,13 @@ export interface MatchDataMessage {
   players: PlayerRosterEntry[]
 }
 
-export type ServerMessage = SyncMessage | UpdateMessage | ErrorMessage | HintPayload | RedirectMessage | MatchDataMessage
+export interface GridRippleMessage {
+  type: 'grid_ripple'
+  quadrant: 'top_left' | 'top_right' | 'bottom_left' | 'bottom_right'
+  tier: 1 | 2 | 3
+}
+
+export type ServerMessage = SyncMessage | UpdateMessage | ErrorMessage | HintPayload | RedirectMessage | MatchDataMessage | GridRippleMessage
 
 export const AVATAR_COLORS: Record<string, string> = {
   avatar_01: '#e57373',

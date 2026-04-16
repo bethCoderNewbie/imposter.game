@@ -106,6 +106,7 @@ def transition_phase(G: MasterGameState, new_phase: Phase) -> MasterGameState:
             player.grid_node_row = None
             player.grid_node_col = None
             player.grid_puzzle_state = None
+            player.under_attack = False
 
         # Generate a fresh 5×5 grid layout for the night
         G.night_actions.grid_layout = generate_grid_layout(G.seed, G.round)
@@ -113,6 +114,8 @@ def transition_phase(G: MasterGameState, new_phase: Phase) -> MasterGameState:
         G.night_actions.sonar_pings_used = 0
         G.night_actions.sonar_ping_results = []
         G.night_actions.night_action_change_count = {}
+        G.night_actions.wolf_charges = {}
+        G.night_actions.charge_kill_target_id = None
 
     elif new_phase == Phase.DAY:
         # Clear day votes for fresh discussion phase
@@ -130,6 +133,8 @@ def transition_phase(G: MasterGameState, new_phase: Phase) -> MasterGameState:
             player.role_confirmed = False
 
     G.phase = new_phase
+    G.timer_paused = False
+    G.timer_remaining_seconds = None
     G.timer_ends_at = _timer_for_phase(new_phase, G.config)
     return G
 

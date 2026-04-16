@@ -8,8 +8,12 @@ from __future__ import annotations
 
 import asyncio
 import secrets
+from datetime import datetime, timedelta, timezone as _tz
 from typing import Any
 from uuid import uuid4
+
+_UTC = _tz.utc
+EXTEND_INCREMENT = 30  # seconds added by extend_timer
 
 from api.intents.errors import IntentError
 from api.narrator.triggers import narrate, narrate_sequence
@@ -448,6 +452,77 @@ async def handle_advance_phase(G, intent, redis_client, cm) -> MasterGameState:
     return G
 
 
+async def handle_pause_timer(G, intent, redis_client, cm) -> MasterGameState:
+    """Host pauses the running phase timer."""
+    _require_host(G, intent.get("player_id", ""))
+    _require_phase(G, Phase.NIGHT, Phase.ROLE_DEAL, Phase.DAY, Phase.DAY_VOTE, Phase.HUNTER_PENDING)
+    if G.timer_paused:
+        raise IntentError("ALREADY_PAUSED", "Timer is already paused.")
+    G = G.model_copy(deep=True)
+    remaining = 0
+    if G.timer_ends_at:
+        deadline = datetime.fromisoformat(G.timer_ends_at.replace("Z", "+00:00"))
+        remaining = max(0, int((deadline - datetime.now(_UTC)).total_seconds()))
+    cancel_phase_timer(G.game_id)
+    G.timer_paused = True
+    G.timer_remaining_seconds = remaining
+    G.timer_ends_at = None
+    return G
+
+
+async def handle_resume_timer(G, intent, redis_client, cm) -> MasterGameState:
+    """Host resumes a paused timer from remaining seconds."""
+    _require_host(G, intent.get("player_id", ""))
+    _require_phase(G, Phase.NIGHT, Phase.ROLE_DEAL, Phase.DAY, Phase.DAY_VOTE, Phase.HUNTER_PENDING)
+    if not G.timer_paused:
+        raise IntentError("NOT_PAUSED", "Timer is not paused.")
+    G = G.model_copy(deep=True)
+    remaining = G.timer_remaining_seconds or 0
+    deadline = datetime.now(_UTC) + timedelta(seconds=remaining)
+    G.timer_ends_at = deadline.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+    G.timer_paused = False
+    G.timer_remaining_seconds = None
+    from api.game_queue import get_or_create_queue
+    queue = get_or_create_queue(G.game_id)
+    await _maybe_start_timer(G, G.game_id, queue)
+    return G
+
+
+async def handle_extend_timer(G, intent, redis_client, cm) -> MasterGameState:
+    """Host extends the current phase by EXTEND_INCREMENT seconds."""
+    _require_host(G, intent.get("player_id", ""))
+    _require_phase(G, Phase.NIGHT, Phase.ROLE_DEAL, Phase.DAY, Phase.DAY_VOTE, Phase.HUNTER_PENDING)
+    G = G.model_copy(deep=True)
+    if G.timer_paused:
+        G.timer_remaining_seconds = (G.timer_remaining_seconds or 0) + EXTEND_INCREMENT
+    else:
+        base = (
+            datetime.fromisoformat(G.timer_ends_at.replace("Z", "+00:00"))
+            if G.timer_ends_at else datetime.now(_UTC)
+        )
+        new_deadline = base + timedelta(seconds=EXTEND_INCREMENT)
+        G.timer_ends_at = new_deadline.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+        cancel_phase_timer(G.game_id)
+        from api.game_queue import get_or_create_queue
+        queue = get_or_create_queue(G.game_id)
+        await _maybe_start_timer(G, G.game_id, queue)
+    return G
+
+
+async def handle_force_next(G, intent, redis_client, cm) -> MasterGameState:
+    """Host immediately ends the current phase (same effect as timer expiry)."""
+    _require_host(G, intent.get("player_id", ""))
+    if G.phase == Phase.DAY:
+        raise IntentError("USE_ADVANCE_PHASE", "Use advance_phase to move from DAY to DAY_VOTE.")
+    _require_phase(G, Phase.NIGHT, Phase.ROLE_DEAL, Phase.DAY_VOTE, Phase.HUNTER_PENDING)
+    cancel_phase_timer(G.game_id)
+    G = G.model_copy(deep=True)
+    G.timer_paused = False
+    G.timer_remaining_seconds = None
+    synthetic = {"type": "phase_timeout", "phase": G.phase}
+    return await handle_phase_timeout(G, synthetic, redis_client, cm)
+
+
 async def handle_phase_timeout(G, intent, redis_client, cm) -> MasterGameState:
     """Timer-triggered phase advancement."""
     timeout_phase = intent.get("phase")
@@ -673,9 +748,14 @@ async def handle_submit_grid_answer(G, intent, redis_client, cm) -> MasterGameSt
     return G
 
 
+_MAX_SONAR_PINGS_PER_NIGHT = 4  # one per quadrant — whole pack shares this budget
+
+
 async def handle_sonar_ping(G, intent, redis_client, cm) -> MasterGameState:
     """
     Wolf fires a Sonar Ping at a quadrant to get activity heat and tier breakdown.
+    The pack shares a budget of MAX_SONAR_PINGS_PER_NIGHT (4) pings per night —
+    one per quadrant. Wolves must allocate them wisely.
     """
     _require_phase(G, Phase.NIGHT)
     player_id = intent.get("player_id", "")
@@ -683,6 +763,12 @@ async def handle_sonar_ping(G, intent, redis_client, cm) -> MasterGameState:
 
     if player.team != "werewolf":
         raise IntentError("NOT_WOLF", "Only wolf-team players can fire Sonar Pings.")
+
+    if G.night_actions.sonar_pings_used >= _MAX_SONAR_PINGS_PER_NIGHT:
+        raise IntentError(
+            "SONAR_PING_LIMIT_REACHED",
+            f"The pack has used all {_MAX_SONAR_PINGS_PER_NIGHT} Sonar Pings for this night.",
+        )
 
     valid_quadrants = {"top_left", "top_right", "bottom_left", "bottom_right"}
     quadrant = intent.get("quadrant", "")
@@ -713,6 +799,155 @@ async def handle_sonar_ping(G, intent, redis_client, cm) -> MasterGameState:
     G.night_actions.night_action_change_count[player_id] = (
         G.night_actions.night_action_change_count.get(player_id, 0) + 1
     )
+
+    G.state_id += 1
+    return G
+
+
+# ── Wolf charge / Villager defend mechanics ───────────────────────────────────
+
+_CHARGE_THRESHOLD_MS = 5000   # pack's combined accumulated ms to auto-fire (PRD-015 §2.1)
+_VALID_QUADRANTS = {"top_left", "top_right", "bottom_left", "bottom_right"}
+
+
+def _players_in_quadrant(G, quadrant: str) -> list[str]:
+    """Return pids of alive non-wolf players whose active grid node maps to `quadrant`."""
+    from engine.puzzle_bank import node_to_quadrant
+    result = []
+    for pid, p in G.players.items():
+        if not p.is_alive or p.team == "werewolf":
+            continue
+        if p.grid_node_row is not None and p.grid_node_col is not None:
+            if node_to_quadrant(p.grid_node_row, p.grid_node_col) == quadrant:
+                result.append(pid)
+    return result
+
+
+def _pack_charge_total(G, quadrant: str) -> int:
+    """Sum accumulated ms across all alive wolves for `quadrant`."""
+    return sum(
+        G.night_actions.wolf_charges.get(pid, {}).get(quadrant, 0)
+        for pid, p in G.players.items()
+        if p.is_alive and p.team == "werewolf"
+    )
+
+
+def _apply_charge_fire(G: MasterGameState, quadrant: str) -> MasterGameState:
+    """
+    Pack charge threshold reached for `quadrant`.
+    - Records the first active solver as charge_kill_target_id (processed by resolve_night).
+    - Disrupts all active solvers in the quadrant (puzzle abandoned immediately).
+    - Resets ALL wolves' accumulated charges for this quadrant to 0.
+    """
+    hits = _players_in_quadrant(G, quadrant)
+
+    # Record the kill target for resolve_night (only if no prior charge kill pending)
+    if hits and G.night_actions.charge_kill_target_id is None:
+        G.night_actions.charge_kill_target_id = hits[0]
+
+    # Immediately disrupt all active solvers' puzzles
+    for pid in hits:
+        p = G.players[pid]
+        if p.grid_puzzle_state:
+            p.grid_puzzle_state.active = False
+            p.grid_puzzle_state.solved = False
+        p.grid_node_row = None
+        p.grid_node_col = None
+        p.under_attack = False
+
+    # Reset ALL wolves' charges for this quadrant (charge spent)
+    for wolf_pid in list(G.night_actions.wolf_charges):
+        G.night_actions.wolf_charges[wolf_pid][quadrant] = 0
+
+    return G
+
+
+async def handle_wolf_charge_update(G, intent, redis_client, cm) -> MasterGameState:
+    """
+    Wolf reports current charge state for a quadrant.
+
+    is_active=True  → wolf is actively holding; set under_attack on villagers in that quadrant.
+    is_active=False → wolf released (pause); charge is preserved but under_attack clears.
+    accumulated_ms  → this wolf's cumulative hold time (persisted server-side per wolf).
+
+    After recording, the server checks the PACK POOL (sum of all wolves' accumulated ms for
+    this quadrant). If the pool reaches CHARGE_THRESHOLD_MS (5000 ms), the charge auto-fires:
+    - charge_kill_target_id is set (used by resolve_night at night end)
+    - Active solvers' puzzles are disrupted immediately
+    - All wolves' charges for this quadrant reset to 0
+
+    Cooperation mechanic: 2 wolves each holding ~2.5 s fires together. First quadrant to
+    reach the threshold wins; second quadrant fire is still a disruption but does not add
+    another kill (charge_kill_target_id already set).
+    """
+    _require_phase(G, Phase.NIGHT)
+    player_id = intent.get("player_id", "")
+    player = _require_alive(G, player_id)
+
+    if player.team != "werewolf":
+        raise IntentError("NOT_WOLF", "Only wolf-team players can charge a quadrant.")
+
+    if player_id == G.night_actions.roleblocked_player_id:
+        raise IntentError("ROLEBLOCKED", "Your night action is blocked.")
+
+    quadrant = intent.get("quadrant", "")
+    if quadrant not in _VALID_QUADRANTS:
+        raise IntentError("INVALID_QUADRANT", f"quadrant must be one of {sorted(_VALID_QUADRANTS)}.")
+
+    accumulated_ms = intent.get("accumulated_ms", 0)
+    if not isinstance(accumulated_ms, (int, float)) or accumulated_ms < 0:
+        raise IntentError("INVALID_CHARGE", "accumulated_ms must be a non-negative number.")
+    accumulated_ms = min(int(accumulated_ms), _CHARGE_THRESHOLD_MS)
+
+    is_active = bool(intent.get("is_active", False))
+
+    G = G.model_copy(deep=True)
+
+    # Persist this wolf's accumulated charge for the quadrant
+    if player_id not in G.night_actions.wolf_charges:
+        G.night_actions.wolf_charges[player_id] = {}
+    G.night_actions.wolf_charges[player_id][quadrant] = accumulated_ms
+
+    # Set or clear under_attack on villagers currently solving in this quadrant
+    for pid in _players_in_quadrant(G, quadrant):
+        G.players[pid].under_attack = is_active
+
+    # ── Auto-fire check: does the pack pool now exceed the threshold? ─────────
+    if _pack_charge_total(G, quadrant) >= _CHARGE_THRESHOLD_MS:
+        G = _apply_charge_fire(G, quadrant)
+
+    G.state_id += 1
+    return G
+
+
+async def handle_grid_defend(G, intent, redis_client, cm) -> MasterGameState:
+    """
+    Villager presses Defend while under attack.
+    Clears under_attack for this player AND resets ALL wolves' charges for this
+    player's quadrant to 0 — the entire pack must restart from zero.
+    """
+    _require_phase(G, Phase.NIGHT)
+    player_id = intent.get("player_id", "")
+    player = _require_alive(G, player_id)
+
+    if player.team == "werewolf":
+        raise IntentError("INVALID_ACTION", "Wolves cannot use the Defend action.")
+
+    if not player.under_attack:
+        raise IntentError("NOT_UNDER_ATTACK", "No active charge to defend against.")
+
+    G = G.model_copy(deep=True)
+    p = G.players[player_id]
+
+    # Clear attack state on this player
+    p.under_attack = False
+
+    # Reset ALL wolves' charges for this player's quadrant (pack's effort is broken)
+    if p.grid_node_row is not None and p.grid_node_col is not None:
+        from engine.puzzle_bank import node_to_quadrant
+        target_q = node_to_quadrant(p.grid_node_row, p.grid_node_col)
+        for wolf_pid in list(G.night_actions.wolf_charges):
+            G.night_actions.wolf_charges[wolf_pid][target_q] = 0
 
     G.state_id += 1
     return G

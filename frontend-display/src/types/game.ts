@@ -94,6 +94,8 @@ export interface StrippedGameState {
   round: number
   host_player_id: string
   timer_ends_at: string | null
+  timer_paused?: boolean
+  timer_remaining_seconds?: number | null
   config: GameConfig
   players: Record<string, PlayerState>
   night_actions: NightActions

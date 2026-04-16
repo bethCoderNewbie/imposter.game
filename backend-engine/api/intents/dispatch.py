@@ -12,9 +12,14 @@ from api.intents.errors import IntentError
 from api.intents.handlers import (
     handle_advance_phase,
     handle_confirm_role_reveal,
+    handle_extend_timer,
+    handle_force_next,
+    handle_grid_defend,
     handle_hunter_revenge,
+    handle_pause_timer,
     handle_phase_timeout,
     handle_player_disconnected,
+    handle_resume_timer,
     handle_select_grid_node,
     handle_sonar_ping,
     handle_start_game,
@@ -22,6 +27,7 @@ from api.intents.handlers import (
     handle_submit_grid_answer,
     handle_submit_night_action,
     handle_submit_puzzle_answer,
+    handle_wolf_charge_update,
 )
 
 # Re-export IntentError so callers can import from dispatch as before
@@ -37,7 +43,13 @@ _HANDLERS = {
     "select_grid_node": handle_select_grid_node,
     "submit_grid_answer": handle_submit_grid_answer,
     "sonar_ping": handle_sonar_ping,
+    "wolf_charge_update": handle_wolf_charge_update,
+    "grid_defend": handle_grid_defend,
     "advance_phase": handle_advance_phase,
+    "pause_timer":   handle_pause_timer,
+    "resume_timer":  handle_resume_timer,
+    "extend_timer":  handle_extend_timer,
+    "force_next":    handle_force_next,
     "phase_timeout": handle_phase_timeout,
     "player_disconnected": handle_player_disconnected,
 }

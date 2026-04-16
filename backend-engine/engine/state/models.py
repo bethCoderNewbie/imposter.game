@@ -97,6 +97,7 @@ class PlayerState(BaseModel):
     grid_node_row: int | None = None       # server-only: current grid node row
     grid_node_col: int | None = None       # server-only: current grid node column
     grid_puzzle_state: PuzzleState | None = None  # active grid node puzzle; correct_index stripped
+    under_attack: bool = False             # own player only: True while a wolf is charging their quadrant
 
 
 class FalseHintPayload(BaseModel):
@@ -180,6 +181,15 @@ class NightActions(BaseModel):
     night_action_change_count: dict[str, int] = Field(default_factory=dict)
     # player_id -> total intent submissions this night. SERVER-ONLY — never sent to any client.
 
+    wolf_charges: dict[str, dict[str, int]] = Field(default_factory=dict)
+    # wolf_pid -> {quadrant -> accumulated_ms}. Tracks cumulative hold time per wolf per quadrant.
+    # SERVER-ONLY — never sent to any client. Reset at NIGHT entry and when charge fires or is defended.
+
+    charge_kill_target_id: str | None = None
+    # Set when the pack's combined charge for a quadrant reaches CHARGE_THRESHOLD_MS and hits an active solver.
+    # Processed by resolve_night() as the wolf kill — takes priority over wolf_votes.
+    # SERVER-ONLY — always stripped. Reset at NIGHT entry.
+
 
 
 class EliminationEvent(BaseModel):
@@ -218,6 +228,8 @@ class MasterGameState(BaseModel):
     round: int = 0
     host_player_id: str | None = None
     timer_ends_at: str | None = None  # ISO8601 UTC | null
+    timer_paused: bool = False
+    timer_remaining_seconds: int | None = None
     config: GameConfig
     players: dict[str, PlayerState] = Field(default_factory=dict)  # player_id -> PlayerState
     night_actions: NightActions = Field(default_factory=NightActions)

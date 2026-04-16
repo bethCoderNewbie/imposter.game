@@ -99,6 +99,8 @@ export default function DayScreen({ gameState, frozenVotes, audioUnlocked, sound
         <span className="day-screen__round">Day {gameState.round}</span>
         <PhaseTimer
           timerEndsAt={gameState.timer_ends_at}
+          timerPaused={gameState.timer_paused}
+          timerRemainingSeconds={gameState.timer_remaining_seconds}
           className="day-screen__timer"
           enableCountdownBeep={true}
           audioUnlocked={audioUnlocked}

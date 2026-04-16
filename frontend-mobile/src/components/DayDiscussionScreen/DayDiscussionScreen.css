@@ -33,6 +33,8 @@
 
 .day-discussion__timer.timer--warning  { color: #c05621; }
 .day-discussion__timer.timer--critical { color: #c53030; }
+.day-discussion__timer.timer--paused   { opacity: 0.55; }
+.day-discussion__paused { font-size: 0.6em; letter-spacing: 0.08em; vertical-align: middle; }
 
 .day-discussion__phase {
   text-align: center;
@@ -92,25 +94,51 @@
 .day-discussion__tag--safe    { background: #81c784; color: #fff; }
 .day-discussion__tag--unknown { background: rgba(0,0,0,0.1); color: rgba(70,50,80,0.6); }
 
-/* Seer intel panel */
-.day-discussion__seer-panel {
+/* ── Shared intel panel shell ─────────────────────────────────────────────── */
+
+.day-discussion__intel-panel {
   border-radius: 12px;
   background: rgba(255,255,255,0.5);
-  padding: 0.75rem 1rem;
+  overflow: hidden;
 }
 
-.day-discussion__seer-label {
+.day-discussion__intel-panel--wolf {
+  background: rgba(30, 20, 40, 0.07);
+  border: 1px solid rgba(80,40,120,0.12);
+}
+
+.day-discussion__intel-label {
   font-size: 0.85rem;
   font-weight: 700;
   color: #4a3560;
-  margin-bottom: 0.5rem;
+  padding: 0.75rem 1rem 0.5rem;
+  margin: 0;
 }
 
-.day-discussion__seer-list {
+.day-discussion__intel-toggle {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: none;
+  border: none;
+  color: #4a3560;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: left;
+}
+
+.day-discussion__intel-toggle--wolf {
+  color: #553080;
+}
+
+.day-discussion__intel-list {
+  padding: 0 0.75rem 0.75rem;
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: 0.4rem;
 }
+
+/* ── Seer rows ───────────────────────────────────────────────────────────── */
 
 .day-discussion__seer-row {
   font-size: 0.9rem;
@@ -122,3 +150,109 @@
 .day-discussion__seer-row--wolf    { color: #c53030; background: rgba(252,129,129,0.15); }
 .day-discussion__seer-row--village { color: #276749; background: rgba(129,199,132,0.15); }
 .day-discussion__seer-row--neutral { color: #744210; background: rgba(246,173,85,0.15); }
+
+/* ── Grid hint rows ──────────────────────────────────────────────────────── */
+
+.day-discussion__hint-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.day-discussion__hint-source {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  margin-top: 1px;
+}
+
+.day-discussion__hint-tier {
+  flex-shrink: 0;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 4px;
+  margin-top: 1px;
+  letter-spacing: 0.04em;
+}
+
+.day-discussion__hint-tier--t1 { background: rgba(0,0,0,0.08);  color: #553080; }
+.day-discussion__hint-tier--t2 { background: rgba(214,158,46,.18); color: #744210; }
+.day-discussion__hint-tier--t3 { background: rgba(197,48,48,.15);  color: #c53030; }
+
+.day-discussion__hint-text {
+  flex: 1;
+  font-size: 0.82rem;
+  color: #3d2a55;
+  line-height: 1.4;
+}
+
+.day-discussion__hint-expiry {
+  flex-shrink: 0;
+  font-size: 0.65rem;
+  color: rgba(80,50,100,0.45);
+  align-self: flex-end;
+}
+
+/* ── Radar summary rows ──────────────────────────────────────────────────── */
+
+.day-discussion__radar-stat {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  margin: 0;
+  padding: 2px 0;
+  border-bottom: 1px solid rgba(80,40,120,0.08);
+}
+
+.day-discussion__radar-stat-label { color: rgba(80,50,100,0.6); }
+.day-discussion__radar-stat-value { font-weight: 700; color: #553080; }
+
+.day-discussion__ping-results {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 4px;
+}
+
+.day-discussion__ping-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+}
+
+.day-discussion__ping-quadrant {
+  width: 80px;
+  flex-shrink: 0;
+  color: rgba(80,50,100,0.7);
+  font-variant: small-caps;
+  font-size: 0.72rem;
+}
+
+.day-discussion__ping-heat {
+  flex-shrink: 0;
+  font-weight: 600;
+  color: #553080;
+  min-width: 48px;
+}
+
+.day-discussion__ping-tiers {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.day-discussion__ping-empty {
+  font-size: 0.72rem;
+  color: rgba(80,50,100,0.35);
+  font-style: italic;
+}
+
+.day-discussion__radar-note {
+  font-size: 0.78rem;
+  color: rgba(80,50,100,0.6);
+  font-style: italic;
+  margin: 2px 0 0;
+}

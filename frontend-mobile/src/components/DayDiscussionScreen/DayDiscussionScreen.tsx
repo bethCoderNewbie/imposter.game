@@ -1,7 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useTimer } from '../../hooks/useTimer'
 import PlayerAvatar from '../PlayerAvatar/PlayerAvatar'
-import type { InvestigationResult, StrippedGameState } from '../../types/game'
+import type {
+  HintPayload,
+  InvestigationResult,
+  SonarPingResult,
+  StrippedGameState,
+} from '../../types/game'
 import './DayDiscussionScreen.css'
 
 type NoteTag = 'Sus' | 'Safe' | '?'
@@ -9,6 +14,7 @@ type NoteTag = 'Sus' | 'Safe' | '?'
 interface Props {
   gameState: StrippedGameState
   myPlayerId: string
+  nightHints?: HintPayload[]
 }
 
 function noteKey(gameId: string, myId: string, targetId: string) {
@@ -28,19 +34,21 @@ function pruneStaleNotes(currentGameId: string) {
   toRemove.forEach(k => localStorage.removeItem(k))
 }
 
-export default function DayDiscussionScreen({ gameState, myPlayerId }: Props) {
-  const { secondsRemaining, isWarning, isCritical } = useTimer(gameState.timer_ends_at)
+export default function DayDiscussionScreen({ gameState, myPlayerId, nightHints = [] }: Props) {
+  const paused = gameState.timer_paused ?? false
+  const { secondsRemaining: liveSeconds, isWarning, isCritical } = useTimer(gameState.timer_ends_at)
+  const secondsRemaining = paused ? (gameState.timer_remaining_seconds ?? 0) : liveSeconds
   const [notepadOpen, setNotepadOpen] = useState(false)
   const [tags, setTags] = useState<Record<string, NoteTag>>({})
 
   const myPlayer = gameState.players[myPlayerId]
-  const isSeer = myPlayer?.role === 'seer'
+  const isSeer   = myPlayer?.role === 'seer'
+  const isWolf   = myPlayer?.team === 'werewolf'
 
   const players = Object.values(gameState.players).filter(p => p.player_id !== myPlayerId)
 
   useEffect(() => {
     pruneStaleNotes(gameState.game_id)
-    // Load existing tags
     const loaded: Record<string, NoteTag> = {}
     players.forEach(p => {
       const val = localStorage.getItem(noteKey(gameState.game_id, myPlayerId, p.player_id))
@@ -65,23 +73,32 @@ export default function DayDiscussionScreen({ gameState, myPlayerId }: Props) {
 
   const mm = String(Math.floor(secondsRemaining / 60)).padStart(2, '0')
   const ss = String(secondsRemaining % 60).padStart(2, '0')
-  const timerClass = isCritical ? 'timer--critical' : isWarning ? 'timer--warning' : ''
+  const timerClass = paused ? 'timer--paused' : isCritical ? 'timer--critical' : isWarning ? 'timer--warning' : ''
 
   return (
     <div className="day-discussion">
       {/* Header */}
       <div className="day-discussion__header">
         <span className="day-discussion__round">Day {gameState.round}</span>
-        <span className={`day-discussion__timer ${timerClass}`}>{mm}:{ss}</span>
+        <span className={`day-discussion__timer ${timerClass}`}>
+          {paused && <span className="day-discussion__paused">PAUSED </span>}
+          {mm}:{ss}
+        </span>
       </div>
 
       {/* Phase label */}
       <p className="day-discussion__phase">Discussion — Speak up!</p>
 
-      {/* Seer intel panel — only visible to the seer */}
-      {isSeer && (
-        <SeerIntelPanel gameState={gameState} />
+      {/* Seer intel — seer role only */}
+      {isSeer && <SeerIntelPanel gameState={gameState} />}
+
+      {/* Grid intel — villagers/wakeOrder==0 players who earned hints last night */}
+      {!isWolf && nightHints.length > 0 && (
+        <GridIntelPanel hints={nightHints} />
       )}
+
+      {/* Radar summary — wolf-team only */}
+      {isWolf && <RadarSummaryPanel gameState={gameState} />}
 
       {/* Private notepad */}
       <div className="day-discussion__notepad">
@@ -125,9 +142,9 @@ function SeerIntelPanel({ gameState }: { gameState: StrippedGameState }) {
   }
 
   return (
-    <div className="day-discussion__seer-panel">
-      <p className="day-discussion__seer-label">🔮 Your Intel</p>
-      <div className="day-discussion__seer-list">
+    <div className="day-discussion__intel-panel">
+      <p className="day-discussion__intel-label">🔮 Your Intel</p>
+      <div className="day-discussion__intel-list">
         {entries.map(([targetId, result]) => {
           const name = gameState.players[targetId]?.display_name ?? targetId
           return (
@@ -140,6 +157,138 @@ function SeerIntelPanel({ gameState }: { gameState: StrippedGameState }) {
           )
         })}
       </div>
+    </div>
+  )
+}
+
+
+// ── Grid Intel Panel (villagers) ──────────────────────────────────────────────
+
+const HINT_TIER: Record<string, 1 | 2 | 3> = {
+  // Tier 1 — composition
+  wolf_count: 1, no_role_present: 1, role_present: 1,
+  neutral_exists: 1, non_wolf_kill: 1, lovers_exist: 1,
+  alive_count: 1, role_alive_check: 1, night_recap: 1,
+  // Tier 2 — relational
+  one_of_three: 2, same_alignment: 2, diff_alignment: 2, positional_clue: 2,
+  // Tier 3 — specific intel
+  innocent_clear: 3, action_log: 3,
+}
+
+const HINT_TIER_LABEL: Record<1 | 2 | 3, string> = {
+  1: 'T1', 2: 'T2', 3: 'T3',
+}
+
+function GridIntelPanel({ hints }: { hints: HintPayload[] }) {
+  const [open, setOpen] = useState(true)
+
+  return (
+    <div className="day-discussion__intel-panel">
+      <button
+        className="day-discussion__intel-toggle"
+        onClick={() => setOpen(o => !o)}
+      >
+        Your Intel ({hints.length}) {open ? '▲' : '▼'}
+      </button>
+      {open && (
+        <div className="day-discussion__intel-list">
+          {hints.map(h => {
+            const tier = HINT_TIER[h.category] ?? 1
+            return (
+              <div key={h.hint_id} className="day-discussion__hint-row">
+                <span className="day-discussion__hint-source">
+                  {h.source === 'archive' ? '📜' : '🔷'}
+                </span>
+                <span className={`day-discussion__hint-tier day-discussion__hint-tier--t${tier}`}>
+                  {HINT_TIER_LABEL[tier]}
+                </span>
+                <span className="day-discussion__hint-text">{h.text}</span>
+                {h.expires_after_round !== null && (
+                  <span className="day-discussion__hint-expiry">
+                    expires R{h.expires_after_round}
+                  </span>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+
+// ── Radar Summary Panel (wolves) ──────────────────────────────────────────────
+
+const TIER_COLORS: Record<string, string> = {
+  '1': '#38a169', '2': '#d69e2e', '3': '#e53e3e',
+}
+
+function RadarSummaryPanel({ gameState }: { gameState: StrippedGameState }) {
+  const [open, setOpen] = useState(true)
+  const na = gameState.night_actions
+  const pingResults: SonarPingResult[] = na.sonar_ping_results ?? []
+  const totalActivity = (na.grid_activity ?? []).length
+  const pingsUsed = na.sonar_pings_used ?? 0
+
+  if (pingsUsed === 0 && totalActivity === 0) {
+    return null
+  }
+
+  return (
+    <div className="day-discussion__intel-panel day-discussion__intel-panel--wolf">
+      <button
+        className="day-discussion__intel-toggle day-discussion__intel-toggle--wolf"
+        onClick={() => setOpen(o => !o)}
+      >
+        📡 Radar Summary {open ? '▲' : '▼'}
+      </button>
+      {open && (
+        <div className="day-discussion__intel-list">
+          {/* Overall activity */}
+          <p className="day-discussion__radar-stat">
+            <span className="day-discussion__radar-stat-label">Nodes solved</span>
+            <span className="day-discussion__radar-stat-value">{totalActivity}</span>
+          </p>
+          <p className="day-discussion__radar-stat">
+            <span className="day-discussion__radar-stat-label">Pings used</span>
+            <span className="day-discussion__radar-stat-value">{pingsUsed} / 4</span>
+          </p>
+
+          {/* Per-quadrant ping results */}
+          {pingResults.length > 0 && (
+            <div className="day-discussion__ping-results">
+              {pingResults.map((r, i) => (
+                <div key={i} className="day-discussion__ping-row">
+                  <span className="day-discussion__ping-quadrant">
+                    {r.quadrant.replace('_', '-')}
+                  </span>
+                  <span className="day-discussion__ping-heat">{r.heat} node{r.heat !== 1 ? 's' : ''}</span>
+                  <span className="day-discussion__ping-tiers">
+                    {([1, 2, 3] as const).map(t => {
+                      const count = r.tier_counts?.[t] ?? 0
+                      return count > 0 ? (
+                        <span key={t} style={{ color: TIER_COLORS[t] }}>
+                          {count}×T{t}
+                        </span>
+                      ) : null
+                    })}
+                    {Object.values(r.tier_counts ?? {}).every(v => v === 0) && (
+                      <span className="day-discussion__ping-empty">quiet</span>
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {pingsUsed === 0 && totalActivity > 0 && (
+            <p className="day-discussion__radar-note">
+              No pings used — {totalActivity} node{totalActivity !== 1 ? 's' : ''} solved across the grid.
+            </p>
+          )}
+        </div>
+      )}
     </div>
   )
 }
