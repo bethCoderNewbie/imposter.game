@@ -13,9 +13,12 @@ const ELIMINATION_DURATION_MS = 10000
 const TIE_DURATION_MS = 5000
 
 export default function VoteElimination({ gameState, onComplete }: Props) {
-  // Day eliminations from village vote in the current round
+  // When transitioning to 'night' the round has already been incremented, but the
+  // elimination event was logged with the pre-increment round number.  All other
+  // successor phases (game_over, hunter_pending) leave the round unchanged.
+  const filterRound = gameState.phase === 'night' ? gameState.round - 1 : gameState.round
   const dayDeaths = gameState.elimination_log.filter(
-    e => e.phase === 'day' && e.round === gameState.round && e.cause === 'village_vote',
+    e => e.phase === 'day' && e.round === filterRound && e.cause === 'village_vote',
   )
   const hasElimination = dayDeaths.length > 0
   const duration = hasElimination ? ELIMINATION_DURATION_MS : TIE_DURATION_MS

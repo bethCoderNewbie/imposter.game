@@ -1,4 +1,4 @@
-import { getAvatarColor, getInitials } from '../../types/game'
+import { getAvatarColor, getInitials, isIconAvatar } from '../../types/game'
 import './PlayerAvatar.css'
 
 interface AvatarPlayer {
@@ -15,7 +15,6 @@ interface Props {
 }
 
 export default function PlayerAvatar({ player, size, className = '', style }: Props) {
-  const bg = getAvatarColor(player.avatar_id)
   const initials = getInitials(player.display_name)
   const sizeStyle = size ? { width: size, height: size, fontSize: size * 0.38 } : {}
 
@@ -36,6 +35,25 @@ export default function PlayerAvatar({ player, size, className = '', style }: Pr
     )
   }
 
+  if (isIconAvatar(player.avatar_id)) {
+    return (
+      <div
+        role="img"
+        aria-label={player.display_name}
+        className={`player-avatar player-avatar--icon ${className}`}
+        style={{ background: '#2d3748', ...sizeStyle, ...style }}
+      >
+        <img
+          src={`/images/${player.avatar_id}.png`}
+          alt={player.display_name}
+          className="player-avatar__icon"
+        />
+      </div>
+    )
+  }
+
+  // Legacy color avatar fallback (avatar_01–avatar_08)
+  const bg = getAvatarColor(player.avatar_id)
   return (
     <div
       role="img"

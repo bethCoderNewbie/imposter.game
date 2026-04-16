@@ -247,15 +247,15 @@ async def update_game_config(game_id: str, body: ConfigUpdateRequest, redis=Depe
         if body.difficulty_level not in ("easy", "standard", "hard"):
             raise HTTPException(status_code=422, detail="difficulty_level must be easy, standard, or hard.")
 
-    TIMER_BOUNDS = {
-        "night_timer_seconds":  (30, 120),
-        "day_timer_seconds":    (60, 300),
-        "vote_timer_seconds":   (30, 120),
+    TIMER_MINIMUMS = {
+        "night_timer_seconds": 30,
+        "day_timer_seconds":   60,
+        "vote_timer_seconds":  30,
     }
-    for field, (lo, hi) in TIMER_BOUNDS.items():
+    for field, lo in TIMER_MINIMUMS.items():
         val = getattr(body, field)
-        if val is not None and not (lo <= val <= hi):
-            raise HTTPException(status_code=422, detail=f"{field} must be {lo}–{hi}.")
+        if val is not None and val < lo:
+            raise HTTPException(status_code=422, detail=f"{field} must be at least {lo}.")
 
     if body.narrator_voice is not None:
         from pathlib import Path

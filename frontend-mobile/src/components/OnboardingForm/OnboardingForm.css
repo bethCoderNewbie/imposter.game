@@ -187,25 +187,49 @@
   cursor: pointer;
 }
 
-/* Avatar color picker */
-.onboarding__avatars {
+/* Icon picker — horizontal scroll, 3 visible at a time */
+.onboarding__icon-row {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
+  gap: 8px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 4px;
 }
 
-.onboarding__avatar-btn {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
+.onboarding__icon-row::-webkit-scrollbar {
+  display: none;
+}
+
+.onboarding__icon-btn {
+  flex: 0 0 calc((100% - 16px) / 3);
+  aspect-ratio: 1;
+  border-radius: 12px;
   border: 3px solid transparent;
+  background: rgba(255,255,255,0.07);
   cursor: pointer;
-  transition: transform 0.15s, border-color 0.15s;
+  padding: 6px;
+  scroll-snap-align: start;
+  transition: border-color 0.15s, transform 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.onboarding__avatar-btn--selected {
+.onboarding__icon-btn--selected {
   border-color: #fff;
-  transform: scale(1.1);
+  transform: scale(1.05);
+  background: rgba(255,255,255,0.14);
+}
+
+.onboarding__icon-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  user-select: none;
+  pointer-events: none;
 }
 
 .onboarding__error {

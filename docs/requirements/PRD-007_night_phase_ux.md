@@ -246,3 +246,16 @@ Feature: Villager puzzle button locking
 - ADR-003: Client-Side Storage Strategy (§9 — seer peek history in sessionStorage)
 - ADR-008: Archive Puzzle System (puzzle_state on PlayerState, puzzle types)
 - `docs/architecture/data_dictionary.md` — `seer_result`, `seer_knowledge`, `puzzle_state` field definitions
+
+---
+
+## §10. See Also — Night Grid System (PRD-013)
+
+**PRD-013** (`docs/requirements/PRD-013_night_grid_wolf_radar.md`) extends the night phase with a 5×5 Data Node grid for `wakeOrder == 0` players, coexisting with the Archive puzzle introduced here.
+
+Key interaction points with this PRD:
+
+- **Button-lock anti-cheat pattern (§3.2 above):** Grid node puzzles rendered by `PuzzleRenderer.tsx` (extracted from `VillagerDecoyUI.tsx`) inherit the same 4-second `LOCK_TIMEOUT_MS` and re-enable timer pattern. The server-side `correct_index` stripping invariant (§3.3) applies identically to `grid_puzzle_state`.
+- **`puzzle_state` vs. `grid_puzzle_state`:** Both fields live on `PlayerState`. The Archive (`puzzle_state`) is generated at phase entry; the grid puzzle (`grid_puzzle_state`) is generated on-demand when a player taps a node. Both are stripped identically by `stripper.py:_strip_puzzle_for_player()`.
+- **`VillagerDecoyUI.tsx` refactor:** `ChoicePuzzle`, `SequencePuzzle`, and `ResolvedPuzzle` were extracted into `PuzzleRenderer.tsx` (shared component) so both Archive and grid puzzle rendering reuse the same timer bar, lock state, and answer submission logic. `VillagerDecoyUI.tsx` is now a thin wrapper.
+- **Intent types:** Grid puzzles use `submit_grid_answer` (not `submit_puzzle_answer`). `PuzzleRenderer`'s `source` prop (`"archive"` \| `"grid"`) determines the intent type emitted.

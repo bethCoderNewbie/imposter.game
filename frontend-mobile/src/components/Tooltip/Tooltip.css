@@ -1,0 +1,93 @@
+.tooltip-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+
+/* The ? trigger button */
+.tooltip-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  margin-left: 5px;
+  flex-shrink: 0;
+  transition: background 0.15s, border-color 0.15s;
+  /* Override any inherited button padding */
+  padding: 0;
+}
+
+.tooltip-trigger:hover,
+.tooltip-trigger:focus-visible {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.45);
+  color: #fff;
+  outline: none;
+}
+
+.tooltip-trigger:active {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+/* Popover bubble */
+.tooltip-popover {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  width: 210px;
+  padding: 8px 10px;
+  background: #1a202c;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  pointer-events: none;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  /* Subtle entrance */
+  animation: tooltip-in 0.12s ease-out;
+}
+
+@keyframes tooltip-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(4px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.tooltip-popover--above {
+  bottom: calc(100% + 8px);
+}
+
+.tooltip-popover--below {
+  top: calc(100% + 8px);
+}
+
+/* Caret */
+.tooltip-popover--above::after,
+.tooltip-popover--below::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+}
+
+.tooltip-popover--above::after {
+  top: 100%;
+  border-top-color: #1a202c;
+}
+
+.tooltip-popover--below::after {
+  bottom: 100%;
+  border-bottom-color: #1a202c;
+}

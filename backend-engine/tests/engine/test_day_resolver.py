@@ -519,3 +519,210 @@ class TestHunterExtended:
         G_new = resolve_night(G)
         assert not G_new.players["p7"].is_alive
         assert "p7" not in G_new.hunter_queue
+
+
+# -- Ghost (extended) ----------------------------------------------------------
+
+class TestGhostExtended:
+    def _ghost_lovers_game(self):
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.phase = Phase.DAY_VOTE
+        G.players["p6"].role = "ghost"
+        G.players["p6"].team = Team.VILLAGE
+        G.lovers_pair = ["p6", "p7"]
+        G.players["p6"].lovers_partner_id = "p7"
+        G.players["p7"].lovers_partner_id = "p6"
+        return G
+
+    def test_ghost_in_lovers_pair_partner_voted_out_ghost_survives(self):
+        G = self._ghost_lovers_game()
+        # Partner p7 is voted out; Ghost p6 is alive
+        G.day_votes = {"p1": "p7", "p2": "p7", "p3": "p7", "p4": "p7", "p5": "p7"}
+        G_new = resolve_day_vote(G)
+        assert not G_new.players["p7"].is_alive  # voted out
+        assert not G_new.players["p6"].is_alive  # broken heart kills Ghost
+        causes = [e.cause for e in G_new.elimination_log]
+        assert EliminationCause.BROKEN_HEART in causes
+
+    def test_ghost_voted_out_partner_dies_from_broken_heart(self):
+        G = self._ghost_lovers_game()
+        # Alive Ghost is voted out (Ghost can still be voted out while alive)
+        G.day_votes = {"p1": "p6", "p2": "p6", "p3": "p6", "p4": "p6", "p5": "p6"}
+        G_new = resolve_day_vote(G)
+        assert not G_new.players["p6"].is_alive  # voted out
+        assert not G_new.players["p7"].is_alive  # partner broken heart
+        causes = [e.cause for e in G_new.elimination_log]
+        assert EliminationCause.BROKEN_HEART in causes
+
+    def test_dead_ghost_self_vote_filtered(self):
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.phase = Phase.DAY_VOTE
+        G.players["p6"].role = "ghost"
+        G.players["p6"].is_alive = False
+        # Dead Ghost votes for themselves (self-vote should be filtered)
+        G.day_votes = {"p6": "p6", "p1": "p7", "p2": "p7", "p3": "p7", "p4": "p7", "p5": "p7"}
+        G_new = resolve_day_vote(G)
+        # p7 gets 5 alive votes; 5 > 8/2 = 4 → eliminated
+        # p6 self-vote dropped; p6 gets 0 votes
+        assert not G_new.players["p7"].is_alive
+        assert G_new.players["p6"].is_alive is False  # still dead (was dead already)
+
+    def test_dead_ghost_not_voting_still_counted_in_eligible_weight(self):
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.phase = Phase.DAY_VOTE
+        G.players["p6"].role = "ghost"
+        G.players["p6"].is_alive = False
+        # 7 alive + 1 dead Ghost = 8 eligible; threshold = > 4
+        # 4 alive votes for p1 = 4; 4 > 4? NO -> no elimination
+        G.day_votes = {"p1": "p2", "p2": "p3", "p3": "p1", "p4": "p1", "p5": "p1"}
+        G_new = resolve_day_vote(G)
+        # p1 gets 3 votes; not majority of 8 eligible
+        assert G_new.players["p1"].is_alive
+
+    def test_village_cursed_does_not_affect_dead_ghost_vote(self):
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.phase = Phase.DAY_VOTE
+        G.players["p6"].role = "ghost"
+        G.players["p6"].is_alive = False
+        G.village_powers_cursed = True
+        # Dead Ghost votes; curse only affects village POWER roles, not voting
+        # 5 alive votes + 1 dead Ghost vote = 6 votes for p1
+        # 8 eligible (7 alive + 1 dead Ghost); 6 > 4 -> eliminated
+        G.day_votes = {
+            "p1": "p3", "p2": "p3", "p3": "p3",
+            "p4": "p3", "p5": "p3",
+            "p6": "p3",  # dead Ghost vote still counts
+        }
+        G_new = resolve_day_vote(G)
+        assert not G_new.players["p3"].is_alive
+
+
+# -- Jester (extended) ---------------------------------------------------------
+
+class TestJesterExtended:
+    def _jester_game(self):
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.players["p6"].role = "jester"
+        G.players["p6"].team = Team.NEUTRAL
+        return G
+
+    def test_jester_killed_at_night_by_wolves_does_not_win(self):
+        from engine.resolver.night import resolve_night
+        G = self._jester_game()
+        G.night_actions.wolf_votes = {"p1": "p6", "p2": "p6"}
+        G_new = resolve_night(G)
+        assert not G_new.players["p6"].is_alive
+        # No Jester win (night death, not village vote)
+        assert G_new.phase != Phase.GAME_OVER or G_new.winner != "neutral"
+
+    def test_jester_killed_by_sk_does_not_win(self):
+        from engine.resolver.night import resolve_night
+        G = self._jester_game()
+        G.players["p5"].role = "serial_killer"
+        G.players["p5"].team = Team.NEUTRAL
+        G.night_actions.serial_killer_target_id = "p6"
+        G_new = resolve_night(G)
+        assert not G_new.players["p6"].is_alive
+        assert G_new.winner != "neutral"
+
+    def test_jester_killed_by_witch_does_not_win(self):
+        from engine.resolver.night import resolve_night
+        G = self._jester_game()
+        G.players["p7"].role = "witch"
+        G.players["p7"].team = Team.VILLAGE
+        G.night_actions.witch_action = "kill"
+        G.night_actions.witch_target_id = "p6"
+        G_new = resolve_night(G)
+        assert not G_new.players["p6"].is_alive
+        assert G_new.winner != "neutral"
+
+    def test_jester_voted_out_hunter_never_queued(self):
+        G = self._jester_game()
+        G.phase = Phase.DAY_VOTE
+        G.players["p5"].role = "hunter"
+        G.players["p5"].team = Team.VILLAGE
+        G.day_votes = {"p1": "p6", "p2": "p6", "p3": "p6", "p4": "p6", "p7": "p6"}
+        G_new = resolve_day_vote(G)
+        assert G_new.phase == Phase.GAME_OVER
+        assert G_new.winner == "neutral"
+        # Game ended before hunter check; hunter NOT queued
+        assert "p5" not in G_new.hunter_queue
+
+    def test_jester_partner_voted_out_jester_does_not_win(self):
+        G = self._jester_game()
+        G.phase = Phase.DAY_VOTE
+        G.lovers_pair = ["p6", "p7"]
+        G.players["p6"].lovers_partner_id = "p7"
+        G.players["p7"].lovers_partner_id = "p6"
+        # Partner p7 is voted out (not Jester p6)
+        G.day_votes = {"p1": "p7", "p2": "p7", "p3": "p7", "p4": "p7", "p5": "p7"}
+        G_new = resolve_day_vote(G)
+        # p7 voted out, p6 (Jester) dies from broken heart
+        assert not G_new.players["p7"].is_alive
+        assert not G_new.players["p6"].is_alive  # broken heart
+        # Jester was NOT voted out directly -> no jester win
+        assert G_new.winner != "neutral"
+
+    def test_jester_voted_out_roles_revealed_at_game_over(self):
+        G = self._jester_game()
+        G.phase = Phase.DAY_VOTE
+        from engine.state.models import EliminationEvent
+        G.day_votes = {"p1": "p6", "p2": "p6", "p3": "p6", "p4": "p6", "p7": "p6"}
+        G_new = resolve_day_vote(G)
+        assert G_new.phase == Phase.GAME_OVER
+        # Jester's elimination event should have role revealed
+        jester_event = next(e for e in G_new.elimination_log if e.player_id == "p6")
+        assert jester_event.role == "jester"
+
+
+# -- Wise (extended, day) -------------------------------------------------------
+
+class TestWiseDayExtended:
+    def _wise_lovers_game(self):
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.phase = Phase.DAY_VOTE
+        G.players["p6"].role = "wise"
+        G.players["p6"].team = Team.VILLAGE
+        G.lovers_pair = ["p6", "p7"]
+        G.players["p6"].lovers_partner_id = "p7"
+        G.players["p7"].lovers_partner_id = "p6"
+        return G
+
+    def test_wise_voted_out_in_lovers_pair_curse_and_broken_heart(self):
+        G = self._wise_lovers_game()
+        G.day_votes = {"p1": "p6", "p2": "p6", "p3": "p6", "p4": "p6", "p5": "p6"}
+        G_new = resolve_day_vote(G)
+        # Both effects: curse AND broken heart
+        assert not G_new.players["p6"].is_alive  # Wise burned
+        assert not G_new.players["p7"].is_alive  # partner broken heart
+        assert G_new.village_powers_cursed is True
+        causes = [e.cause for e in G_new.elimination_log]
+        assert EliminationCause.BROKEN_HEART in causes
+
+    def test_wise_self_vote_blocked_no_curse(self):
+        G, _ = _eight_player_game()
+        G = G.model_copy(deep=True)
+        G.phase = Phase.DAY_VOTE
+        G.players["p6"].role = "wise"
+        G.players["p6"].team = Team.VILLAGE
+        G.day_votes = {"p6": "p6"}  # Wise votes for themselves
+        G_new = resolve_day_vote(G)
+        # Self-vote filtered; Wise not eliminated, no curse
+        assert G_new.players["p6"].is_alive
+        assert G_new.village_powers_cursed is False
+
+    def test_wise_partner_voted_out_no_curse(self):
+        G = self._wise_lovers_game()
+        # Wise partner p7 is voted out; Wise p6 survives via broken heart
+        G.day_votes = {"p1": "p7", "p2": "p7", "p3": "p7", "p4": "p7", "p5": "p7"}
+        G_new = resolve_day_vote(G)
+        assert not G_new.players["p7"].is_alive  # voted out
+        assert not G_new.players["p6"].is_alive  # broken heart
+        # Wise was NOT voted out directly -> no curse
+        assert G_new.village_powers_cursed is False

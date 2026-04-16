@@ -39,11 +39,11 @@ class TestConfigUpdate:
                          json={"host_secret": data["host_secret"], "night_timer_seconds": 10})
         assert r.status_code == 422
 
-    def test_patch_timer_above_max_returns_422(self, client):
+    def test_patch_timer_above_max_accepted(self, client):
         data = client.post("/api/games", json={}).json()
         r = client.patch(f"/api/games/{data['game_id']}/config",
                          json={"host_secret": data["host_secret"], "day_timer_seconds": 9999})
-        assert r.status_code == 422
+        assert r.status_code == 200
 
     def test_patch_invalid_difficulty_returns_422(self, client):
         data = client.post("/api/games", json={}).json()

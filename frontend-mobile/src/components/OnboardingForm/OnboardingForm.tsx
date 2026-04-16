@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { AVATAR_COLORS } from '../../types/game'
+import { AVATAR_ICONS } from '../../types/game'
 import './OnboardingForm.css'
 
 interface JoinedSession {
@@ -17,7 +17,6 @@ interface Props {
   onRejoin?: () => void
 }
 
-const AVATAR_IDS = Object.keys(AVATAR_COLORS) // avatar_01 … avatar_08
 const PERMANENT_ID_KEY = 'ww_permanent_id'
 const PHOTO_URL_KEY = 'ww_photo_url'
 
@@ -59,7 +58,7 @@ export default function OnboardingForm({ prefillCode, permanentId, onJoined, sav
   const [name, setName] = useState('')
   const [code, setCode] = useState(prefillCode.toUpperCase())
   const inAppBrowser = isIosInAppBrowser()
-  const [avatarId, setAvatarId] = useState('avatar_01')
+  const [avatarId, setAvatarId] = useState('icon_00')
   const [photoUrl, setPhotoUrl] = useState<string | null>(() => localStorage.getItem(PHOTO_URL_KEY))
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [photoUploading, setPhotoUploading] = useState(false)
@@ -289,20 +288,26 @@ export default function OnboardingForm({ prefillCode, permanentId, onJoined, sav
         />
       </div>
 
-      {/* Color picker — used as fallback when no photo uploaded */}
+      {/* Icon picker — hidden when a photo is set */}
       {!displayPhoto && (
         <div className="onboarding__field">
-          <label>Or choose a color</label>
-          <div className="onboarding__avatars">
-            {AVATAR_IDS.map(id => (
+          <label>Choose your icon</label>
+          <div className="onboarding__icon-row">
+            {AVATAR_ICONS.map(id => (
               <button
                 key={id}
                 type="button"
-                className={`onboarding__avatar-btn ${avatarId === id ? 'onboarding__avatar-btn--selected' : ''}`}
-                style={{ backgroundColor: AVATAR_COLORS[id] }}
+                className={`onboarding__icon-btn${avatarId === id ? ' onboarding__icon-btn--selected' : ''}`}
                 onClick={() => setAvatarId(id)}
                 aria-label={id}
-              />
+              >
+                <img
+                  src={`/images/${id}.png`}
+                  alt={id}
+                  className="onboarding__icon-img"
+                  draggable={false}
+                />
+              </button>
             ))}
           </div>
         </div>

@@ -1,0 +1,30 @@
+.attack-overlay {
+  /* position:fixed takes the overlay out of the night-shell stacking context entirely,
+     making it a peer of SoundPanel in the root context. z-index:250 beats SoundPanel's 200. */
+  position: fixed;
+  bottom: calc(var(--sound-panel-clearance, 120px) + var(--mobile-safe-bottom, 0px) + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 250;
+  pointer-events: auto;
+}
+
+.attack-overlay__defend-btn {
+  /* Minimum 44×44 px touch target (iOS HIG). padding-block=12px + ~20px line-height = 44px. */
+  padding: 12px 36px;
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  cursor: pointer;
+  /* Prevent 300 ms tap-delay and double-tap-zoom on mobile */
+  touch-action: manipulation;
+  transition: background 0.12s;
+}
+
+.attack-overlay__defend-btn:active {
+  background: rgba(255, 255, 255, 0.20);
+}

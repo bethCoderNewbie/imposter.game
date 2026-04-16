@@ -24,6 +24,7 @@
   display: flex;
   flex-direction: column;
   padding: 1rem 1.5rem calc(var(--sound-panel-clearance) + var(--mobile-safe-bottom));
+  position: relative;
 }
 
 .night-shell__waiting {
@@ -34,4 +35,44 @@
   color: rgba(255,255,255,0.3);
   font-style: italic;
   font-size: 0.9rem;
+}
+
+/* Archive / Grid / HUNT / RADAR tab switcher */
+.night-shell__tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 10px;
+  background: rgba(0,0,0,0.3);
+  border-radius: 8px;
+  padding: 3px;
+}
+
+.night-shell__tab {
+  flex: 1;
+  padding: 6px 0;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: rgba(255,255,255,0.45);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.night-shell__tab--active {
+  background: rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.9);
+}
+
+.night-shell__tab-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f6ad55;
+  margin-left: 4px;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
 }

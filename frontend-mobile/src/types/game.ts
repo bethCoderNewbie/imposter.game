@@ -207,6 +207,14 @@ export function getInitials(displayName: string): string {
   return displayName.slice(0, 2).toUpperCase()
 }
 
+export const AVATAR_ICONS: string[] = Array.from(
+  { length: 26 }, (_, i) => `icon_${String(i).padStart(2, '0')}`,
+)
+
+export function isIconAvatar(avatarId: string): boolean {
+  return avatarId.startsWith('icon_')
+}
+
 // Role color map for mobile RoleRevealScreen background (ADR-003 §5)
 export const ROLE_COLORS: Record<string, string> = {
   werewolf:    'var(--role-wolf)',

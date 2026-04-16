@@ -38,9 +38,10 @@ _ALWAYS_STRIP_PLAYER_FIELDS = frozenset({
     "witch_kill_used",
     "lunatic_redirect_used",
     "wise_shield_used",
-    # Grid system — server-only position tracking
+    # Grid system — server-only position tracking and attack state
     "grid_node_row",
     "grid_node_col",
+    "under_attack",   # restored for own player only in _baseline_alive_view
 })
 
 _ALWAYS_STRIP_NIGHT_ACTION_FIELDS = frozenset({
@@ -61,6 +62,8 @@ _ALWAYS_STRIP_NIGHT_ACTION_FIELDS = frozenset({
     "grid_activity",          # wolf view only; restored by _build_na_for_view
     "sonar_ping_results",     # wolf view only; restored by _build_na_for_view
     "night_action_change_count",  # server-only; never sent to any client
+    "wolf_charges",               # server-only; never sent to any client
+    "charge_kill_target_id",      # server-only; consumed by resolve_night(), never broadcast
 })
 
 
@@ -131,6 +134,7 @@ def _display_view(state: dict[str, Any], is_game_over: bool) -> dict[str, Any]:
         p["vote_target_id"] = None
         p["puzzle_state"] = None
         p["grid_puzzle_state"] = None
+        p["under_attack"] = False
 
     s["night_actions"] = _build_na_for_view(s.get("night_actions", {}), "display")
 
@@ -169,8 +173,9 @@ def _wolf_team_view(
             )
         else:
             p["puzzle_state"] = None
-        # Wolves don't use the grid (no grid_puzzle_state for wolf team)
+        # Wolves don't use the grid (no grid_puzzle_state or under_attack for wolf team)
         p["grid_puzzle_state"] = None
+        p["under_attack"] = False
 
     s["night_actions"] = _build_na_for_view(s.get("night_actions", {}), "wolf")
 
@@ -274,9 +279,12 @@ def _baseline_alive_view(
             p["grid_puzzle_state"] = _strip_puzzle_for_player(
                 _gps.model_dump(mode="json") if _gps else None, player_id, G
             )
+            # Restore under_attack for own player — wolves must never see this field
+            p["under_attack"] = G.players[player_id].under_attack
         else:
             p["puzzle_state"] = None
             p["grid_puzzle_state"] = None
+            p["under_attack"] = False
 
     s["night_actions"] = _build_na_for_view(state.get("night_actions", {}), "baseline")
 
@@ -306,6 +314,7 @@ def _dead_spectator_view(
         p["puzzles_solved_count"] = 0
         p["puzzle_state"] = None
         p["grid_puzzle_state"] = None
+        p["under_attack"] = False
 
     s["night_actions"] = _build_na_for_view(state.get("night_actions", {}), "dead")
 

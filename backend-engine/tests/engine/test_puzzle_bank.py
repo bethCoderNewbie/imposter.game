@@ -365,3 +365,313 @@ class TestHintPayloadStructure:
         G = _base_game(round_num=1)
         ids = {_hint_for(G)["hint_id"] for _ in range(20)}
         assert len(ids) == 20, "hint_id should be unique per call"
+
+
+# ── alive_count (Tier 1, new) ─────────────────────────────────────────────────
+
+
+class TestAliveCount:
+    """alive_count appears in round 3+ and reports exact alive wolf/villager counts."""
+
+    def test_absent_in_vague_rounds(self):
+        """alive_count is only specific — it must not appear in rounds 1–2."""
+        for r in (1, 2):
+            G = _base_game(round_num=r)
+            hints = _all_hints(G)
+            categories = {h["category"] for h in hints}
+            assert "alive_count" not in categories, \
+                f"alive_count should be absent in round {r}"
+
+    def test_appears_in_specific_rounds(self):
+        G = _base_game(round_num=3)
+        hints = _all_hints(G)
+        categories = {h["category"] for h in hints}
+        assert "alive_count" in categories
+
+    def test_text_contains_correct_counts(self):
+        G = _base_game(round_num=3)
+        # 2 wolves, 4 villagers (all alive in _base_game)
+        hints = _all_hints(G)
+        ac = [h for h in hints if h["category"] == "alive_count"]
+        assert ac
+        for h in ac:
+            # "Wolves" (plural) when count != 1 — check for the number and either form
+            assert "2" in h["text"] and ("Wolves" in h["text"] or "Wolf " in h["text"]), \
+                f"Expected wolf count in alive_count: {h['text']}"
+            assert "4" in h["text"] and "Villager" in h["text"], \
+                f"Expected villager count in alive_count: {h['text']}"
+
+    def test_text_pluralisation_single_wolf(self):
+        G = _base_game(round_num=3)
+        G = G.model_copy(deep=True)
+        G.players["p2"].is_alive = False  # eliminate one wolf → 1 alive wolf
+        hints = _all_hints(G)
+        ac = [h for h in hints if h["category"] == "alive_count"]
+        assert ac
+        singular = [h for h in ac if "1 Wolf " in h["text"]]
+        assert singular, f"Expected '1 Wolf' (singular) — got: {ac}"
+
+    def test_expires_next_round(self):
+        G = _base_game(round_num=3)
+        hints = _all_hints(G)
+        for h in hints:
+            if h["category"] == "alive_count":
+                assert h["expires_after_round"] == 4
+
+
+# ── role_alive_check (Tier 1, new) ───────────────────────────────────────────
+
+
+class TestRoleAliveCheck:
+    """role_alive_check reports whether a high-impact role is still alive.
+    Absent in vague rounds; absent when no high-impact or doctor role is in the game."""
+
+    def _game_with_framer(self, round_num: int):
+        """Replace p6 with a framer so role_alive_check has a candidate."""
+        G = _base_game(round_num)
+        G = G.model_copy(deep=True)
+        G.players["p6"].role = "framer"
+        G.players["p6"].team = Team.WEREWOLF
+        return G
+
+    def test_absent_in_vague_rounds(self):
+        for r in (1, 2):
+            G = self._game_with_framer(round_num=r)
+            hints = _all_hints(G)
+            categories = {h["category"] for h in hints}
+            assert "role_alive_check" not in categories, \
+                f"role_alive_check must be absent in round {r} (vague)"
+
+    def test_appears_in_specific_rounds_when_high_impact_role_present(self):
+        G = self._game_with_framer(round_num=3)
+        hints = _all_hints(G)
+        categories = {h["category"] for h in hints}
+        assert "role_alive_check" in categories
+
+    def test_absent_when_no_high_impact_or_doctor_role(self):
+        """_base_game has only villager/werewolf/seer — no framer, arsonist, doctor."""
+        G = _base_game(round_num=3)
+        hints = _all_hints(G)
+        categories = {h["category"] for h in hints}
+        assert "role_alive_check" not in categories
+
+    def test_text_says_still_alive_when_role_is_alive(self):
+        G = self._game_with_framer(round_num=3)
+        hints = _all_hints(G)
+        rac = [h for h in hints if h["category"] == "role_alive_check"]
+        assert rac
+        alive_hints = [h for h in rac if "still alive" in h["text"]]
+        eliminated_hints = [h for h in rac if "eliminated" in h["text"]]
+        assert alive_hints or eliminated_hints, \
+            "Expected 'still alive' or 'eliminated' in role_alive_check text"
+
+    def test_text_says_eliminated_when_role_is_dead(self):
+        G = self._game_with_framer(round_num=3)
+        G = G.model_copy(deep=True)
+        G.players["p6"].is_alive = False  # kill the framer
+        hints = _all_hints(G)
+        rac = [h for h in hints if h["category"] == "role_alive_check"]
+        eliminated = [h for h in rac if "eliminated" in h["text"]]
+        assert eliminated, f"Expected 'eliminated' text for dead framer: {rac}"
+
+    def test_text_contains_role_display_name(self):
+        G = self._game_with_framer(round_num=3)
+        hints = _all_hints(G)
+        rac = [h for h in hints if h["category"] == "role_alive_check"]
+        assert rac
+        # Role name should be title-cased in text
+        named = [h for h in rac if "Framer" in h["text"]]
+        assert named, f"Expected 'Framer' in text: {rac}"
+
+    def test_expires_next_round(self):
+        G = self._game_with_framer(round_num=3)
+        hints = _all_hints(G)
+        for h in hints:
+            if h["category"] == "role_alive_check":
+                assert h["expires_after_round"] == 4
+
+    def test_doctor_also_eligible(self):
+        G = _base_game(round_num=3)
+        G = G.model_copy(deep=True)
+        G.players["p6"].role = "doctor"
+        G.players["p6"].team = Team.VILLAGE
+        hints = _all_hints(G)
+        categories = {h["category"] for h in hints}
+        assert "role_alive_check" in categories, \
+            "Doctor should make role_alive_check eligible"
+
+
+# ── night_recap (Tier 1, new) ─────────────────────────────────────────────────
+
+
+class TestNightRecap:
+    """night_recap appears when wolves have used at least 1 Sonar Ping.
+    Absent when sonar_pings_used == 0. Not round-gated."""
+
+    def _game_with_pings(self, pings: int, round_num: int = 3):
+        G = _base_game(round_num)
+        G = G.model_copy(deep=True)
+        G.night_actions.sonar_pings_used = pings
+        return G
+
+    def test_absent_when_no_pings(self):
+        G = _base_game(round_num=3)
+        assert G.night_actions.sonar_pings_used == 0
+        hints = _all_hints(G)
+        categories = {h["category"] for h in hints}
+        assert "night_recap" not in categories
+
+    def test_appears_when_pings_used(self):
+        G = self._game_with_pings(2)
+        hints = _all_hints(G)
+        categories = {h["category"] for h in hints}
+        assert "night_recap" in categories
+
+    def test_appears_in_early_rounds_too(self):
+        """night_recap is not round-gated — it should appear even in round 1."""
+        G = self._game_with_pings(1, round_num=1)
+        hints = _all_hints(G)
+        categories = {h["category"] for h in hints}
+        assert "night_recap" in categories
+
+    def test_text_contains_correct_ping_count(self):
+        G = self._game_with_pings(3)
+        hints = _all_hints(G)
+        nr = [h for h in hints if h["category"] == "night_recap"]
+        assert nr
+        for h in nr:
+            assert "3" in h["text"], f"Expected '3' in night_recap text: {h['text']}"
+            assert "Ping" in h["text"] or "Pings" in h["text"]
+
+    def test_text_singular_one_ping(self):
+        G = self._game_with_pings(1)
+        hints = _all_hints(G)
+        nr = [h for h in hints if h["category"] == "night_recap"]
+        assert nr
+        singular = [h for h in nr if "1 Sonar Ping" in h["text"]]
+        assert singular, f"Expected '1 Sonar Ping' (singular): {nr}"
+
+    def test_expires_next_round(self):
+        G = self._game_with_pings(2, round_num=3)
+        hints = _all_hints(G)
+        for h in hints:
+            if h["category"] == "night_recap":
+                assert h["expires_after_round"] == 4
+
+
+# ── same_alignment (Tier 2) ───────────────────────────────────────────────────
+
+
+class TestSameAlignment:
+    """same_alignment states that two players share the same team.
+    Only generated when there are ≥2 alive players.
+    Uses generate_grid_hint with tier=2 to reach _build_tier2_pool."""
+
+    def _grid_hints(self, G, samples: int = 50):
+        """Sample Tier 2 grid hints across varied seeds."""
+        hints = []
+        for i in range(samples):
+            G2 = G.model_copy(deep=True)
+            G2.seed = f"seed-{i}"
+            # Use tier 2, arbitrary node coords
+            from engine.hint_bank import generate_grid_hint
+            hints.append(generate_grid_hint(G2, "p3", 2, 0, 2))
+        return hints
+
+    def test_appears_when_alive_players_have_same_team(self):
+        G = _base_game(round_num=2)
+        hints = self._grid_hints(G)
+        categories = {h["category"] for h in hints}
+        assert "same_alignment" in categories, \
+            "same_alignment should appear when multiple players share a team"
+
+    def test_names_two_players(self):
+        G = _base_game(round_num=2)
+        hints = self._grid_hints(G)
+        sa = [h for h in hints if h["category"] == "same_alignment"]
+        assert sa
+        player_names = {p.display_name for p in G.players.values()}
+        for h in sa:
+            named = [n for n in player_names if n in h["text"]]
+            assert len(named) == 2, \
+                f"same_alignment should name exactly 2 players: {h['text']}"
+
+    def test_text_says_same_alignment(self):
+        G = _base_game(round_num=2)
+        hints = self._grid_hints(G)
+        sa = [h for h in hints if h["category"] == "same_alignment"]
+        assert sa
+        for h in sa:
+            assert "same alignment" in h["text"], \
+                f"Expected 'same alignment' in text: {h['text']}"
+
+    def test_expires_next_round(self):
+        G = _base_game(round_num=2)
+        hints = self._grid_hints(G)
+        for h in hints:
+            if h["category"] == "same_alignment":
+                assert h["expires_after_round"] == G.round + 1
+
+
+# ── diff_alignment (Tier 2) ───────────────────────────────────────────────────
+
+
+class TestDiffAlignment:
+    """diff_alignment states that two players are on different teams.
+    Requires at least 1 alive wolf and 1 alive non-wolf."""
+
+    def _grid_hints(self, G, samples: int = 50):
+        hints = []
+        for i in range(samples):
+            G2 = G.model_copy(deep=True)
+            G2.seed = f"seed-{i}"
+            from engine.hint_bank import generate_grid_hint
+            hints.append(generate_grid_hint(G2, "p3", 2, 0, 2))
+        return hints
+
+    def test_appears_when_wolf_and_non_wolf_both_alive(self):
+        G = _base_game(round_num=2)
+        hints = self._grid_hints(G)
+        categories = {h["category"] for h in hints}
+        assert "diff_alignment" in categories
+
+    def test_names_two_players(self):
+        G = _base_game(round_num=2)
+        hints = self._grid_hints(G)
+        da = [h for h in hints if h["category"] == "diff_alignment"]
+        assert da
+        player_names = {p.display_name for p in G.players.values()}
+        for h in da:
+            named = [n for n in player_names if n in h["text"]]
+            assert len(named) == 2, \
+                f"diff_alignment should name exactly 2 players: {h['text']}"
+
+    def test_text_says_not_same_team(self):
+        G = _base_game(round_num=2)
+        hints = self._grid_hints(G)
+        da = [h for h in hints if h["category"] == "diff_alignment"]
+        assert da
+        for h in da:
+            assert "NOT on the same team" in h["text"], \
+                f"Expected 'NOT on the same team' in text: {h['text']}"
+
+    def test_named_players_are_actually_on_different_teams(self):
+        """Verify the named players genuinely have different teams."""
+        G = _base_game(round_num=2)
+        hints = self._grid_hints(G)
+        da = [h for h in hints if h["category"] == "diff_alignment"]
+        assert da
+        name_to_team = {p.display_name: p.team for p in G.players.values()}
+        for h in da:
+            named = [n for n in name_to_team if n in h["text"]]
+            assert len(named) == 2
+            teams = {name_to_team[n] for n in named}
+            assert len(teams) == 2, \
+                f"diff_alignment named two players on the SAME team: {h['text']}"
+
+    def test_expires_next_round(self):
+        G = _base_game(round_num=2)
+        hints = self._grid_hints(G)
+        for h in hints:
+            if h["category"] == "diff_alignment":
+                assert h["expires_after_round"] == G.round + 1

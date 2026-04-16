@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useWebSocket, type WsStatus } from './useWebSocket'
-import type { HintPayload, RedirectMessage, StrippedGameState, ServerMessage, PlayerRosterEntry } from '../types/game'
+import type { GridRippleMessage, HintPayload, RedirectMessage, StrippedGameState, ServerMessage, PlayerRosterEntry } from '../types/game'
 
 interface Options {
   gameId: string | null
@@ -8,9 +8,10 @@ interface Options {
   sessionToken?: string
   onHint?: (hint: HintPayload) => void
   onRedirect?: (msg: RedirectMessage) => void
+  onRipple?: (msg: GridRippleMessage) => void
 }
 
-export function useGameState({ gameId, playerId, sessionToken, onHint, onRedirect }: Options) {
+export function useGameState({ gameId, playerId, sessionToken, onHint, onRedirect, onRipple }: Options) {
   const [gameState, setGameState] = useState<StrippedGameState | null>(null)
   const [roster, setRoster] = useState<PlayerRosterEntry[]>([])
   const [status, setStatus] = useState<WsStatus>('closed')
@@ -19,6 +20,8 @@ export function useGameState({ gameId, playerId, sessionToken, onHint, onRedirec
   onHintRef.current = onHint
   const onRedirectRef = useRef(onRedirect)
   onRedirectRef.current = onRedirect
+  const onRippleRef = useRef(onRipple)
+  onRippleRef.current = onRipple
 
   // Reset state fence and stale game state when switching to a new game.
   // Without this, a rematch (new game starting at state_id=1) is silently
@@ -56,6 +59,8 @@ export function useGameState({ gameId, playerId, sessionToken, onHint, onRedirec
       onHintRef.current?.(msg as HintPayload)
     } else if (msg.type === 'redirect') {
       onRedirectRef.current?.(msg as RedirectMessage)
+    } else if (msg.type === 'grid_ripple') {
+      onRippleRef.current?.(msg as GridRippleMessage)
     } else if (msg.type === 'error') {
       console.warn('[WS error]', msg.code, msg.message)
     }

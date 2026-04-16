@@ -256,6 +256,40 @@ night_msg = consume_until(display_ws, until_phase("night"), max_messages=20)
 
 ---
 
+### Grid system failures (production + test)
+
+**`INVALID_GRID_COORDS` error returned on `select_grid_node`**
+- Cause: Mobile client sent `row` or `col` outside [0, 4], or a non-integer value.
+- Diagnosis: Check the intent payload logged by `logger.exception` in `game_queue.py`. Values of `5`, `null`, or strings are the typical culprits.
+- Fix: Ensure the `GridMapUI` component clamps indices from the `gridLayout` array and never passes out-of-range values. The 5×5 grid is always 0-indexed — any `row/col >= 5` is a client bug.
+
+**`NODE_OCCUPIED` error on node tap**
+- Cause: A node already appears in `grid_activity` (it was completed earlier in the same night). The display greys out completed nodes, but a stale or replayed intent can target them.
+- Diagnosis: Compare `grid_activity` in the current state broadcast against the tapped coordinates.
+- Fix: The `GridMapUI` `completedSet` check prevents this in normal play. If occurring in tests, verify `grid_activity` is reset by `transition_phase("night")` and not carried over from the previous round.
+
+**`PUZZLE_ALREADY_ACTIVE` error on node tap**
+- Cause: Player tapped a new node while `grid_puzzle_state.active == true`. The grid UI disables node buttons when a puzzle is active, but a double-tap or race condition can bypass this.
+- Diagnosis: Confirm `myPlayer.grid_puzzle_state?.active` is `true` in the state snapshot received before the second tap.
+- Fix: UI guard in `GridMapUI`: `if (hasActivePuzzle) return` on `handleNodeTap`. If triggered in tests, ensure the mock state has `grid_puzzle_state = null` before simulating a node select.
+
+**Sonar ping results empty despite grid activity**
+- Cause: Wolf pinged a quadrant before any villager solved a node in that quadrant, OR `grid_activity` was not yet broadcast when the ping fired.
+- Diagnosis: Check `grid_activity` in the wolf's state view. Confirm `node_to_quadrant(row, col)` maps the completed node to the expected quadrant (center row 2 and center col 2 fall in "bottom_right" and "right" respectively — see `puzzle_bank.py:node_to_quadrant`).
+- Fix: No fix needed — empty ping result is correct behavior when the quadrant has no activity.
+
+**Wolf radar ripple animation not firing**
+- Cause: `grid_ripple` side-channel WS event not handled by the client.
+- Diagnosis: Check browser DevTools Network → WS frames for `{"type":"grid_ripple",...}` messages.
+- Fix: Confirm `useGameState.ts` has the `grid_ripple` branch in `handleMessage`, and `App.tsx` passes `onRipple` to `useGameState`. Confirm `latestRipple` prop is forwarded through `NightActionShell` to `WolfRadarUI`.
+
+**`grid_layout` is `null` during night phase**
+- Cause: `generate_grid_layout` import failed, or the NIGHT phase entry block in `machine.py` did not execute (e.g., early return bug).
+- Diagnosis: Check server logs for import errors on `engine.puzzle_bank`. Verify the `transition_phase("night")` code path reaches `G.night_actions.grid_layout = generate_grid_layout(...)`.
+- Fix: Ensure `puzzles.md` is accessible (see `FileNotFoundError` above — `puzzle_bank.py` reads it at module load, and the import fails if the file is missing).
+
+---
+
 ### Common test failure symptoms
 
 **`FileNotFoundError: roles.json not found`** (backend Docker tests)

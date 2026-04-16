@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { useGameState } from './hooks/useGameState'
 import { useHaptics } from './hooks/useHaptics'
-import type { HintPayload, RedirectMessage } from './types/game'
+import type { GridRippleMessage, HintPayload, RedirectMessage } from './types/game'
 import OnboardingForm from './components/OnboardingForm/OnboardingForm'
 import LobbyWaitingScreen from './components/LobbyWaitingScreen/LobbyWaitingScreen'
 import RoleRevealScreen from './components/RoleRevealScreen/RoleRevealScreen'
@@ -57,11 +57,22 @@ const URL_GAME_CODE = urlParams.get('g') ?? ''
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [bootstrapping, setBootstrapping] = useState(true)
-  const [latestHint, setLatestHint] = useState<HintPayload | null>(null)
+  // Per-source hint arrays — cleared at NIGHT entry so they persist through day discussion.
+  const [archiveHints, setArchiveHints] = useState<HintPayload[]>([])
+  const [gridHints, setGridHints] = useState<HintPayload[]>([])
+  const [latestRipple, setLatestRipple] = useState<GridRippleMessage | null>(null)
   const { vibrate } = useHaptics()
 
   const handleHint = useCallback((hint: HintPayload) => {
-    setLatestHint(hint)
+    if (hint.source === 'archive') {
+      setArchiveHints(prev => [...prev, hint])
+    } else {
+      setGridHints(prev => [...prev, hint])
+    }
+  }, [])
+
+  const handleRipple = useCallback((msg: GridRippleMessage) => {
+    setLatestRipple(msg)
   }, [])
 
   const handleRedirect = useCallback((msg: RedirectMessage) => {
@@ -124,6 +135,7 @@ export default function App() {
     sessionToken: session?.session_token,
     onHint: handleHint,
     onRedirect: handleRedirect,
+    onRipple: handleRipple,
   })
 
   // Toggle html.phase-lobby for background gradient
@@ -133,9 +145,13 @@ export default function App() {
     return () => document.documentElement.classList.remove('phase-lobby')
   }, [gameState?.phase])
 
-  // Clear hint when night phase ends
+  // Clear accumulated hints when a NEW night begins (not when night ends).
+  // This keeps hints visible through the entire day discussion phase.
   useEffect(() => {
-    if (gameState?.phase !== 'night') setLatestHint(null)
+    if (gameState?.phase === 'night') {
+      setArchiveHints([])
+      setGridHints([])
+    }
   }, [gameState?.phase])
 
   // Detect death transition for long haptic pulse (PRD-002 §3.6)
@@ -260,7 +276,9 @@ export default function App() {
         gameState={gameState}
         myPlayer={myPlayer!}
         sendIntent={sendIntent}
-        latestHint={latestHint}
+        latestArchiveHint={archiveHints.length > 0 ? archiveHints[archiveHints.length - 1] : null}
+        latestGridHint={gridHints.length > 0 ? gridHints[gridHints.length - 1] : null}
+        latestRipple={latestRipple}
       />
     )
   } else if (phase === 'day') {
@@ -268,6 +286,7 @@ export default function App() {
       <DayDiscussionScreen
         gameState={gameState}
         myPlayerId={session.player_id}
+        nightHints={[...archiveHints, ...gridHints]}
       />
     )
   } else if (phase === 'day_vote') {

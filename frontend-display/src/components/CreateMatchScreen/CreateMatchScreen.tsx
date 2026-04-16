@@ -4,10 +4,9 @@ import {
   DIFFICULTY_LABELS,
   TIMER_LABELS,
   TIMER_STEPS,
-  TIMER_BOUNDS,
+  TIMER_MIN,
   TIMER_FIELDS,
   DEFAULT_CONFIG,
-  formatSeconds,
 } from '../LobbyConfigPanel/config'
 import './CreateMatchScreen.css'
 
@@ -29,6 +28,12 @@ export default function CreateMatchScreen({ onCreated, onResumed }: Props) {
   const [dayTimer, setDayTimer] = useState(DEFAULT_CONFIG.day_timer_seconds)
   const [voteTimer, setVoteTimer] = useState(DEFAULT_CONFIG.vote_timer_seconds)
 
+  const [draftTimers, setDraftTimers] = useState<Record<string, string>>({
+    night_timer_seconds: String(DEFAULT_CONFIG.night_timer_seconds),
+    day_timer_seconds:   String(DEFAULT_CONFIG.day_timer_seconds),
+    vote_timer_seconds:  String(DEFAULT_CONFIG.vote_timer_seconds),
+  })
+
   const timerValues: Record<string, number> = {
     night_timer_seconds: nightTimer,
     day_timer_seconds: dayTimer,
@@ -42,9 +47,23 @@ export default function CreateMatchScreen({ onCreated, onResumed }: Props) {
   }
 
   function adjustTimer(field: string, delta: number) {
-    const [lo, hi] = TIMER_BOUNDS[field]
+    const lo = TIMER_MIN[field]
     const next = timerValues[field] + delta
-    if (next >= lo && next <= hi) timerSetters[field](next)
+    if (next >= lo) {
+      timerSetters[field](next)
+      setDraftTimers(d => ({ ...d, [field]: String(next) }))
+    }
+  }
+
+  function commitTimer(field: string, raw: string) {
+    const lo = TIMER_MIN[field]
+    const parsed = parseInt(raw, 10)
+    if (isNaN(parsed) || parsed < lo) {
+      setDraftTimers(d => ({ ...d, [field]: String(timerValues[field]) }))
+      return
+    }
+    timerSetters[field](parsed)
+    setDraftTimers(d => ({ ...d, [field]: String(parsed) }))
   }
 
   async function handleCreate() {
@@ -124,7 +143,7 @@ export default function CreateMatchScreen({ onCreated, onResumed }: Props) {
             {TIMER_FIELDS.map(field => {
               const value = timerValues[field]
               const step = TIMER_STEPS[field]
-              const [lo, hi] = TIMER_BOUNDS[field]
+              const lo = TIMER_MIN[field]
               return (
                 <div key={field} className="create-match__timer-row">
                   <span className="create-match__timer-label">{TIMER_LABELS[field]}</span>
@@ -133,10 +152,17 @@ export default function CreateMatchScreen({ onCreated, onResumed }: Props) {
                     disabled={value <= lo}
                     onClick={() => adjustTimer(field, -step)}
                   >−</button>
-                  <span className="create-match__timer-value">{formatSeconds(value)}</span>
+                  <input
+                    type="number"
+                    className="create-match__timer-input"
+                    value={draftTimers[field]}
+                    min={lo}
+                    onChange={e => setDraftTimers(d => ({ ...d, [field]: e.target.value }))}
+                    onBlur={e => commitTimer(field, e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') commitTimer(field, (e.target as HTMLInputElement).value) }}
+                  />
                   <button
                     className="create-match__stepper"
-                    disabled={value >= hi}
                     onClick={() => adjustTimer(field, step)}
                   >+</button>
                 </div>

@@ -47,6 +47,12 @@
   overflow: hidden;
 }
 
+/* All children are display-only — the quadrant div is the sole touch target.
+   Prevents Tooltip buttons and text spans from eating hold gestures. */
+.wolf-radar__quadrant > * {
+  pointer-events: none;
+}
+
 .wolf-radar__quadrant--active {
   background: rgba(104, 211, 145, 0.08);
 }
@@ -55,10 +61,74 @@
   outline: 1px solid rgba(104, 211, 145, 0.4);
 }
 
-.wolf-radar__heat-wrap {
-  display: flex;
-  align-items: center;
-  gap: 2px;
+/* Charge states */
+.wolf-radar__quadrant--charging {
+  cursor: grabbing;
+  background: rgba(197, 48, 48, 0.06);
+}
+
+.wolf-radar__quadrant--charged {
+  background: rgba(197, 48, 48, 0.18);
+}
+
+/* Charge arc SVG — fills the quadrant, sits behind content */
+.wolf-radar__charge-arc {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* Charge percentage label */
+.wolf-radar__charge-pct {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  font-size: 0.55rem;
+  color: rgba(252, 129, 129, 0.7);
+  font-weight: 700;
+  pointer-events: none;
+}
+
+/* Fired confirmation flash */
+.wolf-radar__quadrant--fired {
+  animation: radar-fired-flash 1.5s ease-out forwards;
+}
+
+@keyframes radar-fired-flash {
+  0%   { background: rgba(197, 48, 48, 0.55); }
+  60%  { background: rgba(197, 48, 48, 0.25); }
+  100% { background: rgba(197, 48, 48, 0); }
+}
+
+.wolf-radar__fired-label {
+  position: absolute;
+  bottom: 8px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: #fc8181;
+  pointer-events: none;
+  animation: radar-fired-label 1.5s ease-out forwards;
+}
+
+@keyframes radar-fired-label {
+  0%   { opacity: 1; }
+  70%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Hold instruction line */
+.wolf-radar__charge-hint {
+  font-size: 0.62rem;
+  color: rgba(252, 129, 129, 0.45);
+  margin: 0;
+  font-style: italic;
+  text-align: center;
 }
 
 .wolf-radar__heat {
@@ -78,16 +148,6 @@
   margin: 0;
 }
 
-.wolf-radar__q-label {
-  position: absolute;
-  bottom: 4px;
-  left: 0;
-  right: 0;
-  text-align: center;
-  font-size: 0.55rem;
-  color: #4a5568;
-  letter-spacing: 0.05em;
-}
 
 /* Ripple animation */
 .wolf-radar__ripple {

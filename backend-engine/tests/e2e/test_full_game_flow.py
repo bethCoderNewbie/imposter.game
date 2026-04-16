@@ -170,16 +170,19 @@ class TestGameStart:
     def test_player_sees_own_role_after_start(self, e2e_client):
         """
         After game starts, a player's own WS view SHOULD include their own role.
+        Connect before start (subscribe pattern) so we wait for the broadcast
+        rather than racing against the async queue.
         """
         game_id, host_secret = _create_game(e2e_client)
         players = _join_players(e2e_client, game_id, 5)
         alice = players[0]
 
-        e2e_client.post(f"/api/games/{game_id}/start", json={"host_secret": host_secret})
-
         with e2e_client.websocket_connect(f"/ws/{game_id}/{alice['player_id']}") as ws:
             ws.send_json({"type": "auth", "session_token": alice["session_token"]})
-            msg = ws.receive_json()
+            ws.receive_json()  # initial lobby sync after auth
+
+            e2e_client.post(f"/api/games/{game_id}/start", json={"host_secret": host_secret})
+            msg = ws.receive_json()  # role_deal broadcast
 
         assert msg["state"]["phase"] == "role_deal"
         # The authenticated player sees their own role

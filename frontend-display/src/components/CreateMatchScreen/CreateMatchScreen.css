@@ -138,13 +138,21 @@
   color: rgba(255, 255, 255, 0.75);
 }
 
-.create-match__timer-value {
-  min-width: 3rem;
+.create-match__timer-input {
+  width: 4rem;
   text-align: center;
   font-size: 0.9rem;
   font-variant-numeric: tabular-nums;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.35rem;
   color: #fff;
+  padding: 0.2rem 0.4rem;
 }
+
+.create-match__timer-input::-webkit-inner-spin-button,
+.create-match__timer-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+.create-match__timer-input[type=number] { -moz-appearance: textfield; }
 
 .create-match__stepper {
   width: 1.9rem;

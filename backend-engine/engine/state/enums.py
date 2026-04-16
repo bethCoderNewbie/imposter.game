@@ -61,6 +61,7 @@ class EliminationCause(StrEnum):
     LUNATIC_CURSE = "lunatic_curse"
     BODYGUARD_KILL = "bodyguard_kill"
     BODYGUARD_SACRIFICE = "bodyguard_sacrifice"
+    GRID_CHARGE_KILL = "grid_charge_kill"  # wolf pack charged a quadrant for 5 s and hit an active solver
 
 
 class WinCondition(StrEnum):

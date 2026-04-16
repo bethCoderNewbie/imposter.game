@@ -316,42 +316,19 @@ def _step6b_lunatic_redirect(G: MasterGameState) -> MasterGameState:
 
 # ── Step 7: Wolf kill or Infector convert ─────────────────────────────────────
 
-def _step7_wolf_kill_or_infect(G: MasterGameState) -> tuple[MasterGameState, bool]:
-    """Returns (G, infect_cancelled_wolf_kill)."""
-    infector_pid = _find_role_player(G, "infector")
-    target_id = G.night_actions.infector_target_id
-
-    # If Infector has a valid, non-roleblocked target → convert (no kill)
-    if (
-        infector_pid
-        and target_id
-        and infector_pid != G.night_actions.roleblocked_player_id
-        and G.players.get(infector_pid, None) is not None
-        and G.players[infector_pid].infect_used
-    ):
-        target = G.players.get(target_id)
-        if target and target.is_alive:
-            target.role = "werewolf"
-            target.team = "werewolf"
-            return G, True  # wolf kill cancelled
-
-    # Tally wolf votes
-    wolf_votes = G.night_actions.wolf_votes
-    if not wolf_votes:
-        return G, False
-
-    # Count votes per target
-    vote_counts: dict[str, int] = {}
-    for wolf_pid, voted_target in wolf_votes.items():
-        vote_counts[voted_target] = vote_counts.get(voted_target, 0) + 1
-
-    total_wolves = len(wolf_votes)
-    # Strict majority: count > total_wolves / 2
-    kill_target = max(vote_counts, key=lambda t: vote_counts[t])
-    if vote_counts[kill_target] <= total_wolves / 2:
-        return G, False  # tie — no kill
-
-    target = G.players.get(kill_target)
+def _apply_wolf_kill(
+    G: MasterGameState,
+    target_id: str,
+    cause: EliminationCause,
+    attacker_pid: str | None = None,
+) -> tuple[MasterGameState, bool]:
+    """
+    Apply a wolf-team kill attempt with the given cause.
+    Protection sequence: Wise shield → Doctor → Bodyguard 50/50 → SK immunity.
+    Returns (G, killed).
+    attacker_pid is the wolf to die if the Bodyguard's coin flip eliminates the attacker.
+    """
+    target = G.players.get(target_id)
     if not target or not target.is_alive:
         return G, False
 
@@ -368,25 +345,23 @@ def _step7_wolf_kill_or_infect(G: MasterGameState) -> tuple[MasterGameState, boo
     bodyguard_pid = _find_role_player(G, "bodyguard")
     if (
         bodyguard_pid
-        and G.night_actions.bodyguard_target_id == kill_target
+        and G.night_actions.bodyguard_target_id == target_id
         and bodyguard_pid != G.night_actions.roleblocked_player_id
         and not (G.village_powers_cursed and G.players[bodyguard_pid].team == "village")
     ):
         rng = random.Random(f"{G.seed}_{G.round}_bodyguard")
         if rng.random() < 0.5:
-            # Attacker dies — first wolf who voted for the kill target
-            for wolf_pid, voted_target in wolf_votes.items():
-                if voted_target == kill_target:
-                    attacker = G.players.get(wolf_pid)
-                    if attacker and attacker.is_alive:
-                        attacker.is_alive = False
-                        G.elimination_log.append(EliminationEvent(
-                            round=G.round,
-                            phase="night",
-                            player_id=wolf_pid,
-                            cause=EliminationCause.BODYGUARD_KILL,
-                        ))
-                    break
+            # Attacker dies
+            if attacker_pid:
+                attacker = G.players.get(attacker_pid)
+                if attacker and attacker.is_alive:
+                    attacker.is_alive = False
+                    G.elimination_log.append(EliminationEvent(
+                        round=G.round,
+                        phase="night",
+                        player_id=attacker_pid,
+                        cause=EliminationCause.BODYGUARD_KILL,
+                    ))
         else:
             # Bodyguard dies — unless Doctor also protected the Bodyguard
             bodyguard = G.players[bodyguard_pid]
@@ -408,9 +383,64 @@ def _step7_wolf_kill_or_infect(G: MasterGameState) -> tuple[MasterGameState, boo
     G.elimination_log.append(EliminationEvent(
         round=G.round,
         phase="night",
-        player_id=kill_target,
-        cause=EliminationCause.WOLF_KILL,
+        player_id=target_id,
+        cause=cause,
     ))
+    return G, True
+
+
+def _step7_wolf_kill_or_infect(G: MasterGameState) -> tuple[MasterGameState, bool]:
+    """Returns (G, infect_cancelled_wolf_kill)."""
+    infector_pid = _find_role_player(G, "infector")
+    target_id = G.night_actions.infector_target_id
+
+    # If Infector has a valid, non-roleblocked target → convert (no kill)
+    if (
+        infector_pid
+        and target_id
+        and infector_pid != G.night_actions.roleblocked_player_id
+        and G.players.get(infector_pid, None) is not None
+        and G.players[infector_pid].infect_used
+    ):
+        target = G.players.get(target_id)
+        if target and target.is_alive:
+            target.role = "werewolf"
+            target.team = "werewolf"
+            return G, True  # wolf kill cancelled
+
+    # ── Charge kill takes priority over vote kill ──────────────────────────────
+    charge_target_id = G.night_actions.charge_kill_target_id
+    if charge_target_id:
+        attacker_pid = next(
+            (pid for pid, p in G.players.items() if p.is_alive and p.team == "werewolf"),
+            None,
+        )
+        G, _ = _apply_wolf_kill(G, charge_target_id, EliminationCause.GRID_CHARGE_KILL, attacker_pid)
+        G.night_actions.charge_kill_target_id = None
+        return G, False  # charge kill doesn't interact with infector
+
+    # ── Vote-tally logic ───────────────────────────────────────────────────────
+    wolf_votes = G.night_actions.wolf_votes
+    if not wolf_votes:
+        return G, False
+
+    # Count votes per target
+    vote_counts: dict[str, int] = {}
+    for wolf_pid, voted_target in wolf_votes.items():
+        vote_counts[voted_target] = vote_counts.get(voted_target, 0) + 1
+
+    total_wolves = len(wolf_votes)
+    # Strict majority: count > total_wolves / 2
+    kill_target = max(vote_counts, key=lambda t: vote_counts[t])
+    if vote_counts[kill_target] <= total_wolves / 2:
+        return G, False  # tie — no kill
+
+    # Attacker for Bodyguard flip: first wolf who voted for the kill target
+    attacker_pid = next(
+        (pid for pid, voted in wolf_votes.items() if voted == kill_target),
+        None,
+    )
+    G, _ = _apply_wolf_kill(G, kill_target, EliminationCause.WOLF_KILL, attacker_pid)
     return G, False
 
 
