@@ -52,7 +52,15 @@ export default function NightResolution({ gameState, onComplete }: Props) {
                 ? <img className="night-resolution__cause-icon" src={icon.src} alt={icon.alt} />
                 : icon.type === 'emoji'
                   ? <div className="night-resolution__cause-icon night-resolution__cause-icon--emoji" aria-hidden="true">{icon.char}</div>
-                  : null
+                  : (
+                    <div className="night-resolution__cause-icon night-resolution__cause-icon--tombstone" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <path d="M6 21V10a6 6 0 1 1 12 0v11" />
+                        <path d="M3 21h18" />
+                        <path d="M10 14v3" />
+                      </svg>
+                    </div>
+                  )
             })()}
             <p className="night-resolution__player-name">{player.display_name}</p>
           </div>

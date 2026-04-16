@@ -61,6 +61,21 @@
     0 0 60px rgba(150,  0,   0, 0.4);
 }
 
+/* Tombstone icon — generic grave, no kill-cause hint */
+.night-resolution__cause-icon--tombstone {
+  width: clamp(48px, 7vmin, 96px);
+  height: clamp(48px, 7vmin, 96px);
+  color: rgba(200, 180, 210, 0.85);
+  filter:
+    drop-shadow(0 0 8px rgba(150, 100, 180, 0.8))
+    drop-shadow(0 0 20px rgba(100, 60, 140, 0.5));
+}
+
+.night-resolution__cause-icon--tombstone svg {
+  width: 100%;
+  height: 100%;
+}
+
 .night-resolution__player-name {
   font-size: clamp(16px, 2.4vmin, 32px);
   color: rgba(255, 255, 255, 0.8);
