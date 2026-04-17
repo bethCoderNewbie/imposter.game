@@ -191,6 +191,10 @@ export function getAvatarColor(avatarId: string): string {
   return AVATAR_COLORS[avatarId] ?? '#718096'
 }
 
+export function isIconAvatar(avatarId: string): boolean {
+  return avatarId.startsWith('icon_')
+}
+
 export function getInitials(displayName: string): string {
   return displayName.slice(0, 2).toUpperCase()
 }

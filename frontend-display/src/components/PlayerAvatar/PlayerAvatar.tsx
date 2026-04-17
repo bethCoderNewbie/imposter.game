@@ -1,4 +1,4 @@
-import { getAvatarColor, getInitials } from '../../types/game'
+import { getAvatarColor, getInitials, isIconAvatar } from '../../types/game'
 import './PlayerAvatar.css'
 
 interface PlayerLike {
@@ -33,6 +33,22 @@ export default function PlayerAvatar({ player, size, className = '', style, ...r
           src={player.photo_url}
           alt={player.display_name}
           className="player-avatar__photo"
+        />
+      </div>
+    )
+  }
+
+  if (isIconAvatar(player.avatar_id)) {
+    return (
+      <div
+        className={`player-avatar player-avatar--icon ${className}`}
+        style={{ background: '#2d3748', ...sizeStyle, ...style }}
+        data-player-id={dataPlayerId}
+      >
+        <img
+          src={`/images/${player.avatar_id}.png`}
+          alt={player.display_name}
+          className="player-avatar__icon"
         />
       </div>
     )
