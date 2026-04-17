@@ -96,6 +96,13 @@ services:
         #   HOST_IP=http://192.168.1.100 docker compose up --build
         # Reads from the shell environment automatically if exported.
         HOST_IP: ${HOST_IP:-}
+        # Hybrid deployment: public HTTPS URL exposing the backend (tunnel or port-forward).
+        # When set, display API calls use this URL and the QR code embeds it via ?b=
+        # so mobile clients not on the LAN can reach the backend.
+        BACKEND_URL: ${BACKEND_URL:-}
+        # Vercel URL of the mobile frontend. When set, the QR code points here
+        # instead of the local LAN IP so internet players can scan and join.
+        MOBILE_URL: ${MOBILE_URL:-}
     restart: unless-stopped
 
   frontend-mobile:
@@ -115,6 +122,32 @@ services:
       - frontend-display
       - frontend-mobile
     restart: unless-stopped
+
+  # ── Hybrid deployment: Cloudflare Tunnel (optional) ──────────────────────────
+  # Exposes the local backend publicly over HTTPS without port forwarding.
+  # Players' real IP is hidden — they only see the *.trycloudflare.com URL.
+  #
+  # Named tunnel (stable URL, requires CLOUDFLARE_TUNNEL_TOKEN in .env):
+  #   ./start.sh --tunnel
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    restart: unless-stopped
+    depends_on:
+      - nginx
+    profiles: ["tunnel"]
+
+  # Ephemeral quick tunnel — no Cloudflare account or token needed.
+  # Prints the https://xxxx.trycloudflare.com URL in its container logs.
+  # The display QR code automatically embeds this URL via ?b= — no Vercel redeploy needed.
+  #   ./start.sh --tunnel-quick
+  cloudflared-quick:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate --url http://nginx:80
+    restart: unless-stopped
+    depends_on:
+      - nginx
+    profiles: ["tunnel-quick"]
 
 volumes:
   ollama_models:   # persists downloaded models across compose restarts

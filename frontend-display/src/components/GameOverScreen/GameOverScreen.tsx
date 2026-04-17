@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import PlayerAvatar from '../PlayerAvatar/PlayerAvatar'
 import { getCauseIcon } from '../../utils/elimination'
 import type { StrippedGameState } from '../../types/game'
+import { getApiBase } from '../../utils/backend'
 import './GameOverScreen.css'
 
 interface Props {
@@ -37,7 +38,7 @@ export default function GameOverScreen({ gameState, audioUnlocked, gameId, hostS
     setLoading('play_again')
     setError(null)
     try {
-      const res = await fetch(`/api/games/${gameId}/rematch`, {
+      const res = await fetch(`${getApiBase()}/api/games/${gameId}/rematch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ host_secret: hostSecret }),
@@ -60,7 +61,7 @@ export default function GameOverScreen({ gameState, audioUnlocked, gameId, hostS
     if (!hostSecret || loading) return
     setLoading('new_match')
     try {
-      await fetch(`/api/games/${gameId}/abandon`, {
+      await fetch(`${getApiBase()}/api/games/${gameId}/abandon`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ host_secret: hostSecret }),

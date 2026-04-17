@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { AVATAR_ICONS } from '../../types/game'
+import { getApiBase } from '../../utils/backend'
 import './OnboardingForm.css'
 
 interface JoinedSession {
@@ -73,7 +74,7 @@ export default function OnboardingForm({ prefillCode, permanentId, onJoined, sav
 
   useEffect(() => {
     if (!permanentId) return
-    fetch(`/api/players/${permanentId}`)
+    fetch(`${getApiBase()}/api/players/${permanentId}`)
       .then(r => {
         if (r.ok) return r.json()
         if (r.status === 404) {
@@ -103,7 +104,7 @@ export default function OnboardingForm({ prefillCode, permanentId, onJoined, sav
 
       const form = new FormData()
       form.append('file', blob, 'avatar.jpg')
-      const res = await fetch('/api/photos/upload', { method: 'POST', body: form })
+      const res = await fetch(`${getApiBase()}/api/photos/upload`, { method: 'POST', body: form })
       if (!res.ok) {
         setError('Photo upload failed. Try again or skip.')
         setPhotoPreview(null)
@@ -140,7 +141,7 @@ export default function OnboardingForm({ prefillCode, permanentId, onJoined, sav
 
       if (!pid) {
         // First-time player (or stale ID was cleared): register their name
-        const reg = await fetch('/api/players/register', {
+        const reg = await fetch(`${getApiBase()}/api/players/register`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ display_name: name.trim() }),
@@ -153,7 +154,7 @@ export default function OnboardingForm({ prefillCode, permanentId, onJoined, sav
         pid = regData.permanent_id
       } else {
         // Returning player may have edited their name — persist the change
-        const putRes = await fetch(`/api/players/${pid}`, {
+        const putRes = await fetch(`${getApiBase()}/api/players/${pid}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ display_name: name.trim() }),
@@ -161,7 +162,7 @@ export default function OnboardingForm({ prefillCode, permanentId, onJoined, sav
         if (putRes.status === 404) {
           // ID became stale (e.g. DB rebuilt) — clear and re-register
           localStorage.removeItem(PERMANENT_ID_KEY)
-          const reg = await fetch('/api/players/register', {
+          const reg = await fetch(`${getApiBase()}/api/players/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ display_name: name.trim() }),
@@ -176,7 +177,7 @@ export default function OnboardingForm({ prefillCode, permanentId, onJoined, sav
         // Other PUT errors (5xx, network) are non-fatal — proceed with existing ID
       }
 
-      const res = await fetch(`/api/games/${code.trim()}/join`, {
+      const res = await fetch(`${getApiBase()}/api/games/${code.trim()}/join`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ permanent_id: pid, avatar_id: avatarId, photo_url: photoUrl }),

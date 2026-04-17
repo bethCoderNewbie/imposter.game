@@ -7,7 +7,11 @@ COPY . .
 # Pass at build time: docker compose build --build-arg HOST_IP=http://192.168.1.100
 # Or set HOST_IP in your shell before running docker compose up --build.
 ARG HOST_IP
+ARG BACKEND_URL
+ARG MOBILE_URL
 ENV VITE_HOST_IP=$HOST_IP
+ENV VITE_BACKEND_URL=$BACKEND_URL
+ENV VITE_MOBILE_URL=$MOBILE_URL
 RUN npm run build
 
 FROM nginx:alpine

@@ -906,6 +906,111 @@ docker compose logs -f backend
 
 ---
 
+## Hybrid Deployment (Internet Play)
+
+Allows players on **any network** to join without being on the same Wi-Fi.
+The backend still runs locally; only the mobile frontend is deployed to Vercel.
+
+### How it works
+
+1. Mobile frontend is deployed to Vercel (public HTTPS URL).
+2. A tunnel exposes the local backend over HTTPS (hides your real IP).
+3. The display QR code embeds the backend URL via `?b=` so scanned phones know where to reach the backend.
+
+### Quick Start (no accounts needed — ephemeral tunnel)
+
+```bash
+./start.sh --tunnel-quick
+# cloudflared prints something like:
+#   https://xxxx.trycloudflare.com
+```
+
+The QR code on the display automatically embeds this URL. Players scan and join from anywhere. The tunnel URL changes each session (that's fine for a party game).
+
+To see the tunnel URL at any time:
+```bash
+docker compose logs cloudflared-quick | grep trycloudflare
+```
+
+### One-Time Vercel Setup (mobile frontend)
+
+```bash
+cd frontend-mobile
+npx vercel --prod
+# Follow prompts — note the deployment URL (e.g. https://my-game.vercel.app)
+```
+
+Set Vercel project environment variables (Settings → Environment Variables):
+
+| Variable | Value |
+|---|---|
+| `VITE_BACKEND_URL` | `https://xxxx.trycloudflare.com` (or your stable tunnel URL) |
+
+After setting, redeploy: `npx vercel --prod`
+
+Set `.env` on the host machine:
+```
+MOBILE_URL=https://my-game.vercel.app
+```
+
+Then rebuild the display image so the QR code points to Vercel:
+```bash
+./start.sh --tunnel-quick
+```
+
+### Stable Tunnel (permanent URL, recommended for recurring use)
+
+Requires a free Cloudflare account.
+
+```bash
+# One-time setup:
+cloudflared tunnel login
+cloudflared tunnel create werewolf-backend
+cloudflared tunnel route dns werewolf-backend backend.yourdomain.com
+cloudflared tunnel token werewolf-backend   # copy the token
+```
+
+Add to `.env`:
+```
+CLOUDFLARE_TUNNEL_TOKEN=<token>
+BACKEND_URL=https://backend.yourdomain.com
+MOBILE_URL=https://my-game.vercel.app
+```
+
+Set `VITE_BACKEND_URL=https://backend.yourdomain.com` in both Vercel projects.
+
+Launch:
+```bash
+./start.sh --tunnel
+```
+
+### Verification
+
+```bash
+# Backend reachable via tunnel?
+curl https://<tunnel-url>/api/health
+
+# Tunnel URL embedded in QR?
+# Open http://<LAN-IP>/display/ and scan the QR code with a phone not on LAN.
+# Should reach the Vercel mobile frontend and successfully join the lobby.
+
+# WSS working?
+# Open browser dev tools on the mobile Vercel page.
+# Network → WS tab should show wss://<tunnel-url>/ws/... (not ws://)
+```
+
+### Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| Mobile gets CORS/network error | Backend URL wrong or unset | Check `VITE_BACKEND_URL` in Vercel env vars; redeploy |
+| WS closes immediately after connect | Mixed content (HTTP WS from HTTPS page) | Ensure backend is behind HTTPS tunnel, not plain HTTP |
+| QR code missing `?b=` param | Display not in hybrid mode | Set `BACKEND_URL` in `.env` and rebuild display image |
+| Tunnel container keeps restarting | Bad token or network issue | `docker compose logs cloudflared`; verify token with `cloudflared tunnel info` |
+| Players land on "game not found" | Session from previous tunnel URL | Player must re-scan QR (new session); old `?b=` stored in sessionStorage expired |
+
+---
+
 ## CI/CD (GitHub Actions)
 
 The pipeline is defined in `.github/workflows/ci.yml`. It runs automatically on every push and pull request.

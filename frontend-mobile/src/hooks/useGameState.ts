@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useWebSocket, type WsStatus } from './useWebSocket'
 import type { GridRippleMessage, HintPayload, RedirectMessage, StrippedGameState, ServerMessage, PlayerRosterEntry } from '../types/game'
+import { getWsBase } from '../utils/backend'
 
 interface Options {
   gameId: string | null
@@ -32,9 +33,8 @@ export function useGameState({ gameId, playerId, sessionToken, onHint, onRedirec
     setRoster([])
   }, [gameId])
 
-  const proto = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   const url = gameId && playerId
-    ? `${proto}//${window.location.host}/ws/${gameId}/${playerId}`
+    ? `${getWsBase()}/ws/${gameId}/${playerId}`
     : null
 
   const handleMessage = useCallback((data: unknown) => {

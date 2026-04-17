@@ -4,6 +4,7 @@ import PlayerAvatar from '../PlayerAvatar/PlayerAvatar'
 import LobbyConfigPanel from '../LobbyConfigPanel/LobbyConfigPanel'
 import type { StrippedGameState, PlayerRosterEntry } from '../../types/game'
 import { useGameStore } from '../../store/gameStore'
+import { getApiBase } from '../../utils/backend'
 import './LobbyScreen.css'
 
 interface Props {
@@ -12,12 +13,25 @@ interface Props {
   gameId?: string
 }
 
-// VITE_HOST_IP is baked at Docker build time (e.g. http://192.168.1.100).
-// Falls back to window.location.origin so dev mode and direct-IP access still work.
-const HOST_BASE: string = import.meta.env.VITE_HOST_IP || window.location.origin
+// VITE_MOBILE_URL: Vercel URL of the mobile frontend (hybrid deployment).
+// Falls back to VITE_HOST_IP (LAN IP baked at Docker build time), then window.location.origin.
+const MOBILE_BASE: string =
+  import.meta.env.VITE_MOBILE_URL ||
+  import.meta.env.VITE_HOST_IP ||
+  window.location.origin
+
+// In hybrid mode, embed the backend tunnel URL as ?b= so mobile clients not on
+// the LAN know where to reach the backend. In LAN mode getApiBase() is '' and
+// no ?b= param is added — the QR code is identical to the original behaviour.
+function buildJoinUrl(gameId: string): string {
+  const base = `${MOBILE_BASE}/?g=${gameId}`
+  const backendUrl = getApiBase()
+  if (!backendUrl) return base
+  return `${base}&b=${encodeURIComponent(backendUrl)}`
+}
 
 export default function LobbyScreen({ gameState, hostSecret, gameId }: Props) {
-  const joinUrl = `${HOST_BASE}/?g=${gameState.game_id}`
+  const joinUrl = buildJoinUrl(gameState.game_id)
   // roster is updated in real-time via match_data on every player join/leave.
   // gameState.players only updates on sync/update (not sent during lobby phase).
   const roster = useGameStore(state => state.roster)
@@ -31,7 +45,7 @@ export default function LobbyScreen({ gameState, hostSecret, gameId }: Props) {
     if (!gameId || starting) return
     setStarting(true)
     try {
-      await fetch(`/api/games/${gameId}/start`, {
+      await fetch(`${getApiBase()}/api/games/${gameId}/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(hostSecret ? { host_secret: hostSecret } : {}),
@@ -45,7 +59,7 @@ export default function LobbyScreen({ gameState, hostSecret, gameId }: Props) {
     if (!gameId || !hostSecret || kickingIds.has(playerId)) return
     setKickingIds(prev => new Set([...prev, playerId]))
     try {
-      await fetch(`/api/games/${gameId}/players/${playerId}`, {
+      await fetch(`${getApiBase()}/api/games/${gameId}/players/${playerId}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ host_secret: hostSecret }),
@@ -99,7 +113,7 @@ export default function LobbyScreen({ gameState, hostSecret, gameId }: Props) {
             level="M"
             className="lobby-screen__qr"
           />
-          <p className="lobby-screen__url">{HOST_BASE.replace(/^https?:\/\//, '')}/?g=</p>
+          <p className="lobby-screen__url">{MOBILE_BASE.replace(/^https?:\/\//, '')}/?g=</p>
           <p className="lobby-screen__code">{gameState.game_id}</p>
         </div>
         <LobbyConfigPanel

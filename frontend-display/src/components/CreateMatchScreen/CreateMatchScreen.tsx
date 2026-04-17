@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { DifficultyLevel } from '../../types/game'
+import { getApiBase } from '../../utils/backend'
 import {
   DIFFICULTY_LABELS,
   TIMER_LABELS,
@@ -72,7 +73,7 @@ export default function CreateMatchScreen({ onCreated, onResumed }: Props) {
     setError(null)
 
     try {
-      const res = await fetch('/api/games', {
+      const res = await fetch(`${getApiBase()}/api/games`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
@@ -86,7 +87,7 @@ export default function CreateMatchScreen({ onCreated, onResumed }: Props) {
       const { game_id, host_secret } = data
 
       // Apply pre-game settings before signalling the parent
-      await fetch(`/api/games/${game_id}/config`, {
+      await fetch(`${getApiBase()}/api/games/${game_id}/config`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

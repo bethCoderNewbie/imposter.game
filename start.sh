@@ -1,6 +1,45 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# ── Hybrid deployment flags ────────────────────────────────────────────────────
+# --tunnel       Start a named Cloudflare Tunnel (requires CLOUDFLARE_TUNNEL_TOKEN in .env)
+# --tunnel-quick Start an ephemeral Cloudflare Quick Tunnel (no account needed — free)
+#
+# Quick tunnel prints its https://xxxx.trycloudflare.com URL in the container
+# logs. The display QR automatically embeds this URL via ?b= so mobile players
+# can join from anywhere, even without setting VITE_BACKEND_URL in Vercel.
+USE_TUNNEL=false
+USE_TUNNEL_QUICK=false
+TUNNEL_PROFILE=""
+
+for arg in "$@"; do
+  case "$arg" in
+    --tunnel)       USE_TUNNEL=true ;;
+    --tunnel-quick) USE_TUNNEL_QUICK=true ;;
+  esac
+done
+
+if [ "$USE_TUNNEL" = true ]; then
+  if [ -z "${CLOUDFLARE_TUNNEL_TOKEN:-}" ] && [ -f .env ]; then
+    CLOUDFLARE_TUNNEL_TOKEN=$(grep -E '^CLOUDFLARE_TUNNEL_TOKEN=' .env 2>/dev/null | head -1 | cut -d= -f2 || true)
+  fi
+  if [ -z "${CLOUDFLARE_TUNNEL_TOKEN:-}" ]; then
+    echo "ERROR: CLOUDFLARE_TUNNEL_TOKEN must be set for --tunnel mode."
+    echo "  Add it to .env or export it: CLOUDFLARE_TUNNEL_TOKEN=xxx ./start.sh --tunnel"
+    echo ""
+    echo "  For a zero-config tunnel (no token needed), use --tunnel-quick instead."
+    exit 1
+  fi
+  export CLOUDFLARE_TUNNEL_TOKEN
+  TUNNEL_PROFILE="--profile tunnel"
+  echo "Tunnel     : Named Cloudflare Tunnel (stable URL from Cloudflare dashboard)"
+elif [ "$USE_TUNNEL_QUICK" = true ]; then
+  TUNNEL_PROFILE="--profile tunnel-quick"
+  echo "Tunnel     : Ephemeral Quick Tunnel — URL printed in cloudflared-quick logs"
+  echo "             Run:  docker compose logs cloudflared-quick"
+  echo "             URL is embedded in the QR code automatically via ?b= param."
+fi
+
 # ── 0. Windows Firewall — open port 80 for LAN access ─────────────────────────
 # Rules created by New-NetFirewallRule are persistent (survive reboots).
 # This is a fast no-op once the rule exists; elevation is only needed the first time.
@@ -79,5 +118,14 @@ fi
 # HOST_IP is picked up by docker-compose.yml → frontend-display build arg → VITE_HOST_IP
 # so the QR code is baked with the correct LAN address at build time.
 
+# Strip our custom flags before forwarding remaining args to docker compose
+EXTRA_ARGS=()
+for arg in "$@"; do
+  case "$arg" in
+    --tunnel|--tunnel-quick) ;;   # consumed above — don't pass to docker compose
+    *) EXTRA_ARGS+=("$arg") ;;
+  esac
+done
+
 # shellcheck disable=SC2086
-docker compose $COMPOSE_FILES $COMPOSE_PROFILES up --build "$@"
+docker compose $COMPOSE_FILES $COMPOSE_PROFILES $TUNNEL_PROFILE up --build "${EXTRA_ARGS[@]}"

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { GameConfig, DifficultyLevel } from '../../types/game'
+import { getApiBase } from '../../utils/backend'
 import {
   formatSeconds,
   DIFFICULTY_LABELS,
@@ -34,7 +35,7 @@ export default function LobbyConfigPanel({ config, hostSecret, gameId }: Props) 
   }, [config.night_timer_seconds, config.day_timer_seconds, config.vote_timer_seconds])
 
   useEffect(() => {
-    fetch('/api/narrator/voices')
+    fetch(`${getApiBase()}/api/narrator/voices`)
       .then(r => r.json())
       .then(data => setVoices(data.voices ?? []))
       .catch(() => {})
@@ -44,7 +45,7 @@ export default function LobbyConfigPanel({ config, hostSecret, gameId }: Props) 
     if (!gameId || !hostSecret || isPatching) return
     setIsPatching(true)
     try {
-      await fetch(`/api/games/${gameId}/config`, {
+      await fetch(`${getApiBase()}/api/games/${gameId}/config`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ host_secret: hostSecret, ...updates }),

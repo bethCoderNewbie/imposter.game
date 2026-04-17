@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { useGameState } from './hooks/useGameState'
+import { getApiBase } from './utils/backend'
 import { useHaptics } from './hooks/useHaptics'
 import type { GridRippleMessage, HintPayload, RedirectMessage } from './types/game'
 import OnboardingForm from './components/OnboardingForm/OnboardingForm'
@@ -104,7 +105,7 @@ export default function App() {
     const stored = loadSession()
     if (!stored) { setBootstrapping(false); return }
 
-    fetch(`/api/games/${stored.game_id}/rejoin`, {
+    fetch(`${getApiBase()}/api/games/${stored.game_id}/rejoin`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ session_token: stored.session_token }),
