@@ -11,6 +11,8 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
 
+from engine.config import get_settings
+
 router = APIRouter(prefix="/api/photos", tags=["photos"])
 
 PHOTOS_DIR = Path("/app/photos")
@@ -33,7 +35,8 @@ async def upload_photo(file: UploadFile = File(...)):
     PHOTOS_DIR.mkdir(parents=True, exist_ok=True)
     (PHOTOS_DIR / filename).write_bytes(data)
 
-    return {"photo_url": f"/api/photos/{filename}"}
+    base = get_settings().backend_public_url.rstrip("/")
+    return {"photo_url": f"{base}/api/photos/{filename}"}
 
 
 @router.get("/{filename}")

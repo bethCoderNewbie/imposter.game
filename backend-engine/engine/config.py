@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     max_active_games: int = 100
     database_url: str = "postgresql+asyncpg://werewolf:werewolf@postgres/werewolf"
 
+    # Hybrid deployment: public HTTPS URL of this backend (e.g. https://backend.imposter.com).
+    # When set, photo and TTS audio URLs are returned as absolute URLs so Vercel-hosted
+    # frontends can load them. Leave empty for pure LAN mode (relative paths, unchanged).
+    backend_public_url: str = ""
+
     # Narrator settings (PRD-008)
     narrator_enabled: bool = False
     ollama_url: str = "http://host.docker.internal:11434"

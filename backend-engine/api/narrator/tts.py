@@ -16,6 +16,7 @@ from pathlib import Path
 import httpx
 
 from api.narrator.config import get_narrator_settings
+from engine.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +55,8 @@ async def synthesize(text: str) -> tuple[str, int]:
     data_bytes = file_path.stat().st_size - 44  # 44-byte standard PCM WAV header
     duration_ms = int(max(data_bytes, 0) / bytes_per_frame / framerate * 1000)
 
-    return f"/tts/audio/{file_id}.wav", duration_ms
+    base = get_settings().backend_public_url.rstrip("/")
+    return f"{base}/tts/audio/{file_id}.wav", duration_ms
 
 
 async def cleanup_old_audio() -> None:
@@ -106,4 +108,5 @@ async def pick_prebaked(trigger_id: str, voice: str = "kokoro") -> tuple[str, in
     data_bytes = chosen.stat().st_size - 44
     duration_ms = int(max(data_bytes, 0) / bytes_per_frame / framerate * 1000)
 
-    return f"/tts/static/{voice}/{chosen.name}", duration_ms, actual_idx
+    base = get_settings().backend_public_url.rstrip("/")
+    return f"{base}/tts/static/{voice}/{chosen.name}", duration_ms, actual_idx

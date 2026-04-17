@@ -75,6 +75,9 @@ services:
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:3b}
       KOKORO_URL: "http://tts:8880"
       NARRATOR_VOICE: ${NARRATOR_VOICE:-af_bella}
+      # Hybrid deployment: makes photo and TTS URLs absolute so Vercel-hosted
+      # frontends can load them. Leave empty for pure LAN mode.
+      BACKEND_PUBLIC_URL: ${BACKEND_URL:-}
     volumes:
       - photos_data:/app/photos
     depends_on:
