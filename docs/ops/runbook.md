@@ -909,105 +909,77 @@ docker compose logs -f backend
 ## Hybrid Deployment (Internet Play)
 
 Allows players on **any network** to join without being on the same Wi-Fi.
-The backend still runs locally; only the mobile frontend is deployed to Vercel.
+Backend runs locally; mobile frontend is on Vercel; Cloudflare Tunnel bridges the two.
 
-### How it works
+Full setup guide: `docs/ops/hybrid-deploy.md`
 
-1. Mobile frontend is deployed to Vercel (public HTTPS URL).
-2. A tunnel exposes the local backend over HTTPS (hides your real IP).
-3. The display QR code embeds the backend URL via `?b=` so scanned phones know where to reach the backend.
+### Deployed endpoints
 
-### Quick Start (no accounts needed — ephemeral tunnel)
-
-```bash
-./start.sh --tunnel-quick
-# cloudflared prints something like:
-#   https://xxxx.trycloudflare.com
-```
-
-The QR code on the display automatically embeds this URL. Players scan and join from anywhere. The tunnel URL changes each session (that's fine for a party game).
-
-To see the tunnel URL at any time:
-```bash
-docker compose logs cloudflared-quick | grep trycloudflare
-```
-
-### One-Time Vercel Setup (mobile frontend)
-
-```bash
-cd frontend-mobile
-npx vercel --prod
-# Follow prompts — note the deployment URL (e.g. https://my-game.vercel.app)
-```
-
-Set Vercel project environment variables (Settings → Environment Variables):
-
-| Variable | Value |
+| Service | URL |
 |---|---|
-| `VITE_BACKEND_URL` | `https://xxxx.trycloudflare.com` (or your stable tunnel URL) |
+| Mobile (Vercel) | `https://imposter-mobile.vercel.app` |
+| Backend tunnel | `https://backend.imposter.com` |
+| Display | `http://<LAN-IP>/display/` (LAN only, Docker) |
 
-After setting, redeploy: `npx vercel --prod`
+### Per-session launch
 
-Set `.env` on the host machine:
-```
-MOBILE_URL=https://my-game.vercel.app
-```
-
-Then rebuild the display image so the QR code points to Vercel:
-```bash
-./start.sh --tunnel-quick
-```
-
-### Stable Tunnel (permanent URL, recommended for recurring use)
-
-Requires a free Cloudflare account.
-
-```bash
-# One-time setup:
-cloudflared tunnel login
-cloudflared tunnel create werewolf-backend
-cloudflared tunnel route dns werewolf-backend backend.yourdomain.com
-cloudflared tunnel token werewolf-backend   # copy the token
-```
-
-Add to `.env`:
-```
-CLOUDFLARE_TUNNEL_TOKEN=<token>
-BACKEND_URL=https://backend.yourdomain.com
-MOBILE_URL=https://my-game.vercel.app
-```
-
-Set `VITE_BACKEND_URL=https://backend.yourdomain.com` in both Vercel projects.
-
-Launch:
 ```bash
 ./start.sh --tunnel
 ```
 
-### Verification
+### Verify tunnel is up
 
 ```bash
-# Backend reachable via tunnel?
-curl https://<tunnel-url>/api/health
-
-# Tunnel URL embedded in QR?
-# Open http://<LAN-IP>/display/ and scan the QR code with a phone not on LAN.
-# Should reach the Vercel mobile frontend and successfully join the lobby.
-
-# WSS working?
-# Open browser dev tools on the mobile Vercel page.
-# Network → WS tab should show wss://<tunnel-url>/ws/... (not ws://)
+curl -s https://backend.imposter.com/api/health
+# Expected: {"status":"ok","schema_version":"0.4"}
 ```
+
+### Ephemeral tunnel (no Cloudflare account needed)
+
+```bash
+./start.sh --tunnel-quick
+docker compose logs cloudflared-quick | grep trycloudflare
+# Copy the printed URL — it is auto-embedded in the QR code via ?b=
+```
+
+### One-time Cloudflare configuration (already done)
+
+1. **DNS** — `dash.cloudflare.com` → `imposter.com` → DNS → Records:
+   - Type: `CNAME`, Name: `backend`, Target: `b891dd22-6d40-441d-b60a-6479a61c8b4b.cfargotunnel.com`, Proxy: ☁️ Proxied
+
+2. **SSL** — `dash.cloudflare.com` → `imposter.com` → SSL/TLS → Overview → **Full**
+
+3. **Tunnel hostname** — Zero Trust → Networks → Tunnels → `imposter-backend` → Hostname routes:
+   - Subdomain: `backend`, Domain: `imposter.com`, Service: `HTTP`, URL: `nginx:80`
+
+### Vercel environment variables
+
+**`imposter-mobile` project** (Settings → Environment Variables):
+
+| Variable | Value |
+|---|---|
+| `VITE_BACKEND_URL` | `https://backend.imposter.com` |
+
+### `.env` variables (hybrid mode)
+
+| Variable | Value | Flows to |
+|---|---|---|
+| `CLOUDFLARE_TUNNEL_TOKEN` | `<token>` | `cloudflared` container |
+| `BACKEND_URL` | `https://backend.imposter.com` | Backend `BACKEND_PUBLIC_URL` + display `VITE_QR_BACKEND_URL` |
+| `MOBILE_URL` | `https://imposter-mobile.vercel.app` | Display `VITE_MOBILE_URL` → QR target |
 
 ### Troubleshooting
 
-| Symptom | Likely cause | Fix |
+| Symptom | Cause | Fix |
 |---|---|---|
-| Mobile gets CORS/network error | Backend URL wrong or unset | Check `VITE_BACKEND_URL` in Vercel env vars; redeploy |
-| WS closes immediately after connect | Mixed content (HTTP WS from HTTPS page) | Ensure backend is behind HTTPS tunnel, not plain HTTP |
-| QR code missing `?b=` param | Display not in hybrid mode | Set `BACKEND_URL` in `.env` and rebuild display image |
-| Tunnel container keeps restarting | Bad token or network issue | `docker compose logs cloudflared`; verify token with `cloudflared tunnel info` |
-| Players land on "game not found" | Session from previous tunnel URL | Player must re-scan QR (new session); old `?b=` stored in sessionStorage expired |
+| `curl` health fails — SSL error | SSL mode not Full | Cloudflare → `imposter.com` → SSL/TLS → **Full** |
+| DNS resolves to home IP | CNAME record missing | Add CNAME in Cloudflare DNS (see above) |
+| Tunnel shows Down in dashboard | Container not running | `./start.sh --tunnel` |
+| "Network error" on Vercel mobile | `VITE_BACKEND_URL` not set or tunnel down | Set Vercel env var; confirm `curl` health passes |
+| QR missing `?b=` | `BACKEND_URL` not in `.env` | Add to `.env` and `./start.sh --tunnel` |
+| Display broken in LAN mode | Old bug (fixed) | `git pull` to get latest |
+| Docker "network not found" | Stale Docker network | `docker network prune -f && ./start.sh --tunnel` |
+| Stale game after restart | Old `?b=` in sessionStorage | Player opens a fresh tab |
 
 ---
 
