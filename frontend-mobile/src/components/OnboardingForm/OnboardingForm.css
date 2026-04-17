@@ -195,9 +195,8 @@
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
-  padding-bottom: 4px;
+  padding: 4px 4px 8px;
   width: 100%;
-  max-width: 100%;
   box-sizing: border-box;
 }
 
@@ -206,30 +205,32 @@
 }
 
 .onboarding__icon-btn {
-  flex: 0 0 calc((100% - 24px) / 4);
+  flex: 0 0 72px;
+  width: 72px;
   aspect-ratio: 1;
   border-radius: 12px;
   border: 3px solid transparent;
   background: rgba(255,255,255,0.07);
   cursor: pointer;
-  padding: 6px;
+  padding: 0;
+  overflow: hidden;
   scroll-snap-align: start;
-  transition: border-color 0.15s, transform 0.15s;
+  transition: border-color 0.15s;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
 }
 
 .onboarding__icon-btn--selected {
   border-color: #fff;
-  transform: scale(1.05);
   background: rgba(255,255,255,0.14);
 }
 
 .onboarding__icon-img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
   display: block;
   user-select: none;
   pointer-events: none;
