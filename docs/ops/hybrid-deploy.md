@@ -63,7 +63,11 @@ BACKEND_URL=https://backend.imposter.com
 MOBILE_URL=https://imposter-mobile.vercel.app
 ```
 
-All three hybrid vars are set. The display Docker build bakes `MOBILE_URL` into the QR code and `BACKEND_URL` into the `?b=` param.
+| Variable | Docker display usage | Mobile Vercel usage |
+|---|---|---|
+| `BACKEND_URL` | Passed as `QR_BACKEND_URL` build arg → baked as `VITE_QR_BACKEND_URL` → embedded in QR `?b=` only. Display API/WS calls stay LAN-relative. | N/A |
+| `MOBILE_URL` | Baked as `VITE_MOBILE_URL` → QR target URL | N/A |
+| `CLOUDFLARE_TUNNEL_TOKEN` | Used by `cloudflared` Docker service | N/A |
 
 ---
 

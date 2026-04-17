@@ -96,10 +96,11 @@ services:
         #   HOST_IP=http://192.168.1.100 docker compose up --build
         # Reads from the shell environment automatically if exported.
         HOST_IP: ${HOST_IP:-}
-        # Hybrid deployment: public HTTPS URL exposing the backend (tunnel or port-forward).
-        # When set, display API calls use this URL and the QR code embeds it via ?b=
-        # so mobile clients not on the LAN can reach the backend.
-        BACKEND_URL: ${BACKEND_URL:-}
+        # Hybrid deployment: tunnel URL for the QR code ?b= embed only.
+        # The display's own API/WS calls always use relative paths (LAN-direct).
+        # VITE_BACKEND_URL is intentionally NOT baked here — set it in Vercel
+        # project env vars if deploying the display to Vercel.
+        QR_BACKEND_URL: ${BACKEND_URL:-}
         # Vercel URL of the mobile frontend. When set, the QR code points here
         # instead of the local LAN IP so internet players can scan and join.
         MOBILE_URL: ${MOBILE_URL:-}

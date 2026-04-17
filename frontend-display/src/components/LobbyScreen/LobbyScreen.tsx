@@ -25,7 +25,9 @@ const MOBILE_BASE: string =
 // no ?b= param is added — the QR code is identical to the original behaviour.
 function buildJoinUrl(gameId: string): string {
   const base = `${MOBILE_BASE}/?g=${gameId}`
-  const backendUrl = getApiBase()
+  // Docker: VITE_QR_BACKEND_URL is baked from BACKEND_URL in .env (display API/WS stay LAN-relative)
+  // Vercel: falls back to getApiBase() which reads VITE_BACKEND_URL
+  const backendUrl = import.meta.env.VITE_QR_BACKEND_URL || getApiBase()
   if (!backendUrl) return base
   return `${base}&b=${encodeURIComponent(backendUrl)}`
 }
