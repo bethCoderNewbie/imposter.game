@@ -66,8 +66,17 @@ services:
       context: .
       dockerfile: ./backend-engine/Dockerfile
     environment:
+      SECRET_KEY: ${SECRET_KEY}
       REDIS_URL: redis://redis:6379
       DATABASE_URL: postgresql+asyncpg://werewolf:werewolf@postgres/werewolf
+      SCHEMA_VERSION: ${SCHEMA_VERSION:-0.4}
+      DEBUG: ${DEBUG:-false}
+      # Phase timers
+      NIGHT_TIMER_SECONDS: ${NIGHT_TIMER_SECONDS:-60}
+      DAY_TIMER_SECONDS: ${DAY_TIMER_SECONDS:-180}
+      VOTE_TIMER_SECONDS: ${VOTE_TIMER_SECONDS:-90}
+      ROLE_DEAL_TIMER_SECONDS: ${ROLE_DEAL_TIMER_SECONDS:-30}
+      HUNTER_PENDING_TIMER_SECONDS: ${HUNTER_PENDING_TIMER_SECONDS:-30}
       # Narrator settings (PRD-008) — all default to disabled; set NARRATOR_ENABLED=true to activate
       NARRATOR_ENABLED: ${NARRATOR_ENABLED:-false}
       NARRATOR_MODE: ${NARRATOR_MODE:-prebaked}
