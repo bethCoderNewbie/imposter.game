@@ -1,11 +1,12 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// In dev mode base is '/' so http://localhost:5173/ works directly.
-// In production build base is '/display/' so nginx can proxy /display/* to this service.
+// Vercel sets VERCEL=1 at build time — serve from root.
+// Docker build (nginx alias strips /display/ prefix) uses /display/.
+// Dev mode always uses /.
 export default defineConfig(({ command }) => ({
   plugins: [react()],
-  base: command === 'build' ? '/display/' : '/',
+  base: process.env.VERCEL ? '/' : command === 'build' ? '/display/' : '/',
   server: {
     host: '0.0.0.0',
     port: 5173,
