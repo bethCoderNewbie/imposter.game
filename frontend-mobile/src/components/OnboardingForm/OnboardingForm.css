@@ -187,15 +187,18 @@
   cursor: pointer;
 }
 
-/* Icon picker — horizontal scroll, 3 visible at a time */
+/* Icon picker — horizontal scroll showing all icons */
 .onboarding__icon-row {
   display: flex;
   gap: 8px;
-  overflow-x: auto;
+  overflow-x: scroll;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   padding-bottom: 4px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .onboarding__icon-row::-webkit-scrollbar {
@@ -203,7 +206,7 @@
 }
 
 .onboarding__icon-btn {
-  flex: 0 0 calc((100% - 16px) / 3);
+  flex: 0 0 calc((100% - 24px) / 4);
   aspect-ratio: 1;
   border-radius: 12px;
   border: 3px solid transparent;

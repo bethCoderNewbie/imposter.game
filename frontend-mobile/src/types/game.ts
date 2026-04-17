@@ -208,7 +208,7 @@ export function getInitials(displayName: string): string {
 }
 
 export const AVATAR_ICONS: string[] = Array.from(
-  { length: 26 }, (_, i) => `icon_${String(i).padStart(2, '0')}`,
+  { length: 27 }, (_, i) => `icon_${String(i).padStart(2, '0')}`,
 )
 
 export function isIconAvatar(avatarId: string): boolean {
