@@ -58,6 +58,10 @@ function ActivePuzzle({ puzzle, sendIntent, source }: ActiveProps) {
     return <SequencePuzzle puzzle={puzzle} sendIntent={sendIntent} pct={pct} isWarning={isWarning} source={source} />
   }
 
+  if (puzzle.puzzle_type === 'hard_logic') {
+    return <HardLogicPuzzle puzzle={puzzle} sendIntent={sendIntent} pct={pct} isWarning={isWarning} source={source} />
+  }
+
   return <ChoicePuzzle puzzle={puzzle} sendIntent={sendIntent} pct={pct} isWarning={isWarning} source={source} />
 }
 
@@ -107,6 +111,69 @@ function ChoicePuzzle({ puzzle, sendIntent, pct, isWarning, source }: ChoiceProp
         <p className="action-ui__puzzle-question">{prompt}</p>
         <div className="action-ui__answer-grid">
           {options.map((opt, i) => (
+            <button
+              key={i}
+              className="action-ui__answer-btn"
+              disabled={locked}
+              onClick={() => handleAnswer(i)}
+            >
+              {opt}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Hard logic puzzle (two sequential questions, both required) ───────────────
+
+function HardLogicPuzzle({ puzzle, sendIntent, pct, isWarning, source }: ChoiceProps) {
+  const data = puzzle.puzzle_data as {
+    q1: { question: string; answer_options: string[] }
+    q2: { question: string; answer_options: string[] }
+  }
+  const [step, setStep] = useState<1 | 2>(1)
+  const [q1Answer, setQ1Answer] = useState<number | null>(null)
+  const [locked, setLocked] = useState(false)
+  const unlockTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => () => {
+    if (unlockTimer.current) clearTimeout(unlockTimer.current)
+  }, [])
+
+  function handleQ1(i: number) {
+    if (locked) return
+    setQ1Answer(i)
+    setStep(2)
+  }
+
+  function handleQ2(i: number) {
+    if (locked || q1Answer === null) return
+    setLocked(true)
+    const intentType = source === 'archive' ? 'submit_puzzle_answer' : 'submit_grid_answer'
+    sendIntent({ type: intentType, answer_indices: [q1Answer, i] })
+    unlockTimer.current = setTimeout(() => setLocked(false), LOCK_TIMEOUT_MS)
+  }
+
+  const currentQ = step === 1 ? data.q1 : data.q2
+  const handleAnswer = step === 1 ? handleQ1 : handleQ2
+
+  return (
+    <div className="action-ui">
+      <p className="action-ui__header">
+        {step === 1 ? 'Question 1 of 2 — both must be correct.' : 'Question 2 of 2 — finish strong.'}
+      </p>
+      <div className="action-ui__timer-bar-track">
+        <div
+          className={`action-ui__timer-bar${isWarning ? ' action-ui__timer-bar--warning' : ''}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <div className="action-ui__puzzle-panel">
+        <p className="action-ui__puzzle-question">{currentQ.question}</p>
+        <div className="action-ui__answer-grid">
+          {currentQ.answer_options.map((opt, i) => (
             <button
               key={i}
               className="action-ui__answer-btn"

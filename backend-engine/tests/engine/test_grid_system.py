@@ -123,7 +123,12 @@ class TestGridPuzzle:
         for tier in (1, 2, 3):
             rng = random.Random(f"test-{tier}")
             puzzle = generate_grid_puzzle(tier, rng)
-            if puzzle.puzzle_type != "sequence":
+            if puzzle.puzzle_type == "hard_logic":
+                assert "correct_index" in puzzle.puzzle_data["q1"], \
+                    f"Tier {tier} hard_logic q1 missing correct_index"
+                assert "correct_index" in puzzle.puzzle_data["q2"], \
+                    f"Tier {tier} hard_logic q2 missing correct_index"
+            elif puzzle.puzzle_type != "sequence":
                 assert "correct_index" in puzzle.puzzle_data, \
                     f"Tier {tier} puzzle missing correct_index"
 

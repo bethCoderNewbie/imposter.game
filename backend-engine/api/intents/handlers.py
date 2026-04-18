@@ -690,15 +690,23 @@ async def handle_submit_grid_answer(G, intent, redis_client, cm) -> MasterGameSt
     col = player.grid_node_col
 
     answer_index = intent.get("answer_index")
+    answer_indices = intent.get("answer_indices")  # hard_logic: [q1_idx, q2_idx]
     answer_sequence = intent.get("answer_sequence")
-    correct_index = gps.puzzle_data.get("correct_index")
-    correct_sequence = gps.puzzle_data.get("sequence")
 
     # Validate answer
-    if gps.puzzle_type == "sequence":
-        correct = answer_sequence == correct_sequence
+    if gps.puzzle_type == "hard_logic":
+        q1_ci = gps.puzzle_data.get("q1", {}).get("correct_index")
+        q2_ci = gps.puzzle_data.get("q2", {}).get("correct_index")
+        correct = (
+            isinstance(answer_indices, list)
+            and len(answer_indices) == 2
+            and answer_indices[0] == q1_ci
+            and answer_indices[1] == q2_ci
+        )
+    elif gps.puzzle_type == "sequence":
+        correct = answer_sequence == gps.puzzle_data.get("sequence")
     else:
-        correct = isinstance(answer_index, int) and answer_index == correct_index
+        correct = isinstance(answer_index, int) and answer_index == gps.puzzle_data.get("correct_index")
 
     if correct and row is not None and col is not None:
         from engine.puzzle_bank import node_to_quadrant
@@ -708,6 +716,9 @@ async def handle_submit_grid_answer(G, intent, redis_client, cm) -> MasterGameSt
         gps.active = False
         gps.solved = True
         gps.hint_pending = True
+
+        # Mark last-known quadrant so wolf radar can target player after puzzle completes
+        player.grid_last_quadrant = quadrant
 
         # Record anonymized activity for wolf radar
         sequence_idx = len(G.night_actions.grid_activity)
@@ -811,7 +822,12 @@ _VALID_QUADRANTS = {"top_left", "top_right", "bottom_left", "bottom_right"}
 
 
 def _players_in_quadrant(G, quadrant: str) -> list[str]:
-    """Return pids of alive non-wolf players whose active grid node maps to `quadrant`."""
+    """Return pids of alive non-wolf players in `quadrant`.
+
+    Primary: player has an active grid node there (mid-puzzle).
+    Fallback: player's last correctly-solved node was in that quadrant (remains
+    vulnerable after completing a puzzle until they solve one elsewhere).
+    """
     from engine.puzzle_bank import node_to_quadrant
     result = []
     for pid, p in G.players.items():
@@ -820,6 +836,8 @@ def _players_in_quadrant(G, quadrant: str) -> list[str]:
         if p.grid_node_row is not None and p.grid_node_col is not None:
             if node_to_quadrant(p.grid_node_row, p.grid_node_col) == quadrant:
                 result.append(pid)
+        elif p.grid_last_quadrant == quadrant:
+            result.append(pid)
     return result
 
 

@@ -41,6 +41,7 @@ _ALWAYS_STRIP_PLAYER_FIELDS = frozenset({
     # Grid system — server-only position tracking and attack state
     "grid_node_row",
     "grid_node_col",
+    "grid_last_quadrant",
     "under_attack",   # restored for own player only in _baseline_alive_view
 })
 
@@ -407,11 +408,15 @@ def _strip_puzzle_for_player(
     if role_def.get("wakeOrder", 0) != 0:
         return None
 
-    # Strip correct_index — never send to client
+    # Strip correct_index — never send to client (including nested hard_logic q1/q2)
     stripped = deepcopy(puzzle_state)
     if "puzzle_data" in stripped:
-        stripped["puzzle_data"] = dict(stripped["puzzle_data"])
-        stripped["puzzle_data"].pop("correct_index", None)
+        pd = dict(stripped["puzzle_data"])
+        pd.pop("correct_index", None)
+        for qkey in ("q1", "q2"):
+            if isinstance(pd.get(qkey), dict):
+                pd[qkey] = {k: v for k, v in pd[qkey].items() if k != "correct_index"}
+        stripped["puzzle_data"] = pd
 
     return stripped
 

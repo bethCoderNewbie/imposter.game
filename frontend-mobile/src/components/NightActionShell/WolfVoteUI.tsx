@@ -25,6 +25,14 @@ export default function WolfVoteUI({ gameState, myPlayer, sendIntent }: Props) {
     sendIntent({ type: 'submit_night_action', target_id: selectedId })
   }
 
+  if (myPlayer.night_action_submitted) {
+    return (
+      <div className="action-ui">
+        <p className="night-shell__waiting">Hunt target locked in. Waiting for others…</p>
+      </div>
+    )
+  }
+
   return (
     <div className="action-ui">
       <p className="action-ui__header">Choose your target</p>

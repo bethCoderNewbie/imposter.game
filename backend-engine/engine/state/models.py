@@ -96,6 +96,7 @@ class PlayerState(BaseModel):
     # Grid system fields (server-only during night phase)
     grid_node_row: int | None = None       # server-only: current grid node row
     grid_node_col: int | None = None       # server-only: current grid node column
+    grid_last_quadrant: str | None = None  # server-only: quadrant of last correctly-solved grid node this night
     grid_puzzle_state: PuzzleState | None = None  # active grid node puzzle; correct_index stripped
     under_attack: bool = False             # own player only: True while a wolf is charging their quadrant
 

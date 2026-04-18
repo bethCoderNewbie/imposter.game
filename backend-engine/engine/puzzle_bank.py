@@ -74,10 +74,8 @@ def generate_night_puzzle(G: "MasterGameState", player_id: str) -> "PuzzleState"
     return _make_sequence_puzzle(rng)
 
 
-def _make_logic_puzzle(rng: random.Random) -> "PuzzleState":
-    from engine.state.models import PuzzleState
-
-    # Pick question; collect 3 same-category distractors (ADR-012)
+def _make_logic_question(rng: random.Random) -> dict:
+    """Build one 4-option logic Q&A dict with correct_index. Shared by logic/hard_logic."""
     q_idx = rng.randrange(len(BANK))
     question, correct_answer, category = BANK[q_idx]
 
@@ -85,7 +83,6 @@ def _make_logic_puzzle(rng: random.Random) -> "PuzzleState":
     distractor_indices = rng.sample(peers, min(3, len(peers)))
     distractors = [BANK[i][1] for i in distractor_indices]
 
-    # Fallback: pad with cross-category answers if the category had < 3 peers
     seen = {correct_answer} | set(distractors)
     while len(distractors) < 3:
         d_idx = rng.randrange(len(BANK))
@@ -96,15 +93,26 @@ def _make_logic_puzzle(rng: random.Random) -> "PuzzleState":
 
     options = [correct_answer] + distractors
     rng.shuffle(options)
-    correct_index = options.index(correct_answer)
+    return {"question": question, "answer_options": options, "correct_index": options.index(correct_answer)}
+
+
+def _make_logic_puzzle(rng: random.Random) -> "PuzzleState":
+    from engine.state.models import PuzzleState
 
     return PuzzleState(
         puzzle_type="logic",
-        puzzle_data={
-            "question": question,
-            "answer_options": options,
-            "correct_index": correct_index,
-        },
+        puzzle_data=_make_logic_question(rng),
+        time_limit_seconds=20,
+    )
+
+
+def _make_hard_logic_puzzle(rng: random.Random) -> "PuzzleState":
+    """Two sequential logic questions — both must be answered correctly. 20s shared."""
+    from engine.state.models import PuzzleState
+
+    return PuzzleState(
+        puzzle_type="hard_logic",
+        puzzle_data={"q1": _make_logic_question(rng), "q2": _make_logic_question(rng)},
         time_limit_seconds=20,
     )
 
@@ -218,8 +226,7 @@ def generate_grid_puzzle(tier: int, rng: random.Random) -> "PuzzleState":
         puzzle = _make_logic_puzzle(rng)
         return puzzle.model_copy(update={"time_limit_seconds": 10})
     # Tier 3
-    puzzle = _make_logic_puzzle(rng)
-    return puzzle.model_copy(update={"time_limit_seconds": 20})
+    return _make_hard_logic_puzzle(rng)
 
 
 def node_to_quadrant(row: int, col: int) -> str:

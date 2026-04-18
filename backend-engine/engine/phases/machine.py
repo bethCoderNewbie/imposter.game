@@ -96,6 +96,7 @@ def transition_phase(G: MasterGameState, new_phase: Phase) -> MasterGameState:
                 player.puzzle_state = None
                 player.grid_node_row = None
                 player.grid_node_col = None
+                player.grid_last_quadrant = None
                 player.grid_puzzle_state = None
                 continue
             role_def = ROLE_REGISTRY.get(player.role or "", {})
@@ -105,6 +106,7 @@ def transition_phase(G: MasterGameState, new_phase: Phase) -> MasterGameState:
                 player.puzzle_state = None
             player.grid_node_row = None
             player.grid_node_col = None
+            player.grid_last_quadrant = None
             player.grid_puzzle_state = None
             player.under_attack = False
 

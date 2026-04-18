@@ -39,11 +39,20 @@ def generate_hint(G: "MasterGameState", player_id: str) -> dict:
     Rounds 1–2 (< _VAGUE_ROUND_THRESHOLD): composition hints are vague.
     Round 3+: hints are specific.
 
-    Categories: wolf_count (always), no_role_present, role_present, neutral_exists,
-    non_wolf_kill (round 2+), lovers_exist (if Cupid linked a pair).
+    Sequence solves draw from the tier-2 (relational) pool — sequence is the
+    hardest archive puzzle type and deserves stronger intel.
     """
     rng = random.Random(f"{G.seed}:{G.round}:{player_id}:hint")
-    pool = _build_tier1_pool(G, rng)
+    player = G.players.get(player_id)
+    ps = player.puzzle_state if player else None
+    if ps and ps.puzzle_type == "sequence":
+        pool = _build_tier2_pool(G, rng)
+        if not pool:
+            pool = _build_tier1_pool(G, rng)
+    else:
+        pool = _build_tier1_pool(G, rng)
+    if not pool:
+        pool = [_emergency_wolf_count_hint(G)]
     chosen = rng.choice(pool)
     return {**_wrap_hint(chosen, G.round), "source": "archive"}
 
@@ -74,9 +83,11 @@ def generate_grid_hint(
     else:
         pool = _build_tier3_pool(G, rng)
 
-    # Fallback to Tier 1 if higher tier pool is empty (edge case: game almost over)
+    # Fallback: tier 1, then hard guard to prevent rng.choice([]) crash
     if not pool:
         pool = _build_tier1_pool(G, rng)
+    if not pool:
+        pool = [_emergency_wolf_count_hint(G)]
 
     chosen = rng.choice(pool)
     return {**_wrap_hint(chosen, G.round), "source": "grid"}
@@ -130,9 +141,14 @@ def _build_tier1_pool(G: "MasterGameState", rng: random.Random) -> list[dict]:
 
     # neutral_exists
     if any(p.is_alive and p.team == "neutral" for p in G.players.values()):
+        neutral_text = (
+            "A mysterious force stirs within this village."
+            if is_vague
+            else "At least one Neutral player is alive in this game."
+        )
         pool.append({
             "category": "neutral_exists",
-            "text": "At least one Neutral player is alive in this game.",
+            "text": neutral_text,
             "expires_after_round": G.round + 1,
         })
 
@@ -296,6 +312,18 @@ def _build_tier2_pool(G: "MasterGameState", rng: random.Random) -> list[dict]:
                 "expires_after_round": G.round + 1,
             })
 
+    # threat_level — always available, guarantees tier-2 pool is never empty
+    alive_total = sum(1 for p in G.players.values() if p.is_alive)
+    alive_wolf_count = len(alive_wolves)
+    if alive_total > 0:
+        ratio = alive_wolf_count / alive_total
+        level = "high" if ratio >= 0.4 else ("moderate" if ratio >= 0.2 else "low")
+        pool.append({
+            "category": "threat_level",
+            "text": f"Wolf presence among the survivors is {level}.",
+            "expires_after_round": G.round + 1,
+        })
+
     return pool
 
 
@@ -303,7 +331,9 @@ def _build_tier3_pool(G: "MasterGameState", rng: random.Random) -> list[dict]:
     """Tier 3: specific intel hints."""
     pool: list[dict] = []
     alive = [pid for pid, p in G.players.items() if p.is_alive]
+    alive_wolves_t3 = [pid for pid in alive if G.players[pid].team == "werewolf"]
     alive_non_wolves = [pid for pid in alive if G.players[pid].team != "werewolf"]
+    alive_villagers_t3 = [pid for pid in alive if G.players[pid].team == "village"]
 
     # innocent_clear: name one alive non-wolf
     if alive_non_wolves:
@@ -329,10 +359,32 @@ def _build_tier3_pool(G: "MasterGameState", rng: random.Random) -> list[dict]:
                 "expires_after_round": G.round + 1,
             })
 
+    # wolf_near_win: wolves have numerical parity or advantage over villagers
+    if len(alive_wolves_t3) >= len(alive_villagers_t3) and alive_villagers_t3:
+        pool.append({
+            "category": "wolf_near_win",
+            "text": "The wolves are close to seizing control of the village.",
+            "expires_after_round": G.round + 1,
+        })
+
     return pool
 
 
 # ── Shared helpers ────────────────────────────────────────────────────────────
+
+def _emergency_wolf_count_hint(G: "MasterGameState") -> dict:
+    """Last-resort hint when all pool builders return empty. Always safe to call."""
+    wolf_count = sum(1 for p in G.players.values() if p.team == "werewolf")
+    plural = wolf_count != 1
+    return {
+        "category": "wolf_count",
+        "text": (
+            f"There {'are' if plural else 'is'} {wolf_count} "
+            f"{'Wolves' if plural else 'Wolf'} total in this game."
+        ),
+        "expires_after_round": None,
+    }
+
 
 def _wrap_hint(chosen: dict, round_number: int) -> dict:
     """Wrap a raw pool entry into a full HintPayload dict."""
