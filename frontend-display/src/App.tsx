@@ -261,11 +261,14 @@ export default function App() {
 
     if (phase === 'lobby' || phase === 'role_deal') {
       return (
-        <LobbyScreen
-          gameState={gameState}
-          hostSecret={hostSecret ?? undefined}
-          gameId={gameId ?? undefined}
-        />
+        <>
+          <LobbyScreen
+            gameState={gameState}
+            hostSecret={hostSecret ?? undefined}
+            gameId={gameId ?? undefined}
+          />
+          {hostSecret && phase === 'role_deal' && <HostControls gameState={gameState} sendIntent={sendIntent} />}
+        </>
       )
     }
 

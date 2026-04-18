@@ -28,14 +28,12 @@ export default function HostControls({ gameState, sendIntent }: Props) {
       <button className="host-controls__btn" onClick={() => send('extend_timer')}>
         +30s
       </button>
-      {gameState.phase !== 'day' && (
-        <button
-          className="host-controls__btn host-controls__btn--skip"
-          onClick={() => send('force_next')}
-        >
-          Skip ▶▶
-        </button>
-      )}
+      <button
+        className="host-controls__btn host-controls__btn--skip"
+        onClick={() => send('force_next')}
+      >
+        Skip ▶▶
+      </button>
     </div>
   )
 }
