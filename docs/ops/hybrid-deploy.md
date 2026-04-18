@@ -15,7 +15,7 @@ Player phone  ──HTTPS──▶  https://imposter-mobile.vercel.app
                                 │
                         reads ?b= from QR code (or VITE_BACKEND_URL fallback)
                                 │
-                       WSS/HTTPS ──▶  https://backend.imposter.com
+                       WSS/HTTPS ──▶  https://backend-imposter.notist.cc
                                                │
                                        Cloudflare Tunnel
                                                │
@@ -31,7 +31,7 @@ Player phone  ──HTTPS──▶  https://imposter-mobile.vercel.app
 | Service | URL | Notes |
 |---|---|---|
 | Mobile (Vercel) | `https://imposter-mobile.vercel.app` | Players scan QR and land here |
-| Backend tunnel | `https://backend.imposter.com` | Cloudflare Named Tunnel → local nginx |
+| Backend tunnel | `https://backend-imposter.notist.cc` | Cloudflare Named Tunnel → local nginx |
 | Display | `http://<LAN-IP>/display/` | Host only — served by Docker, LAN only |
 
 ---
@@ -41,22 +41,22 @@ Player phone  ──HTTPS──▶  https://imposter-mobile.vercel.app
 ### 1. Tunnel token
 Already configured. Token stored in `.env` as `CLOUDFLARE_TUNNEL_TOKEN`.
 
-Tunnel ID: `b891dd22-6d40-441d-b60a-6479a61c8b4b`
+Tunnel ID: `cea216ac-4ec5-480b-b1e9-c33883e2715e`
 
 ### 2. DNS record (Cloudflare dashboard)
 
-`dash.cloudflare.com` → `imposter.com` → **DNS → Records → Add record**
+`dash.cloudflare.com` → `notist.cc` → **DNS → Records → Add record**
 
 | Field | Value |
 |---|---|
 | Type | `CNAME` |
-| Name | `backend` |
-| Target | `b891dd22-6d40-441d-b60a-6479a61c8b4b.cfargotunnel.com` |
+| Name | `backend-imposter` |
+| Target | `cea216ac-4ec5-480b-b1e9-c33883e2715e.cfargotunnel.com` |
 | Proxy status | **Proxied** (orange cloud ☁️) |
 
 ### 3. SSL mode (Cloudflare dashboard)
 
-`dash.cloudflare.com` → `imposter.com` → **SSL/TLS → Overview**
+`dash.cloudflare.com` → `notist.cc` → **SSL/TLS → Overview**
 
 Set encryption mode to: **Full**
 
@@ -64,12 +64,12 @@ Set encryption mode to: **Full**
 
 ### 4. Tunnel public hostname (Zero Trust dashboard)
 
-`one.dash.cloudflare.com` → **Zero Trust → Networks → Tunnels → imposter-backend → Hostname routes**
+`one.dash.cloudflare.com` → **Zero Trust → Networks → Tunnels → backend-imposter-nothanks → Hostname routes**
 
 | Field | Value |
 |---|---|
-| Subdomain | `backend` |
-| Domain | `imposter.com` |
+| Subdomain | `backend-imposter` |
+| Domain | `notist.cc` |
 | Service type | `HTTP` |
 | URL | `nginx:80` |
 
@@ -83,13 +83,13 @@ Set encryption mode to: **Full**
 
 | Variable | Value | Purpose |
 |---|---|---|
-| `VITE_BACKEND_URL` | `https://backend.imposter.com` | Fallback when player navigates directly (no QR scan) |
+| `VITE_BACKEND_URL` | `https://backend-imposter.notist.cc` | Fallback when player navigates directly (no QR scan) |
 
 ### Display project (`imposter-game-swart`) — optional, if using Vercel display
 
 | Variable | Value | Purpose |
 |---|---|---|
-| `VITE_BACKEND_URL` | `https://backend.imposter.com` | Display API/WS calls via tunnel |
+| `VITE_BACKEND_URL` | `https://backend-imposter.notist.cc` | Display API/WS calls via tunnel |
 | `VITE_MOBILE_URL` | `https://imposter-mobile.vercel.app` | QR code target URL |
 
 > The display is normally served from Docker (LAN), not Vercel. If using the Docker display, these are not needed — `BACKEND_URL` and `MOBILE_URL` in `.env` handle it.
@@ -121,7 +121,7 @@ NARRATOR_MODE=prebaked
 
 # ── Hybrid deployment ──────────────────────────────────────────────────────────
 CLOUDFLARE_TUNNEL_TOKEN=<token from Cloudflare dashboard>
-BACKEND_URL=https://backend.imposter.com
+BACKEND_URL=https://backend-imposter.notist.cc
 MOBILE_URL=https://imposter-mobile.vercel.app
 ```
 
@@ -156,19 +156,19 @@ MOBILE_URL=https://imposter-mobile.vercel.app
 
 ```bash
 # 1. Backend reachable via tunnel
-curl -s https://backend.imposter.com/api/health
+curl -s https://backend-imposter.notist.cc/api/health
 # Expected: {"status":"ok","schema_version":"0.4"}
 
 # 2. Open display on TV (LAN)
 # http://<LAN-IP>/display/
 # Create a match — QR should encode:
-# https://imposter-mobile.vercel.app/?g=XXXX&b=https%3A%2F%2Fbackend.imposter.com
+# https://imposter-mobile.vercel.app/?g=XXXX&b=https%3A%2F%2Fbackend-imposter.notist.cc
 
 # 3. Player scans QR on a phone NOT on your WiFi
 # Should load join form at imposter-mobile.vercel.app and join the lobby
 
 # 4. Check WSS in browser devtools (mobile)
-# Network → WS → should show: wss://backend.imposter.com/ws/...
+# Network → WS → should show: wss://backend-imposter.notist.cc/ws/...
 ```
 
 ---
@@ -180,7 +180,7 @@ curl -s https://backend.imposter.com/api/health
 ./start.sh --tunnel
 
 # Confirm tunnel is up:
-curl -s https://backend.imposter.com/api/health
+curl -s https://backend-imposter.notist.cc/api/health
 
 # Open display (LAN):
 # http://<LAN-IP>/display/
@@ -196,11 +196,11 @@ curl -s https://backend.imposter.com/api/health
 |---|---|---|
 | `curl` health returns nothing / SSL error | DNS CNAME missing or SSL mode wrong | Add CNAME in Cloudflare DNS; set SSL/TLS to **Full** |
 | DNS resolves to home IP (`64.x.x.x`) | A record instead of CNAME | Delete A record, add CNAME to `cfargotunnel.com` |
-| `ERR_SSL_VERSION_OR_CIPHER_MISMATCH` | SSL mode not set to Full | `dash.cloudflare.com` → `imposter.com` → SSL/TLS → Overview → **Full** |
+| `ERR_SSL_VERSION_OR_CIPHER_MISMATCH` | SSL mode not set to Full | `dash.cloudflare.com` → `notist.cc` → SSL/TLS → Overview → **Full** |
 | Tunnel shows "Down" in Zero Trust dashboard | Container not running | `./start.sh --tunnel` |
 | "Network error. Is the server running?" on Vercel mobile | `VITE_BACKEND_URL` not set or tunnel down | Set env var in Vercel project; confirm `curl` health passes |
 | QR code shows LAN IP, not Vercel URL | `MOBILE_URL` not in `.env` or not rebuilt | Set `MOBILE_URL` in `.env` and `./start.sh --tunnel` |
-| `?b=` missing from QR URL | `BACKEND_URL` not in `.env` | Add `BACKEND_URL=https://backend.imposter.com` and rebuild |
+| `?b=` missing from QR URL | `BACKEND_URL` not in `.env` | Add `BACKEND_URL=https://backend-imposter.notist.cc` and rebuild |
 | Display "Network error" in LAN mode (no tunnel) | Old bug — fixed | Ensure you have latest code (`git pull`) |
 | WS closes immediately after connect | Mixed content — backend not HTTPS | Confirm tunnel CNAME + SSL Full are both set |
 | Player avatar photos broken for remote players | `BACKEND_PUBLIC_URL` not set | Ensure `BACKEND_URL` is in `.env` (forwarded automatically) |

@@ -107,7 +107,7 @@ export default function App() {
 
     fetch(`${getApiBase()}/api/games/${stored.game_id}/rejoin`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify({ session_token: stored.session_token }),
     })
       .then(r => {

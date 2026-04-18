@@ -918,7 +918,7 @@ Full setup guide: `docs/ops/hybrid-deploy.md`
 | Service | URL |
 |---|---|
 | Mobile (Vercel) | `https://imposter-mobile.vercel.app` |
-| Backend tunnel | `https://backend.imposter.com` |
+| Backend tunnel | `https://backend-imposter.notist.cc` |
 | Display | `http://<LAN-IP>/display/` (LAN only, Docker) |
 
 ### Per-session launch
@@ -930,7 +930,7 @@ Full setup guide: `docs/ops/hybrid-deploy.md`
 ### Verify tunnel is up
 
 ```bash
-curl -s https://backend.imposter.com/api/health
+curl -s https://backend-imposter.notist.cc/api/health
 # Expected: {"status":"ok","schema_version":"0.4"}
 ```
 
@@ -944,13 +944,13 @@ docker compose logs cloudflared-quick | grep trycloudflare
 
 ### One-time Cloudflare configuration (already done)
 
-1. **DNS** — `dash.cloudflare.com` → `imposter.com` → DNS → Records:
-   - Type: `CNAME`, Name: `backend`, Target: `b891dd22-6d40-441d-b60a-6479a61c8b4b.cfargotunnel.com`, Proxy: ☁️ Proxied
+1. **DNS** — `dash.cloudflare.com` → `notist.cc` → DNS → Records:
+   - Type: `CNAME`, Name: `backend`, Target: `cea216ac-4ec5-480b-b1e9-c33883e2715e.cfargotunnel.com`, Proxy: ☁️ Proxied
 
-2. **SSL** — `dash.cloudflare.com` → `imposter.com` → SSL/TLS → Overview → **Full**
+2. **SSL** — `dash.cloudflare.com` → `notist.cc` → SSL/TLS → Overview → **Full**
 
-3. **Tunnel hostname** — Zero Trust → Networks → Tunnels → `imposter-backend` → Hostname routes:
-   - Subdomain: `backend`, Domain: `imposter.com`, Service: `HTTP`, URL: `nginx:80`
+3. **Tunnel hostname** — Zero Trust → Networks → Tunnels → `backend-imposter-nothanks` → Hostname routes:
+   - Subdomain: `backend`, Domain: `notist.cc`, Service: `HTTP`, URL: `nginx:80`
 
 ### Vercel environment variables
 
@@ -958,28 +958,147 @@ docker compose logs cloudflared-quick | grep trycloudflare
 
 | Variable | Value |
 |---|---|
-| `VITE_BACKEND_URL` | `https://backend.imposter.com` |
+| `VITE_BACKEND_URL` | `https://backend-imposter.notist.cc` |
 
 ### `.env` variables (hybrid mode)
 
 | Variable | Value | Flows to |
 |---|---|---|
 | `CLOUDFLARE_TUNNEL_TOKEN` | `<token>` | `cloudflared` container |
-| `BACKEND_URL` | `https://backend.imposter.com` | Backend `BACKEND_PUBLIC_URL` + display `VITE_QR_BACKEND_URL` |
+| `BACKEND_URL` | `https://backend-imposter.notist.cc` | Backend `BACKEND_PUBLIC_URL` + display `VITE_QR_BACKEND_URL` |
 | `MOBILE_URL` | `https://imposter-mobile.vercel.app` | Display `VITE_MOBILE_URL` → QR target |
 
 ### Troubleshooting
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `curl` health fails — SSL error | SSL mode not Full | Cloudflare → `imposter.com` → SSL/TLS → **Full** |
+| `curl` health fails — SSL error | SSL mode not Full | Cloudflare → `notist.cc` → SSL/TLS → **Full** |
 | DNS resolves to home IP | CNAME record missing | Add CNAME in Cloudflare DNS (see above) |
 | Tunnel shows Down in dashboard | Container not running | `./start.sh --tunnel` |
 | "Network error" on Vercel mobile | `VITE_BACKEND_URL` not set or tunnel down | Set Vercel env var; confirm `curl` health passes |
+| "Network error" on Vercel mobile (CORS) | Cloudflare blocks OPTIONS preflight (502) | Deploy Cloudflare Worker `cors-proxy-backend` on `backend-imposter.notist.cc/*` — see §Cloudflare Worker below |
+| OPTIONS preflight → 502 via tunnel | Cloudflare edge security blocks OPTIONS before reaching nginx | Worker handles OPTIONS at edge; see §Cloudflare Worker |
+| GET/POST → 502 after adding Worker | `SSL: Off` Page Rule overrides tunnel SSL | Delete the Page Rule; leave SSL mode as **Full** in SSL/TLS settings |
+| "Reconnecting…" after join, REST works | `SSL: Off` Page Rule causes WS upgrade → 301 HTTP downgrade | Delete the Page Rule via API or dashboard; see §WebSocket 301 below |
 | QR missing `?b=` | `BACKEND_URL` not in `.env` | Add to `.env` and `./start.sh --tunnel` |
+| Shared game link (no `?b=`) fails | Player copy-pasted URL after `?b=` was stripped | Fixed in code — `?b=` now stays in address bar; update to latest |
 | Display broken in LAN mode | Old bug (fixed) | `git pull` to get latest |
 | Docker "network not found" | Stale Docker network | `docker network prune -f && ./start.sh --tunnel` |
 | Stale game after restart | Old `?b=` in sessionStorage | Player opens a fresh tab |
+
+### Cloudflare Worker — CORS preflight fix
+
+Cloudflare's edge security blocks `OPTIONS` preflights (returned 502) before they reach the tunnel. A Worker intercepts OPTIONS at the edge and returns CORS headers directly.
+
+**One-time setup** (required for hybrid/tunnel mode):
+
+1. `dash.cloudflare.com` → **Workers & Pages → Create Worker** → name: `cors-proxy-backend`
+2. Replace default code with:
+
+```js
+export default {
+  async fetch(request) {
+    if (request.method === 'OPTIONS') {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          'Access-Control-Max-Age': '86400',
+        },
+      })
+    }
+    return fetch(request)
+  },
+}
+```
+
+3. Deploy, then add route: `notist.cc` → **Workers & Pages → Overview → Add route**
+   - Route: `backend-imposter.notist.cc/*`
+   - Worker: `cors-proxy-backend`
+
+**Verify:**
+```bash
+curl -s -w "\nHTTP:%{http_code}" -X OPTIONS "https://backend-imposter.notist.cc/api/health" \
+  -H "Origin: https://imposter-mobile.vercel.app" \
+  -H "Access-Control-Request-Method: POST" \
+  -H "Access-Control-Request-Headers: Content-Type"
+# Expected: HTTP:204
+```
+
+**Warning:** Do NOT create a `SSL: Off` Page Rule for `backend-imposter.notist.cc/*` — it overrides the tunnel's SSL mode and breaks all GET/POST requests through the Worker pass-through.
+
+### Cloudflare API quick-check (read-only token)
+
+Use this to diagnose SSL and Page Rule issues without touching the dashboard. Token requires **Zone → Zone Settings → Read** and **Zone → Page Rules → Read** for `notist.cc`.
+
+```bash
+# Check SSL mode — must be "full", not "flexible" or "off"
+curl -s -H "Authorization: Bearer <TOKEN>" \
+  "https://api.cloudflare.com/client/v4/zones/1bdc0047d1beaeb9e41cc9fff7a1b1a5/settings/ssl" \
+  | python -m json.tool
+
+# List all active Page Rules — look for any action with "ssl":"off"
+curl -s -H "Authorization: Bearer <TOKEN>" \
+  "https://api.cloudflare.com/client/v4/zones/1bdc0047d1beaeb9e41cc9fff7a1b1a5/pagerules?status=active" \
+  | python -m json.tool
+
+# Delete a stale Page Rule by ID
+curl -s -X DELETE \
+  -H "Authorization: Bearer <TOKEN>" \
+  "https://api.cloudflare.com/client/v4/zones/1bdc0047d1beaeb9e41cc9fff7a1b1a5/pagerules/<RULE_ID>"
+```
+
+---
+
+### Symptom: Mobile app shows "Reconnecting…" immediately after joining — REST API works, WebSocket fails
+
+**Cause:** A Cloudflare Page Rule with `SSL: Off` is active on `backend-imposter.notist.cc/*`. This overrides the zone-level SSL mode and causes Cloudflare to issue a 301 redirect from `wss://` to `ws://` (HTTPS→HTTP downgrade) for WebSocket upgrade requests. Browsers refuse to follow that redirect, so the WebSocket never connects.
+
+REST API calls (`GET /api/health`, `POST /api/games`) appear to work because `fetch()` follows 301 redirects silently. Only WebSocket upgrades expose this.
+
+**Diagnosis:**
+
+```bash
+# 1. Reproduce the 301
+curl -s -w "\nHTTP:%{http_code}" \
+  -H "Connection: Upgrade" -H "Upgrade: websocket" \
+  -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
+  -H "Sec-WebSocket-Version: 13" \
+  "https://backend-imposter.notist.cc/ws/TESTGAME/TESTPLAYER"
+# If HTTP:301 with Location: http://... → SSL: Off page rule is the cause
+
+# 2. Confirm via API (see "Cloudflare API quick-check" above)
+# Look for: "actions":[{"id":"ssl","value":"off"}] in pagerules response
+```
+
+**Fix:**
+
+Delete the offending Page Rule via the Cloudflare API (requires a token with **Zone → Page Rules → Edit** permission):
+
+```bash
+# Get the rule ID from pagerules list, then:
+curl -s -X DELETE \
+  -H "Authorization: Bearer <TOKEN>" \
+  "https://api.cloudflare.com/client/v4/zones/1bdc0047d1beaeb9e41cc9fff7a1b1a5/pagerules/<RULE_ID>"
+```
+
+Or delete it in the dashboard: `notist.cc` → Rules → Page Rules → delete the rule targeting `backend-imposter.notist.cc/*`.
+
+**Verify fix:**
+
+```bash
+curl -s -w "\nHTTP:%{http_code}" \
+  -H "Connection: Upgrade" -H "Upgrade: websocket" \
+  -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
+  -H "Sec-WebSocket-Version: 13" \
+  "https://backend-imposter.notist.cc/ws/TESTGAME/TESTPLAYER"
+# Expected: HTTP:502 (no such game — 502 is correct; means no 301 redirect)
+# Or HTTP:101 when a real game code is used
+```
+
+See also: `docs/ops/incidents/INC-002_cloudflare_websocket_301_ssl_pagerule.md`
 
 ---
 

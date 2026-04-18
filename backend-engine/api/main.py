@@ -89,6 +89,7 @@ def create_app() -> FastAPI:
     app.include_router(ws_router)
 
     @app.get("/health", tags=["ops"])
+    @app.get("/api/health", tags=["ops"])
     async def health():
         return {"status": "ok", "schema_version": settings.schema_version}
 

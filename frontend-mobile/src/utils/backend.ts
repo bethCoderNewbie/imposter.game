@@ -38,7 +38,7 @@ export function getWsBase(): string {
  *
  * If the URL contains ?b=<encodedBackendUrl> (embedded by the display QR code),
  * persists it to sessionStorage so all subsequent API and WS calls use it.
- * Strips the ?b= param from the address bar without adding a history entry.
+ * Keeps ?b= in the address bar so copy-pasted share links remain self-contained.
  */
 export function extractAndStoreBackendUrl(): void {
   const params = new URLSearchParams(window.location.search)
@@ -47,9 +47,6 @@ export function extractAndStoreBackendUrl(): void {
   try {
     const decoded = decodeURIComponent(b)
     sessionStorage.setItem('ww_backend_url', decoded)
-    params.delete('b')
-    const q = params.toString()
-    history.replaceState(null, '', `${location.pathname}${q ? '?' + q : ''}`)
   } catch {
     // Malformed ?b= param — ignore; LAN/env fallback still applies
   }
