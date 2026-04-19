@@ -148,7 +148,6 @@ services:
     restart: unless-stopped
     depends_on:
       - nginx
-    profiles: ["tunnel"]
 
   # Ephemeral quick tunnel — no Cloudflare account or token needed.
   # Prints the https://xxxx.trycloudflare.com URL in its container logs.

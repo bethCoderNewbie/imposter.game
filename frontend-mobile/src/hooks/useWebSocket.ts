@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react'
 
-export type WsStatus = 'connecting' | 'open' | 'closed'
+export type WsStatus = 'connecting' | 'open' | 'closed' | 'ssl_error'
 
 interface Options {
   url: string | null
@@ -38,7 +38,11 @@ export function useWebSocket({ url, sessionToken, onMessage, onStatusChange }: O
       wsRef.current = ws
       onStatusRef.current?.('connecting')
 
+      const connectTime = Date.now()
+      let authExchanged = false
+
       ws.onopen = () => {
+        authExchanged = true
         retriesRef.current = 0
         onStatusRef.current?.('open')
         if (sessionToken) {
@@ -55,6 +59,10 @@ export function useWebSocket({ url, sessionToken, onMessage, onStatusChange }: O
       }
 
       ws.onclose = () => {
+        if (!authExchanged && Date.now() - connectTime < 200) {
+          onStatusRef.current?.('ssl_error')
+          return
+        }
         onStatusRef.current?.('closed')
         if (!closed) {
           const delay = Math.min(BASE_RETRY_MS * 2 ** retriesRef.current, MAX_RETRY_MS)

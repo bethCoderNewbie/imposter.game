@@ -218,7 +218,13 @@ export default function App() {
       <>
         <button className="app-leave-btn" onClick={handleLeaveMatch}>Leave</button>
         <div className="app-status">
-          <p>{status === 'closed' ? 'Reconnecting…' : 'Connecting…'}</p>
+          <p>
+            {status === 'ssl_error'
+              ? 'SSL configuration error — contact host'
+              : status === 'closed'
+                ? 'Reconnecting…'
+                : 'Connecting…'}
+          </p>
         </div>
       </>
     )
