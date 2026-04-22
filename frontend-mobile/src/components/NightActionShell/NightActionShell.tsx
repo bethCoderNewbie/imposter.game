@@ -42,6 +42,11 @@ export default function NightActionShell({ gameState, myPlayer, sendIntent, late
   const [wolfTab, setWolfTab] = useState<WolfTab>('vote')
 
   const nightActions = gameState.night_actions
+  const wolfTeammates = WOLF_ROLES.has(role)
+    ? Object.values(gameState.players).filter(
+        p => p.is_alive && p.player_id !== myPlayer.player_id && p.team === 'werewolf',
+      )
+    : []
 
   return (
     <div className="night-shell">
@@ -71,6 +76,16 @@ export default function NightActionShell({ gameState, myPlayer, sendIntent, late
              FramerUI for the Framer, WolfVoteUI for all other wolf roles.
              This ensures Framer also has access to the Radar (backend allows it — team=="werewolf"). */
           <>
+            {wolfTeammates.length > 0 && (
+              <div className="night-shell__pack">
+                {wolfTeammates.map(p => (
+                  <div key={p.player_id} className="night-shell__pack-chip">
+                    <span className="night-shell__pack-name">{p.display_name}</span>
+                    <span className="night-shell__pack-role">{p.role?.replace(/_/g, ' ')}</span>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="night-shell__tabs">
               <button
                 className={`night-shell__tab${wolfTab === 'vote' ? ' night-shell__tab--active' : ''}`}

@@ -148,9 +148,7 @@ async def handle_submit_night_action(G, intent, redis_client, cm) -> MasterGameS
         # Signal display client to play a scream SFX after a random delay.
         # Only on the first wolf vote this night to avoid duplicate screams (PRD-012 §2.3).
         if len(na.wolf_votes) == 1:
-            asyncio.create_task(
-                cm.broadcast_raw(G.game_id, {"type": "wolf_kill_queued"})
-            )
+            await cm.broadcast_raw(G.game_id, {"type": "wolf_kill_queued"})
 
     elif role_id == "wolf_shaman":
         target_id = intent.get("target_id")
@@ -542,9 +540,6 @@ async def handle_phase_timeout(G, intent, redis_client, cm) -> MasterGameState:
     elif G.phase == Phase.NIGHT:
         elim_count_before = len(G.elimination_log)
         G = resolve_night(G)
-        # Same intermediate broadcast as in auto-advance path.
-        G.state_id += 1
-        await cm.broadcast(G.game_id, G)
         if G.phase not in (Phase.GAME_OVER, Phase.HUNTER_PENDING):
             G = transition_phase(G, Phase.DAY)
             if get_settings().narrator_enabled:
@@ -666,7 +661,6 @@ async def handle_select_grid_node(G, intent, redis_client, cm) -> MasterGameStat
         G.night_actions.night_action_change_count.get(player_id, 0) + 1
     )
 
-    G.state_id += 1
     return G
 
 
@@ -755,7 +749,6 @@ async def handle_submit_grid_answer(G, intent, redis_client, cm) -> MasterGameSt
         player.grid_node_row = None
         player.grid_node_col = None
 
-    G.state_id += 1
     return G
 
 
@@ -811,7 +804,6 @@ async def handle_sonar_ping(G, intent, redis_client, cm) -> MasterGameState:
         G.night_actions.night_action_change_count.get(player_id, 0) + 1
     )
 
-    G.state_id += 1
     return G
 
 
@@ -934,7 +926,6 @@ async def handle_wolf_charge_update(G, intent, redis_client, cm) -> MasterGameSt
     if _pack_charge_total(G, quadrant) >= _CHARGE_THRESHOLD_MS:
         G = _apply_charge_fire(G, quadrant)
 
-    G.state_id += 1
     return G
 
 
@@ -967,5 +958,4 @@ async def handle_grid_defend(G, intent, redis_client, cm) -> MasterGameState:
         for wolf_pid in list(G.night_actions.wolf_charges):
             G.night_actions.wolf_charges[wolf_pid][target_q] = 0
 
-    G.state_id += 1
     return G

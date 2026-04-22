@@ -32,7 +32,11 @@ const PRESETS: Preset[] = [
   { id: 'infector_present',  label: 'Infector exists',   category: 'role_present',   text: 'There IS an Infector in this game.' },
 ]
 
-const HACK_ROLES = ['alpha_wolf', 'framer', 'infector', 'doctor', 'tracker', 'serial_killer', 'arsonist']
+const HACK_ROLES = [
+  'werewolf', 'alpha_wolf', 'wolf_shaman', 'framer', 'infector',
+  'seer', 'tracker', 'doctor', 'bodyguard', 'witch', 'cupid',
+  'serial_killer', 'arsonist', 'lunatic', 'wise', 'jester',
+]
 
 const CATEGORY_LABELS: Record<string, string> = {
   wolf_count:     'There are {N} Wolves',
@@ -50,6 +54,14 @@ function buildText(category: string, param: string): string {
 export default function FramerUI({ gameState, myPlayer, sendIntent }: Props) {
   const [mode, setMode] = useState<Mode>(null)
   const { vibrate } = useHaptics()
+
+  if (myPlayer.night_action_submitted) {
+    return (
+      <div className="action-ui">
+        <p className="night-shell__waiting">Hunt target locked in. Waiting for others…</p>
+      </div>
+    )
+  }
 
   if (mode === null) {
     return <ModeSelect onSelect={setMode} />

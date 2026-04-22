@@ -70,7 +70,10 @@ export function useGameState({ gameId, playerId, sessionToken, onHint, onRedirec
     url,
     sessionToken,
     onMessage: handleMessage,
-    onStatusChange: setStatus,
+    onStatusChange: useCallback((s: WsStatus) => {
+      if (s === 'open') lastStateIdRef.current = -1
+      setStatus(s)
+    }, []),
   })
 
   const sendIntent = useCallback(

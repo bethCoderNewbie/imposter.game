@@ -65,6 +65,34 @@
   color: rgba(255,255,255,0.9);
 }
 
+/* Wolf pack roster — compact teammate + sub-role chips above HUNT/RADAR tabs */
+.night-shell__pack {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.night-shell__pack-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.55rem;
+  border-radius: 20px;
+  background: rgba(229, 62, 62, 0.07);
+  border: 1px solid rgba(229, 62, 62, 0.18);
+  font-size: 0.7rem;
+}
+
+.night-shell__pack-name {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.night-shell__pack-role {
+  color: rgba(229, 62, 62, 0.65);
+  font-style: italic;
+}
+
 .night-shell__tab-dot {
   display: inline-block;
   width: 6px;
