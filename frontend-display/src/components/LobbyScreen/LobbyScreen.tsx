@@ -13,27 +13,25 @@ interface Props {
   gameId?: string
 }
 
-// VITE_MOBILE_URL: Vercel URL of the mobile frontend (hybrid deployment).
-// Falls back to VITE_HOST_IP (LAN IP baked at Docker build time), then window.location.origin.
-const MOBILE_BASE: string =
-  import.meta.env.VITE_MOBILE_URL ||
-  import.meta.env.VITE_HOST_IP ||
-  window.location.origin
+const VERCEL_BASE: string = import.meta.env.VITE_MOBILE_URL || ''
+const LOCAL_BASE: string = import.meta.env.VITE_HOST_IP || window.location.origin
 
 // In hybrid mode, embed the backend tunnel URL as ?b= so mobile clients not on
 // the LAN know where to reach the backend. In LAN mode getApiBase() is '' and
 // no ?b= param is added — the QR code is identical to the original behaviour.
-function buildJoinUrl(gameId: string): string {
-  const base = `${MOBILE_BASE}/?g=${gameId}`
-  // Docker: VITE_QR_BACKEND_URL is baked from BACKEND_URL in .env (display API/WS stay LAN-relative)
-  // Vercel: falls back to getApiBase() which reads VITE_BACKEND_URL
+function buildJoinUrl(mobileBase: string, gameId: string): string {
+  const base = `${mobileBase}/?g=${gameId}`
   const backendUrl = import.meta.env.VITE_QR_BACKEND_URL || getApiBase()
   if (!backendUrl) return base
   return `${base}&b=${encodeURIComponent(backendUrl)}`
 }
 
+const HAS_VERCEL = Boolean(VERCEL_BASE) && VERCEL_BASE !== LOCAL_BASE
+
 export default function LobbyScreen({ gameState, hostSecret, gameId }: Props) {
-  const joinUrl = buildJoinUrl(gameState.game_id)
+  const [qrMode, setQrMode] = useState<'vercel' | 'local'>(HAS_VERCEL ? 'vercel' : 'local')
+  const activeBase = qrMode === 'vercel' ? VERCEL_BASE : LOCAL_BASE
+  const joinUrl = buildJoinUrl(activeBase, gameState.game_id)
   // roster is updated in real-time via match_data on every player join/leave.
   // gameState.players only updates on sync/update (not sent during lobby phase).
   const roster = useGameStore(state => state.roster)
@@ -107,6 +105,22 @@ export default function LobbyScreen({ gameState, hostSecret, gameId }: Props) {
       {/* Left column: QR code + join info + config panel */}
       <div className="lobby-screen__left">
         <div className="lobby-screen__join">
+          {HAS_VERCEL && (
+            <div className="lobby-screen__qr-toggle">
+              <button
+                className={`lobby-screen__qr-tab${qrMode === 'vercel' ? ' lobby-screen__qr-tab--active' : ''}`}
+                onClick={() => setQrMode('vercel')}
+              >
+                Vercel
+              </button>
+              <button
+                className={`lobby-screen__qr-tab${qrMode === 'local' ? ' lobby-screen__qr-tab--active' : ''}`}
+                onClick={() => setQrMode('local')}
+              >
+                Local
+              </button>
+            </div>
+          )}
           <QRCodeSVG
             value={joinUrl}
             size={200}
@@ -115,7 +129,7 @@ export default function LobbyScreen({ gameState, hostSecret, gameId }: Props) {
             level="M"
             className="lobby-screen__qr"
           />
-          <p className="lobby-screen__url">{MOBILE_BASE.replace(/^https?:\/\//, '')}/?g=</p>
+          <p className="lobby-screen__url">{activeBase.replace(/^https?:\/\//, '')}/?g=</p>
           <p className="lobby-screen__code">{gameState.game_id}</p>
         </div>
         <LobbyConfigPanel

@@ -37,6 +37,36 @@
   gap: 1vmin;
 }
 
+.lobby-screen__qr-toggle {
+  display: flex;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 0.5em;
+  padding: 2px;
+  gap: 2px;
+}
+
+.lobby-screen__qr-tab {
+  flex: 1;
+  padding: 0.25em 1em;
+  font-size: clamp(11px, 1.4vmin, 18px);
+  font-weight: 600;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.5);
+  border: none;
+  border-radius: 0.35em;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.lobby-screen__qr-tab--active {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+.lobby-screen__qr-tab:not(.lobby-screen__qr-tab--active):hover {
+  color: rgba(255, 255, 255, 0.8);
+}
+
 .lobby-screen__qr {
   border-radius: 8px;
   display: block;
